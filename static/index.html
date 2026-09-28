@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Local Thai OCR Web Studio - ระบบแปลงเอกสาร PDF และภาพเป็นข้อความภาษาไทย พร้อมตรวจแก้ด้วย Local AI และตรวจทานบนเว็บ">
+  <title>OneOCR Thai Web Studio - ระบบแปลงและตรวจทานเอกสารไทย</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Sarabun:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="theme-dark">
+  <div class="app-container">
+    <!-- Top Navigation / Header -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/>
+            <path d="M6 6h10"/>
+            <path d="M6 10h10"/>
+            <path d="M6 14h6"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-title">OneOCR Thai Studio</h1>
+          <p class="brand-subtitle">ระบบแปลง PDF & ภาพเป็นข้อความไทย พร้อม Local AI ตรวจแก้</p>
+        </div>
+      </div>
+
+      <div class="header-status">
+        <!-- AI Connection Badge -->
+        <div id="ai-status-badge" class="status-badge status-checking" title="ตรวจสอบการเชื่อมต่อโมเดล Local AI">
+          <span class="status-dot"></span>
+          <span id="ai-status-text" class="status-label">กำลังตรวจโมเดล...</span>
+        </div>
+
+        <a class="btn btn-outline btn-sm" href="/config.html">ตั้งค่า Local LLM</a>
+
+        <!-- Theme Toggle -->
+        <button id="btn-theme-toggle" class="btn-icon" aria-label="สลับโหมดมืด/สว่าง" title="สลับโหมดมืด/สว่าง">
+          <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/>
+            <line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="app-main">
+      <!-- 1. Upload & Options Section -->
+      <section id="section-upload" class="card upload-card">
+        <div class="card-header">
+          <h2 class="card-title">1. อัปโหลดเอกสาร</h2>
+          <span class="badge badge-info">PDF / PNG / JPG • สูงสุด 50 MB • แปลงครั้งละ 100 หน้า</span>
+        </div>
+
+        <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="ลากไฟล์มาวางที่นี่ หรือคลิกเพื่อเลือกไฟล์">
+          <input type="file" id="file-input" accept=".pdf, .png, .jpg, .jpeg" hidden>
+          <div class="dropzone-content">
+            <div class="dropzone-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+            </div>
+            <p class="dropzone-title">ลากไฟล์มาวางที่นี่ หรือ <span class="text-accent">คลิกเลือกไฟล์</span></p>
+            <p class="dropzone-hint">รองรับไฟล์ PDF, PNG, JPG (ระบบจะประมวลผลบนเครื่องของคุณแบบ Local 100%)</p>
+          </div>
+        </div>
+
+        <!-- Selected File Preview -->
+        <div id="file-selected-box" class="file-selected-box hidden">
+          <div class="file-info-row">
+            <div class="file-meta">
+              <span id="selected-file-icon" class="file-badge">PDF</span>
+              <div>
+                <strong id="selected-file-name" class="file-name">-</strong>
+                <span id="selected-file-size" class="file-size">-</span>
+              </div>
+            </div>
+            <button id="btn-remove-file" class="btn-text btn-danger" type="button">ลบไฟล์</button>
+          </div>
+        </div>
+
+        <div id="page-options" class="page-options hidden" aria-live="polite">
+          <strong id="pdf-page-summary">กำลังตรวจจำนวนหน้า...</strong>
+          <label for="input-page-count">ต้องการแปลง OCR กี่หน้า</label>
+          <div class="page-count-control">
+            <input id="input-page-count" type="number" min="1" value="1" disabled>
+            <span id="page-count-limit">หน้า</span>
+          </div>
+          <p>ระบบแปลงจากหน้า 1 ต่อเนื่อง และจำกัด 100 หน้าต่อครั้ง</p>
+        </div>
+
+        <!-- Engine / AI Mode Options -->
+        <div class="options-grid">
+          <div class="option-card">
+            <label class="radio-label">
+              <input type="radio" name="ai-mode" value="true" id="mode-ocr-ai" checked>
+              <div class="radio-content">
+                <div class="radio-header">
+                  <strong>OneOCR + Local AI ตรวจแก้คำ</strong>
+                  <span id="ai-available-badge" class="badge badge-success">พร้อมใช้งาน</span>
+                </div>
+                <p class="radio-desc">ดึงข้อความด้วย OneOCR แล้วส่งต่อให้ Gemma 3 1B ตรวจสอบคำผิด สระ วรรณยุกต์ และการสะกดอัตโนมัติ</p>
+              </div>
+            </label>
+          </div>
+
+          <div class="option-card">
+            <label class="radio-label">
+              <input type="radio" name="ai-mode" value="false" id="mode-ocr-only">
+              <div class="radio-content">
+                <div class="radio-header">
+                  <strong>OneOCR อย่างเดียว (Baseline)</strong>
+                  <span class="badge badge-neutral">รวดเร็ว</span>
+                </div>
+                <p class="radio-desc">ประมวลผลข้อความดิบโดยไม่เรียก Local LLM เหมาะสำหรับเครื่องที่มีแรมจำกัด หรือต้องการความเร็วสูงสุด</p>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Start Processing CTA -->
+        <div class="action-footer">
+          <button id="btn-start-job" class="btn btn-primary btn-large" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            <span>ตรวจสอบจำนวนหน้า</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- 2. Job Queue & Processing Progress -->
+      <section id="section-progress" class="card progress-card hidden">
+        <div class="progress-header">
+          <div class="job-meta">
+            <h2 class="card-title">2. สถานะการประมวลผล</h2>
+            <div class="job-badges">
+              <span id="job-id-badge" class="badge badge-code">job_...</span>
+              <span id="job-status-badge" class="badge badge-status">กำลังรัน</span>
+              <span id="job-attempt-badge" class="badge badge-attempt">Attempt 1</span>
+            </div>
+          </div>
+
+          <div class="job-actions">
+            <button id="btn-cancel-job" class="btn btn-outline btn-danger btn-sm" title="ยกเลิกงาน">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="15" y1="9" x2="9" y2="15"/>
+                <line x1="9" y1="9" x2="15" y2="15"/>
+              </svg>
+              <span>ยกเลิกงาน</span>
+            </button>
+
+            <div class="dropdown-wrapper">
+              <button id="btn-retry-job" class="btn btn-outline btn-warning btn-sm hidden" title="ลองใหม่">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                </svg>
+                <span>ลองใหม่ (Retry)</span>
+              </button>
+              <div id="retry-menu" class="dropdown-menu hidden">
+                <button class="dropdown-item" data-retry-mode="failed_only">เฉพาะหน้าที่ล้มเหลว (failed_only)</button>
+                <button class="dropdown-item" data-retry-mode="ai_only">รัน AI ใหม่ (ai_only)</button>
+                <button class="dropdown-item" data-retry-mode="full">รันใหม่ทั้งหมด (full)</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="progress-bar-container">
+          <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%;"></div>
+        </div>
+        <div class="progress-text-row">
+          <span id="progress-text-pages">ประมวลผล 0 / 0 หน้า</span>
+          <span id="progress-text-percent">0%</span>
+        </div>
+
+        <!-- Alert Notification Box -->
+        <div id="job-alert-banner" class="alert-banner hidden">
+          <svg class="alert-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <div class="alert-content">
+            <strong id="job-alert-title">คำเตือน</strong>
+            <p id="job-alert-msg">-</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. Dual-Pane Document & Review Workspace -->
+      <section id="section-workspace" class="card workspace-card hidden">
+        <!-- Page Navigation Bar -->
+        <div class="workspace-toolbar">
+          <div class="page-navigation-controls">
+            <button id="btn-prev-page" class="btn btn-outline btn-sm" aria-label="หน้าก่อนหน้า" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15 18 9 12 15 6"/>
+              </svg>
+              <span>ก่อนหน้า</span>
+            </button>
+
+            <div class="page-selector-box">
+              <label for="page-select">หน้า</label>
+              <select id="page-select" class="select-page" aria-label="เลือกหน้าที่ต้องการตรวจทาน">
+                <option value="1">1</option>
+              </select>
+              <span id="page-total-label">จาก 1</span>
+            </div>
+
+            <button id="btn-next-page" class="btn btn-outline btn-sm" aria-label="หน้าถัดไป" disabled>
+              <span>ถัดไป</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Page Review Status Controls -->
+          <div class="review-status-controls">
+            <div class="review-indicator">
+              <span class="label">สถานะตรวจทาน:</span>
+              <span id="badge-page-review-status" class="badge badge-unreviewed">ยังไม่ตรวจทาน</span>
+            </div>
+            <button id="btn-mark-reviewed" class="btn btn-success btn-sm" title="ยืนยันตรวจทานหน้านี้ครบถ้วนแล้ว">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              <span>ยืนยันตรวจทานครบถ้วน</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Dual Pane Grid -->
+        <div class="dual-pane-grid">
+          <!-- Left Pane: Reference Image with Interactive Bounding Boxes -->
+          <div class="pane pane-left">
+            <div class="pane-header">
+              <h3 class="pane-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                  <circle cx="8.5" cy="8.5" r="1.5"/>
+                  <polyline points="21 15 16 10 5 21"/>
+                </svg>
+                ภาพเอกสารต้นฉบับ
+              </h3>
+              <div class="viewer-tools">
+                <button id="btn-zoom-in" class="btn-icon-sm" title="ขยาย (+)" aria-label="ขยายภาพ">+</button>
+                <button id="btn-zoom-out" class="btn-icon-sm" title="ย่อ (-)" aria-label="ย่อภาพ">-</button>
+                <button id="btn-zoom-reset" class="btn-icon-sm" title="พอดีหน้าจอ" aria-label="รีเซ็ตขนาดภาพ">⤢</button>
+              </div>
+            </div>
+
+            <div id="image-viewer-container" class="image-viewer-container">
+              <div id="image-viewport" class="image-viewport">
+                <img id="ref-image" class="ref-image" src="" alt="ภาพเอกสารต้นฉบับ">
+                <svg id="bbox-overlay" class="bbox-overlay" xmlns="http://www.w3.org/2000/svg"></svg>
+              </div>
+            </div>
+            <div class="pane-footer-hint">
+              <span>💡 คลิกที่กรอบข้อความบนภาพ เพื่อเลื่อนไปยังตำแหน่งข้อความในฝั่งขวา</span>
+            </div>
+          </div>
+
+          <!-- Right Pane: Text Editor & AI Diff Inspector -->
+          <div class="pane pane-right">
+            <div class="pane-header">
+              <!-- View Mode Tabs -->
+              <div class="tabs-nav" role="tablist">
+                <button id="tab-final" class="tab-btn active" role="tab" aria-selected="true">
+                  ข้อความตรวจทาน (Final)
+                </button>
+                <button id="tab-diff" class="tab-btn" role="tab" aria-selected="false">
+                  การแก้ไข AI (Diff <span id="badge-proposals-count" class="tab-badge">0</span>)
+                </button>
+                <button id="tab-raw" class="tab-btn" role="tab" aria-selected="false">
+                  ข้อความดิบ (Raw)
+                </button>
+              </div>
+
+              <!-- Revision Badge & Save Status -->
+              <div class="save-status-group">
+                <span id="revision-badge" class="badge badge-code" title="Revision ของหน้านี้">Rev 1</span>
+                <span id="save-indicator" class="save-indicator saved" title="สถานะการบันทึก">
+                  <span class="status-dot"></span>
+                  <span id="save-status-text">บันทึกแล้ว</span>
+                </span>
+              </div>
+            </div>
+
+            <!-- Tab 1: Final Text Manual Editor -->
+            <div id="panel-final" class="tab-panel active" role="tabpanel">
+              <div class="editor-wrapper">
+                <textarea id="editor-final-text" class="text-editor" aria-label="แก้ไขข้อความตรวจทาน" spellcheck="false" placeholder="กำลังโหลดข้อความ..."></textarea>
+              </div>
+              <div class="editor-actions">
+                <span class="keyboard-hint">บันทึกอัตโนมัติหรือกด <kbd>Ctrl+S</kbd></span>
+                <button id="btn-save-edit" class="btn btn-primary btn-sm">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                    <polyline points="17 21 17 13 7 13 7 21"/>
+                    <polyline points="7 3 7 8 15 8"/>
+                  </svg>
+                  <span>บันทึกการแก้ไข</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Tab 2: AI Proposals & Character Diff -->
+            <div id="panel-diff" class="tab-panel hidden" role="tabpanel">
+              <div class="diff-summary-card">
+                <div class="diff-metric">
+                  <span class="metric-label">ระยะแก้ไข (Distance)</span>
+                  <strong id="metric-levenshtein">0</strong>
+                </div>
+                <div class="diff-metric">
+                  <span class="metric-label">แทนที่</span>
+                  <strong id="metric-substitutions" class="text-amber">0</strong>
+                </div>
+                <div class="diff-metric">
+                  <span class="metric-label">เพิ่มคำ</span>
+                  <strong id="metric-insertions" class="text-green">0</strong>
+                </div>
+                <div class="diff-metric">
+                  <span class="metric-label">ลบคำ</span>
+                  <strong id="metric-deletions" class="text-danger">0</strong>
+                </div>
+              </div>
+
+              <!-- Batch Action Buttons -->
+              <div class="proposals-batch-bar">
+                <span>ข้อเสนอการตรวจแก้จาก AI:</span>
+                <div class="batch-btns">
+                  <button id="btn-accept-all" class="btn btn-outline btn-success btn-xs">
+                    ยอมรับทั้งหมด
+                  </button>
+                  <button id="btn-revert-all" class="btn btn-outline btn-danger btn-xs">
+                    คืนค่าทั้งหมด
+                  </button>
+                </div>
+              </div>
+
+              <!-- Proposals Card List -->
+              <div id="proposals-list" class="proposals-list">
+                <div class="empty-placeholder">ไม่มีข้อเสนอการแก้ไขในหน้านี้ (AI ยืนยันข้อความเดิม)</div>
+              </div>
+            </div>
+
+            <!-- Tab 3: Raw OCR Text (Read-Only) -->
+            <div id="panel-raw" class="tab-panel hidden" role="tabpanel">
+              <div class="editor-wrapper">
+                <textarea id="viewer-raw-text" class="text-editor" readonly aria-label="ข้อความดิบจาก OneOCR" placeholder="ข้อความดิบ..."></textarea>
+              </div>
+              <div class="editor-actions">
+                <span class="text-muted text-xs">ข้อความต้นทางที่อ่านได้จาก OneOCR Baseline ก่อนผ่าน AI</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Export & Download Bar -->
+        <div class="export-footer">
+          <div class="export-warning-container">
+            <div id="download-warning-banner" class="download-warning hidden">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+              <span>คำเตือน: งานนี้มีหน้าที่ประมวลผลไม่สมบูรณ์หรือล้มเหลว ไฟล์ดาวน์โหลดจะระบุหน้าล้มเหลวชัดเจน</span>
+            </div>
+          </div>
+
+          <div class="export-buttons-group">
+            <a id="btn-download-raw" class="btn btn-outline btn-sm" href="#" download>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              <span>ดาวน์โหลด OCR only (raw.txt)</span>
+            </a>
+
+            <a id="btn-download-corrected" class="btn btn-primary btn-sm hidden" href="#" download>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              <span>ดาวน์โหลด AI ตรวจคำผิด (corrected.txt)</span>
+            </a>
+
+            <a id="btn-download-final" class="btn btn-outline btn-sm" href="#" download>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              <span>ดาวน์โหลดฉบับแก้มือ (final.txt)</span>
+            </a>
+
+            <a id="btn-download-bundle" class="btn btn-outline btn-sm" href="#" download>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="21 8 21 21 3 21 3 8"/>
+                <rect x="1" y="3" width="22" height="5"/>
+                <line x1="10" y1="12" x2="14" y2="12"/>
+              </svg>
+              <span>ดาวน์โหลดชุดผลลัพธ์ (ZIP)</span>
+            </a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Revision Conflict Modal -->
+    <div id="modal-conflict" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-conflict-title">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-icon-alert">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+          </div>
+          <div>
+            <h3 id="modal-conflict-title" class="modal-title">ตรวจพบข้อขัดแย้งการแก้ไข (Revision Conflict)</h3>
+            <p class="modal-subtitle">หน้านี้มีการแก้ไขและบันทึกจากแท็บอื่นหรือผู้ใช้อื่นแล้ว</p>
+          </div>
+        </div>
+        <div class="modal-body">
+          <p id="modal-conflict-text">
+            ฉบับปัจจุบันในเซิร์ฟเวอร์เปลี่ยนไปแล้ว ระบบจะไม่เขียนทับข้อมูลโดยไม่แจ้ง เพื่อป้องกันข้อความของคุณสูญหาย
+          </p>
+          <div class="conflict-preview">
+            <label>ข้อความที่คุณพิมพ์ล่าสุด (คัดลอกเก็บไว้ได้):</label>
+            <textarea id="conflict-unsaved-text" readonly class="conflict-textarea"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="btn-conflict-copy" class="btn btn-outline btn-sm">คัดลอกข้อความของฉัน</button>
+          <button id="btn-conflict-reload" class="btn btn-primary btn-sm">โหลดฉบับล่าสุดจากเซิร์ฟเวอร์</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

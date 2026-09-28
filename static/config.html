@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="ตั้งค่า Local LLM สำหรับ OneOCR Thai Studio">
+  <title>ตั้งค่า Local LLM - OneOCR Thai Studio</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="theme-dark">
+  <div class="app-container">
+    <header class="app-header">
+      <a class="brand brand-link" href="/" aria-label="กลับหน้า OneOCR Thai Studio">
+        <div class="logo-icon">⚙</div>
+        <div>
+          <h1 class="brand-title">ตั้งค่า Local LLM</h1>
+          <p class="brand-subtitle">เชื่อมต่อโมเดล AI ที่ทำงานบนเครื่องของคุณ</p>
+        </div>
+      </a>
+      <div class="header-status">
+        <a class="btn btn-outline btn-sm" href="/">กลับหน้าหลัก</a>
+        <button id="btn-theme-toggle" class="btn-icon" aria-label="สลับโหมดมืด/สว่าง" title="สลับโหมดมืด/สว่าง">☼</button>
+      </div>
+    </header>
+
+    <main class="app-main config-main">
+      <section class="card config-card" aria-labelledby="config-title">
+        <div class="card-header">
+          <div>
+            <h2 id="config-title" class="card-title">การเชื่อมต่อ Local LLM</h2>
+            <p class="config-subtitle">รองรับ API แบบ OpenAI-compatible เช่น LM Studio, Ollama, vLLM และ llama.cpp server</p>
+          </div>
+          <span id="config-status" class="status-badge status-checking">กำลังโหลดค่า...</span>
+        </div>
+
+        <form id="llm-config-form" class="config-form">
+          <label class="form-field" for="llm-base-url">
+            <span>Base URL</span>
+            <input id="llm-base-url" name="base_url" type="url" inputmode="url" required placeholder="http://127.0.0.1:1234/v1" autocomplete="url">
+            <small>อนุญาตเฉพาะ `127.0.0.1`, `localhost` หรือ `::1` เพื่อให้ข้อมูลเอกสารอยู่ในเครื่อง</small>
+          </label>
+
+          <label class="form-field" for="llm-model">
+            <span>Model</span>
+            <input id="llm-model" name="model" type="text" required maxlength="200" placeholder="google/gemma-3-1b" autocomplete="off">
+          </label>
+
+          <label class="form-field" for="llm-api-key">
+            <span>API key <em>(ไม่บังคับ)</em></span>
+            <input id="llm-api-key" name="api_key" type="password" maxlength="500" placeholder="เว้นว่างเพื่อใช้ค่าเดิม" autocomplete="new-password">
+            <small id="api-key-hint">API key จะไม่แสดงหรือส่งกลับมายังหน้าเว็บ</small>
+          </label>
+
+          <label class="form-field" for="llm-timeout">
+            <span>Timeout (วินาที)</span>
+            <input id="llm-timeout" name="timeout" type="number" required min="1" max="300" step="1" value="60">
+          </label>
+
+          <div id="config-result" class="config-result hidden" role="status" aria-live="polite"></div>
+
+          <div class="config-actions">
+            <button id="btn-test-connection" type="button" class="btn btn-outline">ทดสอบการเชื่อมต่อ</button>
+            <button id="btn-save-config" type="submit" class="btn btn-primary">บันทึกการตั้งค่า</button>
+          </div>
+        </form>
+      </section>
+    </main>
+  </div>
+  <script src="/static/config.js"></script>
+</body>
+</html>
