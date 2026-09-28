@@ -17,10 +17,10 @@
 หลัง clone repository แล้ว ให้เปิด PowerShell ที่โฟลเดอร์โครงการและรัน:
 
 ```powershell
-.\publish\run_server.ps1
+.\run_server.ps1
 ```
 
-สคริปต์จะสร้าง `publish\venv` และติดตั้ง dependencies ให้เองในครั้งแรก จากนั้นเปิด [http://127.0.0.1:8000/](http://127.0.0.1:8000/) ในเบราว์เซอร์
+สคริปต์จะสร้าง `venv` และติดตั้ง dependencies ให้เองในครั้งแรก จากนั้นเปิด [http://127.0.0.1:8000/](http://127.0.0.1:8000/) ในเบราว์เซอร์
 
 หาก PowerShell ไม่อนุญาตให้รัน script ให้ใช้คำสั่งนี้เฉพาะหน้าต่างปัจจุบัน แล้วรันใหม่:
 
@@ -49,14 +49,11 @@ Set-ExecutionPolicy -Scope Process Bypass
   - [5. แผนภาพขั้นตอนการทำงานของผู้ใช้บนหน้าเว็บ (End-to-End User Experience Flow)](#5-แผนภาพขั้นตอนการทำงานของผู้ใช้บนหน้าเว็บ-end-to-end-user-experience-flow)
 - [การติดตั้งและเริ่มต้นใช้งาน (Getting Started)](#การติดตั้งและเริ่มต้นใช้งาน-getting-started)
   - [ความต้องการของระบบ](#ความต้องการของระบบ-prerequisites)
-  - [วิธีที่ 1: รันด่วนด้วยชุดติดตั้งพร้อมแจกจ่าย (`publish/`)](#วิธีที่-1-รันด่วนด้วยชุดติดตั้งพร้อมแจกจ่าย-publish)
-  - [วิธีที่ 2: ติดตั้งจาก Source Code สำหรับนักพัฒนา](#วิธีที่-2-ติดตั้งจาก-source-code-สำหรับนักพัฒนา)
+  - [ติดตั้งและเริ่มต้นใช้งาน](#การติดตั้งและเริ่มต้นใช้งาน-getting-started)
 - [การตั้งค่า Local AI ตรวจแก้](#การตั้งค่า-local-ai-ตรวจแก้)
 - [สัญญาข้อมูลและไฟล์ผลลัพธ์ (Data Contract)](#สัญญาข้อมูลและไฟล์ผลลัพธ์-data-contract)
 - [โครงสร้างโฟลเดอร์ (Repository Structure)](#โครงสร้างโฟลเดอร์-repository-structure)
 - [ผลการทดสอบและเกณฑ์ตรวจรับ (Verification & Benchmarks)](#ผลการทดสอบและเกณฑ์ตรวจรับ-verification--benchmarks)
-- [ชุดข้อมูลทดสอบที่อนุมัติ](#ชุดข้อมูลทดสอบที่อนุมัติ-approved-dataset)
-- [เอกสารที่เกี่ยวข้องและการกำกับดูแล](#เอกสารที่เกี่ยวข้องและการกำกับดูแล)
 - [ข้อควรรู้ก่อนเผยแพร่บน GitHub](#ข้อควรรู้ก่อนเผยแพร่บน-github)
 
 ---
@@ -319,11 +316,11 @@ flowchart TD
 
 ---
 
-### วิธีที่ 1: รันด่วนด้วยชุดติดตั้งพร้อมแจกจ่าย (`publish/`)
+### รันด่วน
 
-เหมาะสำหรับการนำไปติดตั้งใช้งานบน Windows เครื่องอื่นทันที โดยในโฟลเดอร์ `publish/` ได้รวบรวมไฟล์ binary, โมเดล, โค้ด และหน้าเว็บไว้อย่างครบถ้วนแล้ว:
+ชุดนี้มีไฟล์ binary, model, backend และหน้าเว็บครบแล้ว:
 
-1. เปิด **PowerShell** ในโฟลเดอร์ `publish/`
+1. เปิด **PowerShell** ในโฟลเดอร์นี้
 2. หาก PowerShell บล็อกการรันสคริปต์ ให้ปลดล็อกชั่วคราว:
    ```powershell
    Set-ExecutionPolicy -Scope Process Bypass
@@ -341,9 +338,9 @@ flowchart TD
 
 ---
 
-### วิธีที่ 2: ติดตั้งจาก Source Code สำหรับนักพัฒนา
+### ติดตั้ง dependencies ด้วยตนเอง
 
-หากต้องการพัฒนาต่อ ปรับแต่ง หรือรันชุดทดสอบ (Tests):
+ใช้เมื่อต้องการสร้าง virtual environment เองแทน `install.ps1`:
 
 1. **ตรวจสอบโฟลเดอร์โมเดล OneOCR:**  
    ตรวจสอบว่ามีไฟล์ binary ครบถ้วนในโฟลเดอร์ `oneOCR/`:
@@ -363,7 +360,7 @@ flowchart TD
 3. **ติดตั้ง Dependencies:**
    ```powershell
    python -m pip install --upgrade pip
-   python -m pip install -r publish/requirements.txt
+   python -m pip install -r requirements.txt
    ```
 
 4. **เตรียมไฟล์การตั้งค่า (`.env`):**
@@ -371,13 +368,7 @@ flowchart TD
    Copy-Item .env.example .env
    ```
 
-5. **ทดสอบความพร้อมของ OneOCR (Smoke Test):**
-   ```powershell
-   python tests/smoke_test_oneocr.py
-   ```
-   *หากผ่านจะแสดงข้อความ `Final Smoke Test Verdict: PASS`*
-
-6. **เริ่มการทำงานของเซิร์ฟเวอร์:**
+5. **เริ่มการทำงานของเซิร์ฟเวอร์:**
    ```powershell
    python -m uvicorn src.server:app --host 127.0.0.1 --port 8000 --reload
    ```
@@ -417,7 +408,7 @@ flowchart TD
 ## โครงสร้างโฟลเดอร์ (Repository Structure)
 
 ```text
-OCR/
+publish/
 ├── src/                    # ซอร์สโค้ดหลักของ Backend และ OCR Pipeline
 │   ├── server.py           # FastAPI Web Application & REST Endpoints
 │   ├── pipeline.py         # OCR & Assembly Processing Pipeline
@@ -434,17 +425,13 @@ OCR/
 │   ├── app.js              # ตรรกะการทำงานฝั่งไคลเอนต์ (Vanilla JS)
 │   └── app.css             # ดีไซน์และชุดแต่ง Modern Dark/Light Theme
 ├── oneOCR/                 # OneOCR Binary DLL & Model Runtime (64-bit)
-├── publish/                # ชุดติดตั้งสำเร็จรูปสำหรับ Deploy บนเครื่องอื่น (ขนาด ~145 MB)
-├── demo/                   # ชุดเอกสารทดสอบที่ได้รับอนุมัติ (01.pdf–07.pdf, 01.png, 02.png)
-├── tests/                  # ชุดทดสอบอัตโนมัติ (Unit / Regression / Benchmarks)
-│   ├── phase1/ - phase6/   # ชุดทดสอบแยกตาม Phase การพัฒนา
-│   ├── test_clean_installation.py          # สคริปต์ตรวจรับ Clean Environment
-│   └── test_browser_automation_chrome_edge.py # Playwright Cross-browser Automation
-├── phase1/ - phase6/       # รายงานผลและหลักฐานการตรวจรับ (Evidence Reports)
+├── data/                   # SQLite job database (สร้างขณะใช้งาน)
+├── files/                  # ไฟล์อัปโหลดและผลลัพธ์ (สร้างขณะใช้งาน)
 ├── checklist.md            # จุดตรวจบังคับและเกณฑ์การตรวจรับราย Phase
 ├── manual.md               # คู่มือการติดตั้ง เริ่ม/หยุดระบบ และการบำรุงรักษา
-├── gemini.md               # บันทึกความเห็นและการออกแบบสถาปัตยกรรม (Read-only)
-├── gpt.md                  # บันทึกข้อเสนอ ประเด็นคงค้าง และการตรวจรับ
+├── install.ps1             # สร้าง virtual environment และติดตั้ง dependencies
+├── run_server.ps1          # เริ่ม FastAPI server
+├── requirements.txt        # Python dependencies
 └── readme.md               # เอกสารภาพรวมและขอบเขตของโครงการ (หน้านี้)
 ```
 
@@ -452,7 +439,9 @@ OCR/
 
 ## ผลการทดสอบและเกณฑ์ตรวจรับ (Verification & Benchmarks)
 
-ระบบได้รับการทดสอบและตรวจรับตามเกณฑ์ใน [checklist.md](checklist.md) อย่างเข้มงวด โดยมีผลลัพธ์สำคัญดังนี้:
+สถานะด้านล่างสรุปจากหลักฐานที่บันทึกในโครงการ ณ วันที่ 2026-09-29 เพื่อไม่ให้ผลที่ยังไม่มีหลักฐานถูกแสดงเป็นผ่าน
+
+### ผ่านตามขอบเขตที่ทดสอบ
 
 | รายการทดสอบ | เกณฑ์ที่กำหนด | ผลการทดสอบจริง | สถานะ |
 |---|---|---|:---:|
@@ -463,38 +452,30 @@ OCR/
 | **ความเสถียรสะสม $\ge 200$ หน้าต่อเนื่อง** | ไม่มี Crash, ไม่ OOM | 200/200 หน้าสำเร็จ (Peak RAM **33.28 MB**) | **PASSED** |
 | **การทำงานแบบออฟไลน์ (Network Isolation)** | 0 คำขอนอก Loopback | บล็อกทุก external network request 100% | **PASSED** |
 | **Browser Automation (Chrome & Edge)** | ทำงานสมบูรณ์ผ่านเว็บ | ผ่าน 100% ทั้ง Google Chrome และ Edge | **PASSED** |
-| **Clean Installation Verification** | ผ่านสถาปัตยกรรมและ DLL | ทดสอบผ่านเรียบร้อยบน Windows x64 / Python 3.10+ | **PASSED** |
+| **Backend, queue และ recovery** | สถานะงานและการกู้คืนถูกต้อง | ผ่าน 21/21 tests | **PASSED** |
+| **หน้าเว็บเลือกช่วง OCR** | เลือกช่วง, จำกัด 200 หน้า และตรวจ scope | ผ่าน 4/4 tests | **PASSED** |
 
-> รายละเอียดผลการทดสอบเชิงลึกสามารถอ่านเพิ่มเติมได้ใน [phase1/evidence.md](phase1/evidence.md) ถึง [phase6/evidence.md](phase6/evidence.md)
+### ไม่ผ่าน
 
----
+ไม่มีกรณีทดสอบที่บันทึกผลเป็น **FAILED** ในหลักฐานปัจจุบัน
 
-## ชุดข้อมูลทดสอบที่อนุมัติ (Approved Dataset)
+### ยังไม่ได้ทดสอบ / รอหลักฐาน / ยกเว้นชั่วคราว
 
-โครงการนี้มีข้อตกลงจำกัดชุดข้อมูลสำหรับการทดลอง, benchmark, regression และตรวจรับเฉพาะเอกสารจริงในโฟลเดอร์ `demo/` เท่านั้น (รวม 2,229 หน้า):
-- `demo/01.pdf`–`04.pdf`, `demo/01.png`, `demo/02.png` (44 หน้าเดิม: ชุด Baseline และการตรวจรับ Phase 1–5)
-- `demo/05.pdf` (420 หน้า, เอกสารสแกน)
-- `demo/06.pdf` (569 หน้า, เอกสารสแกนคุณภาพไม่ชัด)
-- `demo/07.pdf` (1,196 หน้า, หนังสือนวนิยายภาษาไทย มีทั้ง Native Text Layer และหน้าว่างจริง)
-
-*หมายเหตุ: ตามข้อตกลงโปรเจกต์ ห้ามสร้าง synthetic fixture หรือตัดต่อไฟล์จำลองใน temporary directory สำหรับการตรวจรับ*
-
----
-
-## เอกสารที่เกี่ยวข้องและการกำกับดูแล
-
-- **[checklist.md](checklist.md):** เอกสารเกณฑ์ตรวจรับหลักและจุดตรวจบังคับ 100% ของแต่ละ Phase
-- **[manual.md](manual.md):** คู่มือปฏิบัติการ การติดตั้ง บำรุงรักษา และการแก้ไขปัญหา
-- **[gpt.md](gpt.md):** บันทึกปัญหาคงค้าง ข้อเสนอประกอบ และประวัติการตรวจรับชุดติดตั้ง `publish/`
-- **[gemini.md](gemini.md):** บันทึกความเห็นทางเทคนิคและสถาปัตยกรรมระบบ (เอกสารอ่านอย่างเดียว)
-- **[win11-oneocr](https://github.com/b1tg/win11-oneocr):** โครงการอ้างอิง C++ reverse engineering ของ Windows 11 Snipping Tool OCR
-
----
+| รายการ | สถานะ | เหตุผลหรือขอบเขตที่เหลือ |
+|---|:---:|---|
+| ชุดเอกสารขยาย 2,185 หน้า | **NOT TESTED** | ต้องประมวลผลครบ ตรวจ disk mapping และจัดทำ ground truth ก่อนรับรอง Phase 2–3 ครอบคลุมไฟล์ขยาย |
+| Benchmark AI สำหรับเอกสารขยาย | **NOT TESTED** | รอ Phase 2 และ ground truth ที่ล็อกแล้ว |
+| งานจริง 100 หน้า: เวลา/RAM/VRAM | **NOT TESTED** | ไม่มีเอกสารทดสอบที่ตรงเงื่อนไขเดิม; ผลเสถียรภาพ 200 หน้าไม่ทดแทนเกณฑ์นี้ |
+| Accept/Revert จากข้อเสนอ AI จริง 10 จุด | **NOT TESTED** | ยังไม่มีเอกสารจริงที่สร้างข้อเสนอได้ครบ 10 จุด |
+| ภาพหมุน 90° / 180° / 270° | **NOT TESTED** | ไม่มีตัวอย่างเอกสารจริงสำหรับตรวจรับ |
+| PDF เสีย, PDF ติดรหัสผ่าน และภาพใหญ่ | **EXEMPTED** | ยกเว้นโดยเจ้าของงาน; ระบบยังคงตอบ error HTTP 400/422/413 |
+| ติดตั้งบน clean target machine จากศูนย์ | **NOT TESTED** | รอทดสอบบนเครื่องปลายทางจริงหรือจัดเตรียม wheelhouse แบบ offline |
+| การยอมรับข้อจำกัดก่อนใช้งานจริง | **PENDING** | รอเจ้าของงานตรวจผลและยอมรับข้อจำกัดที่ระบุไว้ |
 
 ## ข้อควรรู้ก่อนเผยแพร่บน GitHub
 
 - ห้าม commit `.env`, `venv/`, `data/jobs.db` และไฟล์ใน `files/` เพราะอาจมีค่า Local LLM หรือเอกสารที่ผู้ใช้อัปโหลด
-- โฟลเดอร์ `publish/` มี `.gitignore` สำหรับตัดไฟล์ runtime เหล่านี้ออกแล้ว
+- repository มี `.gitignore` สำหรับตัดไฟล์ runtime เหล่านี้ออกแล้ว
 - ตรวจสิทธิ์การแจกจ่าย OneOCR binary และ model ตามนโยบายองค์กรหรือสิทธิ์ของ Windows ก่อนเผยแพร่ repository แบบสาธารณะ
 - การตรวจแก้ด้วย AI เป็นทางเลือก; ผู้ใช้ใหม่ยังใช้งาน OCR แบบ Baseline ได้โดยไม่ต้องติดตั้งหรือเปิด Local LLM
 
