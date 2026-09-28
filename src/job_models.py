@@ -68,8 +68,8 @@ class JobCreateResponse(BaseModel):
 
 class JobStartRequest(BaseModel):
     enable_ai: bool = True
-    max_pages: Optional[int] = Field(default=None, ge=1)
-    page_range: Optional[List[int]] = None
+    page_start: Optional[int] = Field(default=None, ge=1)
+    page_end: Optional[int] = Field(default=None, ge=1)
 
 
 class JobStatusResponse(BaseModel):

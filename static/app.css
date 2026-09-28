@@ -332,12 +332,12 @@ body.theme-light .icon-sun { display: none; }
 
 .page-options {
   margin-top: 16px;
-  padding: 14px 16px;
+  padding: 18px 20px;
   border: 1px solid var(--bg-card-border);
   border-radius: var(--radius-md);
-  background: var(--bg-secondary);
+  background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .page-options strong {
@@ -351,19 +351,38 @@ body.theme-light .icon-sun { display: none; }
   font-size: 0.9rem;
 }
 
-.page-count-control {
+.range-heading,
+.page-range-control {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
-.page-count-control input {
-  width: 110px;
-  padding: 8px 10px;
+.range-heading {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.range-heading span {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.page-range-control input {
+  width: 120px;
+  padding: 10px 12px;
   border: 1px solid var(--bg-card-border);
   border-radius: var(--radius-sm);
   background: var(--bg-primary);
   color: var(--text-primary);
+  font-weight: 600;
+  text-align: center;
+}
+
+.range-arrow {
+  color: var(--accent-primary);
+  font-size: 1.2rem;
+  font-weight: 700;
 }
 
 .file-info-row {
@@ -417,6 +436,14 @@ body.theme-light .icon-sun { display: none; }
   border-color: rgba(255, 255, 255, 0.2);
 }
 
+.option-card.option-disabled {
+  opacity: 0.55;
+}
+
+.option-card.option-disabled .radio-label {
+  cursor: not-allowed;
+}
+
 .radio-label {
   display: flex;
   align-items: flex-start;
@@ -450,6 +477,8 @@ body.theme-light .icon-sun { display: none; }
   margin-top: 1.5rem;
   display: flex;
   justify-content: flex-end;
+  border-top: 1px solid var(--bg-card-border);
+  padding-top: 1rem;
 }
 
 /* ==========================================================================
@@ -470,9 +499,18 @@ body.theme-light .icon-sun { display: none; }
   text-decoration: none;
 }
 
+/* Keep action icons aligned with the button text; inline SVG otherwise uses
+   its intrinsic 300 × 150 fallback size in some browsers. */
+.btn svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+}
+
 .btn-large {
-  padding: 0.85rem 1.75rem;
-  font-size: 1rem;
+  padding: 0.7rem 1.2rem;
+  font-size: 0.95rem;
+  min-width: 200px;
 }
 
 .btn-sm {
@@ -637,6 +675,17 @@ body.theme-light .icon-sun { display: none; }
   justify-content: space-between;
   font-size: 0.85rem;
   color: var(--text-secondary);
+}
+
+.current-processing-page {
+  margin-top: 0.85rem;
+  padding: 0.7rem 0.85rem;
+  border-left: 3px solid var(--accent-primary);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 600;
 }
 
 .alert-banner {
@@ -1184,6 +1233,10 @@ kbd {
   flex-wrap: wrap;
 }
 
+.export-buttons-group .btn {
+  padding: 0.45rem 0.7rem;
+}
+
 /* ==========================================================================
    Modal (Revision Conflict)
    ========================================================================== */
@@ -1358,6 +1411,13 @@ kbd {
 .config-result.error { background: var(--danger-bg); color: #fecaca; border: 1px solid rgba(239, 68, 68, 0.35); }
 
 @media (max-width: 640px) {
+  .app-container { padding: 1rem; gap: 1rem; }
+  .app-header { padding: 0.85rem 1rem; }
+  .brand-subtitle { display: none; }
+  .card { padding: 1rem; }
+  .page-range-control { flex-wrap: wrap; }
+  .page-range-control input { flex: 1 1 110px; width: auto; }
+  .action-footer .btn-large { width: 100%; }
   .config-card { padding: 1rem; }
   .config-actions { flex-direction: column-reverse; }
   .config-actions .btn { width: 100%; }

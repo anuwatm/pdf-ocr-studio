@@ -15,6 +15,7 @@
     currentJobId: null,
     jobStatus: null,
     currentPageNum: 1,
+    selectedPageIds: [],
     currentPageData: null,
     currentRevision: 1,
     hasUnsavedChanges: false,
@@ -30,6 +31,7 @@
     themeToggle: document.getElementById("btn-theme-toggle"),
     aiStatusBadge: document.getElementById("ai-status-badge"),
     aiStatusText: document.getElementById("ai-status-text"),
+    btnTestAiConnection: document.getElementById("btn-test-ai-connection"),
     aiAvailableBadge: document.getElementById("ai-available-badge"),
     modeOcrAi: document.getElementById("mode-ocr-ai"),
     modeOcrOnly: document.getElementById("mode-ocr-only"),
@@ -45,8 +47,9 @@
     btnStartJob: document.getElementById("btn-start-job"),
     pageOptions: document.getElementById("page-options"),
     pdfPageSummary: document.getElementById("pdf-page-summary"),
-    inputPageCount: document.getElementById("input-page-count"),
-    pageCountLimit: document.getElementById("page-count-limit"),
+    inputPageStart: document.getElementById("input-page-start"),
+    inputPageEnd: document.getElementById("input-page-end"),
+    pageRangeLimit: document.getElementById("page-range-limit"),
 
     // Progress Section
     sectionProgress: document.getElementById("section-progress"),
@@ -56,6 +59,7 @@
     progressBarFill: document.getElementById("progress-bar-fill"),
     progressTextPages: document.getElementById("progress-text-pages"),
     progressTextPercent: document.getElementById("progress-text-percent"),
+    currentProcessingPage: document.getElementById("current-processing-page"),
     btnCancelJob: document.getElementById("btn-cancel-job"),
     btnRetryJob: document.getElementById("btn-retry-job"),
     retryMenu: document.getElementById("retry-menu"),
@@ -146,6 +150,12 @@
   }
 
   // Check Local LLM Status
+  function setAiModeAvailability(isAvailable) {
+    el.modeOcrAi.disabled = !isAvailable;
+    el.modeOcrAi.closest(".option-card")?.classList.toggle("option-disabled", !isAvailable);
+    if (!isAvailable) el.modeOcrOnly.checked = true;
+  }
+
   async function checkAiStatus() {
     try {
       const res = await fetch("/api/ai/status");
@@ -154,12 +164,14 @@
 
       if (data.status === "connected") {
         state.aiConnected = true;
+        setAiModeAvailability(true);
         el.aiStatusBadge.className = "status-badge status-online";
         el.aiStatusText.textContent = `Online: ${data.configured_model}`;
         el.aiAvailableBadge.className = "badge badge-success";
         el.aiAvailableBadge.textContent = "พร้อมใช้งาน";
       } else {
         state.aiConnected = false;
+        setAiModeAvailability(false);
         el.aiStatusBadge.className = "status-badge status-offline";
         el.aiStatusText.textContent = "Offline (Local AI ไม่พร้อม)";
         el.aiAvailableBadge.className = "badge badge-warning";
@@ -167,11 +179,20 @@
       }
     } catch {
       state.aiConnected = false;
+      setAiModeAvailability(false);
       el.aiStatusBadge.className = "status-badge status-offline";
       el.aiStatusText.textContent = "Offline: Local AI 127.0.0.1:1234";
       el.aiAvailableBadge.className = "badge badge-warning";
       el.aiAvailableBadge.textContent = "ออฟไลน์";
     }
+  }
+
+  async function testAiConnection() {
+    el.btnTestAiConnection.disabled = true;
+    el.btnTestAiConnection.textContent = "กำลังทดสอบ...";
+    await checkAiStatus();
+    el.btnTestAiConnection.disabled = false;
+    el.btnTestAiConnection.textContent = state.aiConnected ? "เชื่อมต่อแล้ว" : "ทดสอบอีกครั้ง";
   }
 
   /* ==========================================================================
@@ -262,14 +283,10 @@
 
   function setupEventListeners() {
     el.btnStartJob.addEventListener("click", startJobFlow);
-    el.inputPageCount.addEventListener("input", () => {
-      if (!state.uploadedJob) return;
-      const value = Number.parseInt(el.inputPageCount.value, 10);
-      const max = Number.parseInt(el.inputPageCount.max, 10);
-      if (Number.isInteger(value) && value >= 1 && value <= max) {
-        el.btnStartJob.innerHTML = `<span>เริ่มแปลง ${value} หน้า</span>`;
-      }
-    });
+    el.btnTestAiConnection.addEventListener("click", testAiConnection);
+    [el.inputPageStart, el.inputPageEnd]
+      .filter(Boolean)
+      .forEach(input => input.addEventListener("input", updateRangeButton));
     el.btnCancelJob.addEventListener("click", cancelCurrentJob);
 
     // Retry dropdown toggle
@@ -287,8 +304,8 @@
     });
 
     // Page navigation
-    el.btnPrevPage.addEventListener("click", () => switchPage(state.currentPageNum - 1));
-    el.btnNextPage.addEventListener("click", () => switchPage(state.currentPageNum + 1));
+    el.btnPrevPage.addEventListener("click", () => switchPageByOffset(-1));
+    el.btnNextPage.addEventListener("click", () => switchPageByOffset(1));
     el.pageSelect.addEventListener("change", (e) => switchPage(parseInt(e.target.value, 10)));
 
     // Zoom controls
@@ -352,24 +369,32 @@
           throw new Error(err.detail || "Upload failed");
         }
         state.uploadedJob = await upRes.json();
+        if (!el.inputPageStart || !el.inputPageEnd || !el.pageRangeLimit) {
+          throw new Error("หน้าเว็บเป็นเวอร์ชันเก่า กรุณากด Ctrl+F5 เพื่อโหลดหน้าเลือกช่วงหน้าใหม่");
+        }
         const sourcePages = state.uploadedJob.total_pages;
-        const allowedPages = Math.min(sourcePages, 100);
+        const endPage = Math.min(sourcePages, 200);
         el.pdfPageSummary.textContent = `เอกสารนี้มี ${sourcePages} หน้า`;
-        el.inputPageCount.min = "1";
-        el.inputPageCount.max = String(allowedPages);
-        el.inputPageCount.value = String(allowedPages);
-        el.inputPageCount.disabled = false;
-        el.pageCountLimit.textContent = `หน้า (เลือกได้ 1–${allowedPages})`;
+        el.inputPageStart.min = "1";
+        el.inputPageStart.max = String(sourcePages);
+        el.inputPageStart.value = "1";
+        el.inputPageEnd.min = "1";
+        el.inputPageEnd.max = String(sourcePages);
+        el.inputPageEnd.value = String(endPage);
+        el.inputPageStart.disabled = false;
+        el.inputPageEnd.disabled = false;
+        el.pageRangeLimit.textContent = `เลือก ${endPage} หน้า • จำกัดสูงสุด 200 หน้า`;
         el.pageOptions.classList.remove("hidden");
         el.btnStartJob.disabled = false;
-        el.btnStartJob.innerHTML = `<span>เริ่มแปลง ${allowedPages} หน้า</span>`;
+        updateRangeButton();
         return;
       }
 
-      const selectedPages = Number.parseInt(el.inputPageCount.value, 10);
-      const maximumPages = Number.parseInt(el.inputPageCount.max, 10);
-      if (!Number.isInteger(selectedPages) || selectedPages < 1 || selectedPages > maximumPages) {
-        throw new Error(`กรุณาเลือกจำนวนหน้าระหว่าง 1 ถึง ${maximumPages}`);
+      const pageStart = Number.parseInt(el.inputPageStart.value, 10);
+      const pageEnd = Number.parseInt(el.inputPageEnd.value, 10);
+      const selectedPages = pageEnd - pageStart + 1;
+      if (!Number.isInteger(pageStart) || !Number.isInteger(pageEnd) || pageStart < 1 || pageEnd < pageStart || selectedPages > 200) {
+        throw new Error("กรุณาเลือกช่วงหน้าที่ถูกต้อง และไม่เกิน 200 หน้า");
       }
 
       el.btnStartJob.innerHTML = "<span>กำลังเริ่มงาน...</span>";
@@ -378,11 +403,18 @@
       const startRes = await fetch(`/api/jobs/${state.currentJobId}/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enable_ai: enableAi, max_pages: selectedPages }),
+        body: JSON.stringify({ enable_ai: enableAi, page_start: pageStart, page_end: pageEnd }),
       });
       if (!startRes.ok) {
         const err = await startRes.json();
         throw new Error(err.detail || "Failed to start job");
+      }
+      const startedJob = await startRes.json();
+      if (startedJob.page_start !== pageStart || startedJob.page_end !== pageEnd) {
+        // An already-running server can retain an older API that ignores the
+        // selected range. Stop it before it OCRs the wrong pages.
+        await fetch(`/api/jobs/${state.currentJobId}/cancel`, { method: "POST" });
+        throw new Error("server ยังเป็นเวอร์ชันเก่า กรุณาปิดแล้วเปิด run_server.ps1 ใหม่ แล้วลองอีกครั้ง");
       }
 
       // 3. Show Progress & Workspace
@@ -393,7 +425,7 @@
       alert(`เกิดข้อผิดพลาด: ${err.message}`);
       el.btnStartJob.disabled = false;
       el.btnStartJob.innerHTML = state.uploadedJob
-        ? `<span>เริ่มแปลง ${el.inputPageCount.value} หน้า</span>`
+        ? "<span>เริ่มแปลงเอกสาร</span>"
         : "<span>ตรวจสอบจำนวนหน้า</span>";
     }
   }
@@ -415,18 +447,19 @@
 
       updateProgressUI(job);
 
-      // Populate page selector if total_pages changed
-      if (el.pageSelect.children.length !== job.total_pages) {
-        updatePageSelector(job.total_pages);
+      const pageIds = job.pages.map(page => page.page_id);
+      if (pageIds.join(",") !== state.selectedPageIds.join(",")) {
+        state.selectedPageIds = pageIds;
+        updatePageSelector(job.pages);
       }
 
       // If at least one page completed, show workspace
       const hasCompletedPages = job.pages.some(p => p.status === "completed" || p.status === "blank");
       if (hasCompletedPages && el.sectionWorkspace.classList.contains("hidden")) {
         el.sectionWorkspace.classList.remove("hidden");
-        switchPage(1);
+        switchPage(state.selectedPageIds[0]);
       } else if (hasCompletedPages && !state.currentPageData) {
-        switchPage(1);
+        switchPage(state.selectedPageIds[0]);
       }
 
       // Update downloads
@@ -463,6 +496,10 @@
     el.progressBarFill.style.width = `${pct}%`;
     el.progressTextPages.textContent = `ประมวลผลแล้ว ${completed} / ${total} หน้า`;
     el.progressTextPercent.textContent = `${pct}%`;
+    const runningPage = job.pages.find(page => page.status === "running");
+    el.currentProcessingPage.textContent = runningPage
+      ? `กำลัง OCR หน้า ${runningPage.page_num}`
+      : job.status === "queued" ? "รอคิวประมวลผล" : `ประมวลผลแล้ว ${completed} หน้า`;
 
     // Action buttons
     if (job.status === "queued" || job.status === "running") {
@@ -528,21 +565,21 @@
      Dual-Pane Workspace: Page Viewer & Image Overlays
      ========================================================================== */
 
-  function updatePageSelector(totalPages) {
+  function updatePageSelector(pages) {
     el.pageSelect.innerHTML = "";
-    for (let i = 1; i <= totalPages; i++) {
+    pages.forEach(page => {
       const opt = document.createElement("option");
-      opt.value = i;
-      opt.textContent = i;
+      opt.value = page.page_id;
+      opt.textContent = page.page_num;
       el.pageSelect.appendChild(opt);
-    }
-    el.pageTotalLabel.textContent = `จาก ${totalPages}`;
+    });
+    el.pageTotalLabel.textContent = `ทั้งหมด ${pages.length} หน้า`;
   }
 
   async function switchPage(pageNum) {
     if (!state.jobStatus) return;
-    const total = state.jobStatus.total_pages;
-    if (pageNum < 1 || pageNum > total) return;
+    const pageIndex = state.selectedPageIds.indexOf(pageNum);
+    if (pageIndex === -1) return;
 
     // Check unsaved changes before switching
     if (state.hasUnsavedChanges) {
@@ -553,10 +590,29 @@
 
     state.currentPageNum = pageNum;
     el.pageSelect.value = pageNum;
-    el.btnPrevPage.disabled = pageNum <= 1;
-    el.btnNextPage.disabled = pageNum >= total;
+    el.btnPrevPage.disabled = pageIndex <= 0;
+    el.btnNextPage.disabled = pageIndex >= state.selectedPageIds.length - 1;
 
     await loadPageData(state.currentJobId, pageNum);
+  }
+
+  function switchPageByOffset(offset) {
+    const currentIndex = state.selectedPageIds.indexOf(state.currentPageNum);
+    const nextPage = state.selectedPageIds[currentIndex + offset];
+    if (nextPage !== undefined) switchPage(nextPage);
+  }
+
+  function updateRangeButton() {
+    if (!state.uploadedJob || !el.inputPageStart || !el.inputPageEnd || !el.pageRangeLimit) return;
+    const start = Number.parseInt(el.inputPageStart.value, 10);
+    const end = Number.parseInt(el.inputPageEnd.value, 10);
+    const count = end - start + 1;
+    const valid = Number.isInteger(start) && Number.isInteger(end) && start >= 1 && end >= start && end <= state.uploadedJob.total_pages && count <= 200;
+    el.btnStartJob.disabled = !valid;
+    el.pageRangeLimit.textContent = valid
+      ? `เลือก ${count} หน้า • จำกัดสูงสุด 200 หน้า`
+      : "ช่วงหน้าไม่ถูกต้อง หรือเกิน 200 หน้า";
+    if (valid) el.btnStartJob.innerHTML = `<span>เริ่มแปลงหน้า ${start}–${end}</span>`;
   }
 
   async function loadPageData(jobId, pageNum) {

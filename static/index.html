@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Sarabun:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="/static/app.css?v=20260929-ai-mode-1">
 </head>
 <body class="theme-dark">
   <div class="app-container">
@@ -35,6 +35,8 @@
           <span class="status-dot"></span>
           <span id="ai-status-text" class="status-label">กำลังตรวจโมเดล...</span>
         </div>
+
+        <button id="btn-test-ai-connection" class="btn btn-outline btn-sm" type="button">ทดสอบการเชื่อมต่อ</button>
 
         <a class="btn btn-outline btn-sm" href="/config.html">ตั้งค่า Local LLM</a>
 
@@ -64,7 +66,7 @@
       <section id="section-upload" class="card upload-card">
         <div class="card-header">
           <h2 class="card-title">1. อัปโหลดเอกสาร</h2>
-          <span class="badge badge-info">PDF / PNG / JPG • สูงสุด 50 MB • แปลงครั้งละ 100 หน้า</span>
+          <span class="badge badge-info">PDF / PNG / JPG • สูงสุด 50 MB • แปลงครั้งละ 200 หน้า</span>
         </div>
 
         <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="ลากไฟล์มาวางที่นี่ หรือคลิกเพื่อเลือกไฟล์">
@@ -98,19 +100,23 @@
 
         <div id="page-options" class="page-options hidden" aria-live="polite">
           <strong id="pdf-page-summary">กำลังตรวจจำนวนหน้า...</strong>
-          <label for="input-page-count">ต้องการแปลง OCR กี่หน้า</label>
-          <div class="page-count-control">
-            <input id="input-page-count" type="number" min="1" value="1" disabled>
-            <span id="page-count-limit">หน้า</span>
+          <div class="range-heading">
+            <label for="input-page-start">ต้องการแปลงจากหน้าที่</label>
+            <span>ถึงหน้าที่</span>
           </div>
-          <p>ระบบแปลงจากหน้า 1 ต่อเนื่อง และจำกัด 100 หน้าต่อครั้ง</p>
+          <div class="page-range-control">
+            <input id="input-page-start" type="number" min="1" value="1" disabled aria-label="หน้าเริ่มต้น">
+            <span class="range-arrow">→</span>
+            <input id="input-page-end" type="number" min="1" value="1" disabled aria-label="หน้าสิ้นสุด">
+          </div>
+          <p id="page-range-limit">เลือกช่วงได้สูงสุด 200 หน้า</p>
         </div>
 
         <!-- Engine / AI Mode Options -->
         <div class="options-grid">
           <div class="option-card">
             <label class="radio-label">
-              <input type="radio" name="ai-mode" value="true" id="mode-ocr-ai" checked>
+              <input type="radio" name="ai-mode" value="true" id="mode-ocr-ai" disabled>
               <div class="radio-content">
                 <div class="radio-header">
                   <strong>OneOCR + Local AI ตรวจแก้คำ</strong>
@@ -123,7 +129,7 @@
 
           <div class="option-card">
             <label class="radio-label">
-              <input type="radio" name="ai-mode" value="false" id="mode-ocr-only">
+              <input type="radio" name="ai-mode" value="false" id="mode-ocr-only" checked>
               <div class="radio-content">
                 <div class="radio-header">
                   <strong>OneOCR อย่างเดียว (Baseline)</strong>
@@ -138,9 +144,6 @@
         <!-- Start Processing CTA -->
         <div class="action-footer">
           <button id="btn-start-job" class="btn btn-primary btn-large" disabled>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon points="5 3 19 12 5 21 5 3"/>
-            </svg>
             <span>ตรวจสอบจำนวนหน้า</span>
           </button>
         </div>
@@ -192,6 +195,7 @@
           <span id="progress-text-pages">ประมวลผล 0 / 0 หน้า</span>
           <span id="progress-text-percent">0%</span>
         </div>
+        <div id="current-processing-page" class="current-processing-page">รอเริ่มงาน</div>
 
         <!-- Alert Notification Box -->
         <div id="job-alert-banner" class="alert-banner hidden">
@@ -464,6 +468,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=20260929-ai-mode-1"></script>
 </body>
 </html>

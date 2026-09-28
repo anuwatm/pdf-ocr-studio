@@ -249,7 +249,7 @@ def process_job_worker(
 
     # Assemble overall job files (raw.txt, corrected.txt, final.txt) across pages
     if os.path.exists(job_dir):
-        _assemble_job_text_files(job_dir, total_pages, updated_job)
+        _assemble_job_text_files(job_dir, updated_job)
     else:
         print(f"[Worker] Job directory {job_dir} was deleted. Skipping file assembly.")
         return
@@ -273,7 +273,7 @@ def process_job_worker(
     print(f"[Worker] Job {job_id} finished with status {final_st.value}. Completed {completed}/{total_pages} pages.")
 
 
-def _assemble_job_text_files(job_dir: str, total_pages: int, job_status: JobStatusResponse):
+def _assemble_job_text_files(job_dir: str, job_status: JobStatusResponse):
     """
     Concatenates individual page outputs into top-level document files:
     - raw.txt
@@ -289,10 +289,8 @@ def _assemble_job_text_files(job_dir: str, total_pages: int, job_status: JobStat
     corr_lines = []
     final_lines = []
 
-    page_status_map = {p.page_num: p for p in job_status.pages}
-
-    for p_num in range(1, total_pages + 1):
-        page_info = page_status_map.get(p_num)
+    for page_info in job_status.pages:
+        p_num = page_info.page_num
         page_dir = os.path.join(job_dir, f"page_{p_num:02d}")
         page_header = f"--- Page {p_num} ---"
 

@@ -8,20 +8,38 @@ if (-not [Environment]::Is64BitOperatingSystem) {
     throw 'ต้องใช้ Windows 64-bit เพราะ OneOCR DLL เป็น 64-bit'
 }
 
+$candidates = @()
 $launcher = Get-Command py -ErrorAction SilentlyContinue
-if (-not $launcher) {
-    throw 'ไม่พบ Python Launcher (py) กรุณาติดตั้ง Python 3.10+ แบบ 64-bit แล้วเปิด PowerShell ใหม่'
-}
-
-$available = & $launcher.Source -0p 2>$null
-$candidates = foreach ($line in $available) {
-    if ($line -match '-V:(\d+\.\d+).*?([A-Za-z]:\\.*python\.exe)\s*$') {
-        $version = [version]$Matches[1]
-        if ($version -ge [version]'3.10') {
-            [pscustomobject]@{ Version = $version; Path = $Matches[2] }
+if ($launcher) {
+    $available = & $launcher.Source -0p 2>$null
+    foreach ($line in $available) {
+        if ($line -match '-V:(\d+\.\d+).*?([A-Za-z]:\\.*python\.exe)\s*$') {
+            $version = [version]$Matches[1]
+            if ($version -ge [version]'3.10') {
+                $candidates += [pscustomobject]@{ Version = $version; Path = $Matches[2] }
+            }
         }
     }
 }
+
+# Python from python.org can be installed per-user without appearing in `py -0p`.
+$pythonRoots = @(
+    (Join-Path $env:LOCALAPPDATA 'Programs\Python'),
+    'C:\Program Files\Python',
+    'C:\Program Files (x86)\Python'
+)
+foreach ($root in $pythonRoots) {
+    Get-ChildItem -Path (Join-Path $root 'Python*\python.exe') -File -ErrorAction SilentlyContinue | ForEach-Object {
+        $versionText = & $_.FullName --version 2>$null
+        if ($versionText -match 'Python\s+(\d+\.\d+(?:\.\d+)?)') {
+            $version = [version]$Matches[1]
+            if ($version -ge [version]'3.10') {
+                $candidates += [pscustomobject]@{ Version = $version; Path = $_.FullName }
+            }
+        }
+    }
+}
+
 $selected = $candidates | Sort-Object Version -Descending | Select-Object -First 1
 if (-not $selected) {
     throw 'ไม่พบ Python 3.10+ กรุณาติดตั้ง Python 3.10+ แบบ 64-bit'

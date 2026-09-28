@@ -41,7 +41,7 @@ from src.job_models import (
 
 # Configuration defaults
 MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024  # 50 MB
-MAX_PAGE_LIMIT = 100                     # 100 pages
+MAX_PAGE_LIMIT = 200                     # 200 pages per job
 DEFAULT_DB_PATH = "data/jobs.db"
 DEFAULT_OUTPUT_DIR = "files"
 
@@ -309,21 +309,22 @@ def start_job(job_id: str, req: JobStartRequest = JobStartRequest()):
     if job.status == JobStatus.RUNNING:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Job is already running")
 
-    if req.page_range is not None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="เลือกได้เป็นจำนวนหน้าตั้งแต่หน้า 1 เท่านั้น กรุณาใช้ max_pages",
-        )
-
-    max_pages = req.max_pages if req.max_pages is not None else min(job.total_pages, MAX_PAGE_LIMIT)
-    if max_pages < 1 or max_pages > job.total_pages:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="จำนวนหน้าที่เลือกไม่อยู่ในช่วงของเอกสาร")
-    if max_pages > MAX_PAGE_LIMIT:
+    page_start = req.page_start if req.page_start is not None else 1
+    page_end = req.page_end if req.page_end is not None else min(job.total_pages, MAX_PAGE_LIMIT)
+    selected_count = page_end - page_start + 1
+    if page_start < 1 or page_end < page_start or page_end > job.total_pages:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ช่วงหน้าที่เลือกไม่อยู่ในเอกสาร")
+    if selected_count > MAX_PAGE_LIMIT:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"แปลงได้สูงสุด {MAX_PAGE_LIMIT} หน้าต่อครั้ง",
         )
-    if not db.configure_job_for_start(job_id, max_pages=max_pages, enable_ai=req.enable_ai):
+    if not db.configure_job_for_start(
+        job_id,
+        page_start=page_start,
+        page_end=page_end,
+        enable_ai=req.enable_ai,
+    ):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Job cannot be configured for processing")
 
     success = job_manager.enqueue_job(job_id=job_id, enable_ai=req.enable_ai)
@@ -334,7 +335,9 @@ def start_job(job_id: str, req: JobStartRequest = JobStartRequest()):
         "message": "Job enqueued successfully",
         "job_id": job_id,
         "status": "queued",
-        "processing_pages": max_pages,
+        "processing_pages": selected_count,
+        "page_start": page_start,
+        "page_end": page_end,
     }
 
 

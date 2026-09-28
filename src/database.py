@@ -413,13 +413,8 @@ class JobDatabase:
                     WHERE job_id = ?
                 """, (status.value, error_message, now, job_id))
 
-    def configure_job_for_start(self, job_id: str, max_pages: int, enable_ai: bool) -> bool:
-        """Locks a queued job to its first ``max_pages`` pages before it is enqueued.
-
-        The upload can inspect a PDF with more than the processing limit.  This
-        method makes the chosen page count the job's actual scope, so progress,
-        retries and the assembled download files all use the same denominator.
-        """
+    def configure_job_for_start(self, job_id: str, page_start: int, page_end: int, enable_ai: bool) -> bool:
+        """Locks a queued job to a contiguous, user-selected PDF page range."""
         now = get_iso_now()
         with self.transaction() as conn:
             cursor = conn.cursor()
@@ -427,12 +422,14 @@ class JobDatabase:
             job = cursor.fetchone()
             if not job or job["status"] != JobStatus.QUEUED.value:
                 return False
-            if max_pages < 1 or max_pages > job["total_pages"]:
+            if page_start < 1 or page_end < page_start or page_end > job["total_pages"]:
                 return False
 
+            selected_count = page_end - page_start + 1
+
             cursor.execute(
-                "DELETE FROM pages WHERE job_id = ? AND page_num > ?",
-                (job_id, max_pages),
+                "DELETE FROM pages WHERE job_id = ? AND (page_num < ? OR page_num > ?)",
+                (job_id, page_start, page_end),
             )
             cursor.execute(
                 """
@@ -440,7 +437,7 @@ class JobDatabase:
                 SET total_pages = ?, enable_ai = ?, updated_at = ?
                 WHERE job_id = ?
                 """,
-                (max_pages, 1 if enable_ai else 0, now, job_id),
+                (selected_count, 1 if enable_ai else 0, now, job_id),
             )
         return True
 

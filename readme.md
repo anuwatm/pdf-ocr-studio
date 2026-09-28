@@ -3,16 +3,43 @@
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011%20(64--bit)-0078D6.svg?logo=windows)](https://microsoft.com)
 [![Python](https://img.shields.io/badge/Python-3.10%2B%20(64--bit)-3776AB.svg?logo=python)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688.svg?logo=fastapi)](https://fastapi.tiangolo.com)
-[![Engine](https://img.shields.io/badge/OCR-OneOCR%20(ctypes)-critical.svg)](#บทบาทของ-oneocr-และ-local-ai)
+[![Engine](https://img.shields.io/badge/OCR-OneOCR%20(ctypes)-critical.svg)](#จุดเด่นของระบบ-key-features)
 [![Local AI](https://img.shields.io/badge/AI-Local%20LLM%20%2F%20VLM-blueviolet.svg)](#การตั้งค่า-local-ai-ตรวจแก้)
-[![Security](https://img.shields.io/badge/Privacy-100%25%20Offline%20%2F%20Loopback-success.svg)](#ความปลอดภัยและการทำงานแบบ-offline)
+[![Security](https://img.shields.io/badge/Privacy-100%25%20Offline%20%2F%20Loopback-success.svg)](#จุดเด่นของระบบ-key-features)
 
 เว็บแอปพลิเคชันสำหรับแปลงเอกสาร **PDF และภาพภาษาไทยเป็นข้อความ UTF-8** ขับเคลื่อนด้วย **OneOCR** (เอนจิน OCR ภาษาไทยแบบเนทีฟจาก Windows 11 Snipping Tool ผ่าน Python `ctypes`) พร้อมระบบจัดลำดับข้อความอัจฉริยะ (Smart Layout Assembly) และผสานพลัง **Local AI (LLM/VLM)** ช่วยตรวจแก้คำผิด สระ และวรรณยุกต์ โดยประมวลผล **ภายในเครื่อง 100% (Localhost Single-User)** โดยไม่ส่งข้อมูลออกนอกเครื่อง พร้อมหน้าเว็บ **Web Studio** สำหรับตรวจทาน เทียบภาพต้นฉบับ แก้ไข และส่งออกไฟล์
+
+> [!IMPORTANT]
+> ระบบรองรับ Windows 10/11 แบบ 64-bit เท่านั้น เพราะใช้ OneOCR DLL แบบ 64-bit และออกแบบให้ใช้งานจาก `127.0.0.1` บนเครื่องเดียว
+
+## เริ่มใช้งานด่วนจาก GitHub
+
+หลัง clone repository แล้ว ให้เปิด PowerShell ที่โฟลเดอร์โครงการและรัน:
+
+```powershell
+.\publish\run_server.ps1
+```
+
+สคริปต์จะสร้าง `publish\venv` และติดตั้ง dependencies ให้เองในครั้งแรก จากนั้นเปิด [http://127.0.0.1:8000/](http://127.0.0.1:8000/) ในเบราว์เซอร์
+
+หาก PowerShell ไม่อนุญาตให้รัน script ให้ใช้คำสั่งนี้เฉพาะหน้าต่างปัจจุบัน แล้วรันใหม่:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+```
+
+### โหมด OCR และ Local AI
+
+- ค่าเริ่มต้นคือ **OneOCR อย่างเดียว (Baseline)** จึงใช้งาน OCR ได้แม้ไม่ได้เปิด Local LLM
+- เลือกช่วงหน้าเริ่มต้น–สิ้นสุดได้สูงสุด **200 หน้า/งาน**
+- เมื่อ Local AI เป็น Offline ระบบจะล็อก **OneOCR + Local AI ตรวจแก้คำ** ไว้
+- กด **ทดสอบการเชื่อมต่อ** ข้างสถานะ Local AI; เมื่อเชื่อมต่อและพบโมเดลแล้ว ตัวเลือก AI จะถูกปลดล็อก
 
 ---
 
 ## สารบัญ
 
+- [เริ่มใช้งานด่วนจาก GitHub](#เริ่มใช้งานด่วนจาก-github)
 - [จุดเด่นของระบบ (Key Features)](#จุดเด่นของระบบ-key-features)
 - [สถาปัตยกรรมและแผนภาพการทำงาน (Architecture & Diagrams)](#สถาปัตยกรรมและแผนภาพการทำงาน-architecture--diagrams)
   - [1. แผนภาพสถาปัตยกรรมระบบและการแยก Process](#1-แผนภาพสถาปัตยกรรมระบบและการแยก-process)
@@ -30,6 +57,7 @@
 - [ผลการทดสอบและเกณฑ์ตรวจรับ (Verification & Benchmarks)](#ผลการทดสอบและเกณฑ์ตรวจรับ-verification--benchmarks)
 - [ชุดข้อมูลทดสอบที่อนุมัติ](#ชุดข้อมูลทดสอบที่อนุมัติ-approved-dataset)
 - [เอกสารที่เกี่ยวข้องและการกำกับดูแล](#เอกสารที่เกี่ยวข้องและการกำกับดูแล)
+- [ข้อควรรู้ก่อนเผยแพร่บน GitHub](#ข้อควรรู้ก่อนเผยแพร่บน-github)
 
 ---
 
@@ -129,7 +157,7 @@ flowchart TD
     
     PDFPath --> Encrypted{"มีรหัสผ่านหรือไม่?"}
     Encrypted -->|มีรหัสผ่าน| ErrPW["แจ้งข้อผิดพลาด: ไม่รองรับ PDF ติดรหัส (HTTP 422)"]
-    Encrypted -->|ไม่มีรหัสผ่าน| PageLoop["วนลูปประมวลผลทีละหน้าตาม max_pages"]
+    Encrypted -->|ไม่มีรหัสผ่าน| PageLoop["ผู้ใช้เลือกช่วงหน้า แล้ววนลูปประมวลผลทีละหน้า (ไม่เกิน 200 หน้า/งาน)"]
     
     PageLoop --> BlankCheck{"ตรวจจับหน้าว่าง<br/>(Visual Blank Detection)"}
     BlankCheck -->|หน้าว่างจริง| MarkBlank["กำหนดสถานะ blank<br/>บันทึก --- Page N [BLANK] ---"]
@@ -206,7 +234,7 @@ flowchart TD
 ```mermaid
 stateDiagram-v2
     [*] --> Uploaded: อัปโหลดไฟล์ (POST /api/upload)
-    Uploaded --> Queued: เลือกจำนวนหน้า & เริ่มงาน (POST /api/jobs/{id}/start)
+    Uploaded --> Queued: เลือกช่วงหน้า & เริ่มงาน (POST /api/jobs/{id}/start)
     
     state Queued {
         [*] --> InQueue: อยู่ในคิวรอทำงาน (Max Concurrency = 1)
@@ -259,10 +287,10 @@ flowchart TD
     Step1["1. เข้าสู่หน้าเว็บหลัก http://127.0.0.1:8000"] --> Step2["2. ลากไฟล์ PDF / PNG / JPG มาวาง หรือคลิกเลือกไฟล์"]
     Step2 --> Step3["3. ระบบตรวจสอบไฟล์ & อ่านจำนวนหน้าทั้งหมดอัตโนมัติ"]
     
-    Step3 --> Step4["4. ผู้ใช้กำหนดเงื่อนไขการประมวลผล:<br/>- เลือกจำนวนหน้าเริ่มต้นที่ต้องการแปลง (1 ถึงสูงสุด 100 หน้า)<br/>- เลือกโหมด: 'OneOCR อย่างเดียว' หรือ 'OneOCR + AI ตรวจแก้'"]
+    Step3 --> Step4["4. ผู้ใช้กำหนดเงื่อนไขการประมวลผล:<br/>- เลือกหน้าที่เริ่มต้นและหน้าสิ้นสุด (ไม่เกิน 200 หน้า/งาน)<br/>- เริ่มต้นด้วย OneOCR อย่างเดียว; เปิด AI ได้เมื่อ Local LLM พร้อม"]
     
-    Step4 --> Step5["5. คลิกปุ่ม 'เริ่มแปลง X หน้า'"]
-    Step5 --> Step6["6. หน้าจอแสดง Progress Bar & สถานะประมวลผลแบบ Real-time<br/>(พร้อมปุ่มยกเลิกงาน Cancel Job หากต้องการ)"]
+    Step4 --> Step5["5. คลิกปุ่ม 'เริ่มแปลงหน้า X–Y'"]
+    Step5 --> Step6["6. หน้าจอแสดง Progress Bar, หน้าที่กำลัง OCR และสถานะแบบ Real-time<br/>(พร้อมปุ่มยกเลิกงาน Cancel Job หากต้องการ)"]
     
     Step6 --> Step7["7. เมื่องานเสร็จสิ้น เข้าสู่ 'Web Studio Dual-Pane Viewer'"]
     
@@ -328,7 +356,7 @@ flowchart TD
 
 2. **สร้าง Virtual Environment และเปิดใช้งาน:**
    ```powershell
-   py -3.10 -m venv venv
+   py -3 -m venv venv
    .\venv\Scripts\Activate.ps1
    ```
 
@@ -404,7 +432,7 @@ OCR/
 │   ├── index.html          # หน้าจอหลัก Web Studio Dual-Pane Viewer
 │   ├── config.html         # หน้าจอตั้งค่า Local LLM
 │   ├── app.js              # ตรรกะการทำงานฝั่งไคลเอนต์ (Vanilla JS)
-│   └── styles.css          # ดีไซน์และชุดแต่ง Modern Dark/Light Theme
+│   └── app.css             # ดีไซน์และชุดแต่ง Modern Dark/Light Theme
 ├── oneOCR/                 # OneOCR Binary DLL & Model Runtime (64-bit)
 ├── publish/                # ชุดติดตั้งสำเร็จรูปสำหรับ Deploy บนเครื่องอื่น (ขนาด ~145 MB)
 ├── demo/                   # ชุดเอกสารทดสอบที่ได้รับอนุมัติ (01.pdf–07.pdf, 01.png, 02.png)
@@ -460,6 +488,15 @@ OCR/
 - **[gpt.md](gpt.md):** บันทึกปัญหาคงค้าง ข้อเสนอประกอบ และประวัติการตรวจรับชุดติดตั้ง `publish/`
 - **[gemini.md](gemini.md):** บันทึกความเห็นทางเทคนิคและสถาปัตยกรรมระบบ (เอกสารอ่านอย่างเดียว)
 - **[win11-oneocr](https://github.com/b1tg/win11-oneocr):** โครงการอ้างอิง C++ reverse engineering ของ Windows 11 Snipping Tool OCR
+
+---
+
+## ข้อควรรู้ก่อนเผยแพร่บน GitHub
+
+- ห้าม commit `.env`, `venv/`, `data/jobs.db` และไฟล์ใน `files/` เพราะอาจมีค่า Local LLM หรือเอกสารที่ผู้ใช้อัปโหลด
+- โฟลเดอร์ `publish/` มี `.gitignore` สำหรับตัดไฟล์ runtime เหล่านี้ออกแล้ว
+- ตรวจสิทธิ์การแจกจ่าย OneOCR binary และ model ตามนโยบายองค์กรหรือสิทธิ์ของ Windows ก่อนเผยแพร่ repository แบบสาธารณะ
+- การตรวจแก้ด้วย AI เป็นทางเลือก; ผู้ใช้ใหม่ยังใช้งาน OCR แบบ Baseline ได้โดยไม่ต้องติดตั้งหรือเปิด Local LLM
 
 ---
 
