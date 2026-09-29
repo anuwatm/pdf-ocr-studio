@@ -89,6 +89,10 @@
 ```powershell
 .\run_server.ps1
 ```
+หากใช้ Command Prompt ให้รัน:
+```cmd
+.\run_server.cmd
+```
 หรือรันคำสั่ง:
 ```powershell
 python -m src.server

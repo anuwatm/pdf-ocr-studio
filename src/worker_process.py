@@ -15,11 +15,49 @@ import time
 import argparse
 import traceback
 import shutil
+import gc
 from typing import Optional, List, Dict, Any
 
 from src.database import JobDatabase
-from src.job_models import JobStatus, PageStatus, StageStatus, JobStatusResponse
+from src.job_models import OCR_BATCH_SIZE, JobStatus, PageStatus, StageStatus, JobStatusResponse
 from src.pipeline import ProcessingPipeline
+
+
+def _run_full_text_ai_review(page_dir: str, job_id: str, page_num: int, revision: int) -> Dict[str, Any]:
+    """Run Local AI on the saved raw text without repeating OCR."""
+    raw_path = os.path.join(page_dir, "raw.txt")
+    ocr_path = os.path.join(page_dir, "ocr.json")
+    if not os.path.exists(raw_path) or not os.path.exists(ocr_path):
+        raise FileNotFoundError("Saved OCR text is unavailable for full-text AI review")
+
+    with open(raw_path, "r", encoding="utf-8") as f:
+        raw_text = f.read()
+    with open(ocr_path, "r", encoding="utf-8") as f:
+        ocr_data = json.load(f)
+
+    page_data = (ocr_data.get("pages") or [{}])[0]
+    from src.ai_corrector import AICorrector
+    corrected_text, changes_doc = AICorrector().correct_text(
+        raw_text=raw_text,
+        job_id=job_id,
+        page_id=page_num,
+        source_revision=revision,
+        current_revision=revision,
+        page_blocks=page_data.get("blocks"),
+        char_mapping=page_data.get("char_mapping"),
+        use_prescreener=False,
+    )
+    with open(os.path.join(page_dir, "corrected.txt"), "w", encoding="utf-8", newline="\n") as f:
+        f.write(corrected_text)
+    with open(os.path.join(page_dir, "changes.json"), "w", encoding="utf-8") as f:
+        json.dump(changes_doc.model_dump(), f, ensure_ascii=False, indent=2)
+    return {"raw_text": raw_text}
+
+
+def _iter_page_batches(page_numbers: List[int], batch_size: int = OCR_BATCH_SIZE):
+    """Yields sequential page groups so long jobs release OCR resources every batch."""
+    for offset in range(0, len(page_numbers), batch_size):
+        yield page_numbers[offset:offset + batch_size]
 
 
 def process_job_worker(
@@ -70,6 +108,9 @@ def process_job_worker(
         elif retry_mode == "ai_only":
             if p.ocr_status == StageStatus.COMPLETED and p.ai_status != StageStatus.COMPLETED:
                 pages_to_process.append(p.page_num)
+        elif retry_mode == "full_text_ai":
+            if p.ocr_status == StageStatus.COMPLETED:
+                pages_to_process.append(p.page_num)
         else:  # full
             pages_to_process.append(p.page_num)
 
@@ -79,13 +120,24 @@ def process_job_worker(
         db.finalize_attempt(job_id, attempt_number, JobStatus.COMPLETED)
         return
 
-    print(f"[Worker] Starting processing job {job_id}, attempt {attempt_number}, pages: {pages_to_process}")
+    total_batches = max(1, (len(pages_to_process) + OCR_BATCH_SIZE - 1) // OCR_BATCH_SIZE)
+    print(
+        f"[Worker] Starting processing job {job_id}, attempt {attempt_number}, "
+        f"{len(pages_to_process)} pages in {total_batches} batches of {OCR_BATCH_SIZE}."
+    )
 
     any_ocr_failed = False
     any_ai_failed = False
     is_cancelled = False
 
-    for page_num in pages_to_process:
+    for page_index, page_num in enumerate(pages_to_process):
+        batch_number = (page_index // OCR_BATCH_SIZE) + 1
+        if page_index % OCR_BATCH_SIZE == 0:
+            batch_end = min(page_index + OCR_BATCH_SIZE, len(pages_to_process))
+            print(
+                f"[Worker] Batch {batch_number}/{total_batches}: "
+                f"pages {pages_to_process[page_index]}–{pages_to_process[batch_end - 1]}"
+            )
         # 1. Check for cancellation, deletion, or attempt supersede before starting page
         current_job = db.get_job_status(job_id)
         if not current_job:
@@ -106,11 +158,12 @@ def process_job_worker(
             os._exit(139)
 
         # Mark page running
+        is_full_text_ai = retry_mode == "full_text_ai"
         db.update_page_progress(
             job_id=job_id,
             page_id=page_num,
             status=PageStatus.RUNNING,
-            ocr_status=StageStatus.RUNNING,
+            ocr_status=StageStatus.COMPLETED if is_full_text_ai else StageStatus.RUNNING,
             ai_status=StageStatus.RUNNING if enable_ai else StageStatus.SKIPPED,
             attempt_number=attempt_number,
         )
@@ -126,12 +179,16 @@ def process_job_worker(
 
             # Execute OCR + AI via pipeline for this page
             actual_enable_ai = enable_ai and (not simulate_ai_failure)
-            result = pipeline.process_file(
-                file_path=file_path,
-                output_dir=page_dir,
-                page_range=[page_num],
-                enable_ai_correction=actual_enable_ai,
-            )
+            if is_full_text_ai:
+                page_status = next(p for p in job.pages if p.page_num == page_num)
+                result = _run_full_text_ai_review(page_dir, job_id, page_num, page_status.revision)
+            else:
+                result = pipeline.process_file(
+                    file_path=file_path,
+                    output_dir=page_dir,
+                    page_range=[page_num],
+                    enable_ai_correction=actual_enable_ai,
+                )
 
             # Check if job was deleted or directory cleaned up while pipeline was executing
             post_check_job = db.get_job_status(job_id)
@@ -171,13 +228,23 @@ def process_job_worker(
                     raw_len = len(f.read())
 
             corrections_cnt = 0
+            ai_error_message = None
+            ai_failed = False
             if os.path.exists(changes_json_path):
                 with open(changes_json_path, "r", encoding="utf-8") as f:
                     try:
                         cdata = json.load(f)
                         corrections_cnt = cdata.get("total_corrections", 0)
+                        if enable_ai and cdata.get("status") != "completed":
+                            ai_failed = True
+                            ai_error_message = cdata.get("error_message") or f"AI correction status: {cdata.get('status', 'unknown')}"
                     except Exception:
-                        pass
+                        if enable_ai:
+                            ai_failed = True
+                            ai_error_message = "Could not read AI correction result"
+            elif enable_ai:
+                ai_failed = True
+                ai_error_message = "AI correction result was not written"
 
             # Determine statuses
             if simulate_ai_failure:
@@ -194,6 +261,22 @@ def process_job_worker(
                     error_message="AI correction service failed / timeout",
                     raw_text_length=raw_len,
                     corrections_count=0,
+                )
+            elif ai_failed:
+                # OCR is usable, but Local AI returned timeout, malformed JSON,
+                # or another explicit failure. Never report this page as fully completed.
+                any_ai_failed = True
+                db.update_page_progress(
+                    job_id=job_id,
+                    page_id=page_num,
+                    status=PageStatus.PARTIAL,
+                    ocr_status=StageStatus.COMPLETED,
+                    ai_status=StageStatus.FAILED,
+                    attempt_number=attempt_number,
+                    latency_ms=latency,
+                    error_message=ai_error_message,
+                    raw_text_length=raw_len,
+                    corrections_count=corrections_cnt,
                 )
             else:
                 # Page fully completed
@@ -212,17 +295,30 @@ def process_job_worker(
         except Exception as e:
             latency = (time.perf_counter() - t_start) * 1000.0
             err_msg = str(e)
-            any_ocr_failed = True
+            if is_full_text_ai:
+                any_ai_failed = True
+            else:
+                any_ocr_failed = True
             db.update_page_progress(
                 job_id=job_id,
                 page_id=page_num,
-                status=PageStatus.FAILED,
-                ocr_status=StageStatus.FAILED,
+                status=PageStatus.PARTIAL if is_full_text_ai else PageStatus.FAILED,
+                ocr_status=StageStatus.COMPLETED if is_full_text_ai else StageStatus.FAILED,
                 ai_status=StageStatus.FAILED if enable_ai else StageStatus.SKIPPED,
                 attempt_number=attempt_number,
                 latency_ms=latency,
                 error_message=err_msg,
             )
+
+        if (page_index + 1) % OCR_BATCH_SIZE == 0 or page_index + 1 == len(pages_to_process):
+            pipeline.close()
+            gc.collect()
+            if page_index + 1 < len(pages_to_process):
+                pipeline = ProcessingPipeline()
+            print(f"[Worker] Batch {batch_number}/{total_batches} finished.")
+
+    pipeline.close()
+    gc.collect()
 
     # 3. Finalize Job Status
     updated_job = db.get_job_status(job_id)

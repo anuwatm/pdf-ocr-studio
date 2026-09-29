@@ -7,6 +7,8 @@ from typing import List, Optional, Dict, Any, Literal
 from enum import Enum
 from pydantic import BaseModel, Field
 
+OCR_BATCH_SIZE = 200
+
 
 class JobStatus(str, Enum):
     QUEUED = "queued"
@@ -79,6 +81,9 @@ class JobStatusResponse(BaseModel):
     filename: str
     file_size_bytes: int
     total_pages: int
+    batch_size: int = OCR_BATCH_SIZE
+    total_batches: int = 1
+    current_batch: int = 1
     completed_pages: int = 0
     failed_pages: int = 0
     cancelled_pages: int = 0
@@ -91,7 +96,7 @@ class JobStatusResponse(BaseModel):
 
 
 class JobRetryRequest(BaseModel):
-    retry_mode: Literal["failed_only", "ai_only", "full"] = "failed_only"
+    retry_mode: Literal["failed_only", "ai_only", "full", "full_text_ai"] = "failed_only"
 
 
 class PageEditRequest(BaseModel):

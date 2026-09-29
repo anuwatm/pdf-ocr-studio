@@ -1334,6 +1334,26 @@ kbd {
   display: none !important;
 }
 
+/* Previous OCR jobs */
+.history-card { padding: 1.25rem 1.5rem; }
+.history-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.history-subtitle, .history-message { margin: 0.3rem 0 0; color: var(--text-secondary); font-size: 0.85rem; }
+.history-actions, .history-row-actions { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.retention-control { display: flex; align-items: center; gap: 0.35rem; color: var(--text-secondary); font-size: 0.8rem; }
+.retention-control input { width: 58px; border: 1px solid var(--bg-card-border); border-radius: var(--radius-sm); background: var(--bg-primary); color: var(--text-primary); padding: 0.35rem; }
+.history-list { display: grid; gap: 0.55rem; margin-top: 1rem; max-height: 310px; overflow-y: auto; }
+.history-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 0.8rem; padding: 0.75rem; border: 1px solid var(--bg-card-border); border-radius: var(--radius-sm); background: var(--bg-primary); }
+.history-job-info { min-width: 0; display: grid; gap: 0.18rem; }
+.history-job-info strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.9rem; }
+.history-job-info span, .history-job-info small { color: var(--text-secondary); font-size: 0.75rem; }
+
+@media (max-width: 640px) {
+  .history-card { padding: 1rem; }
+  .history-actions { width: 100%; }
+  .history-row { grid-template-columns: 1fr auto; }
+  .history-row-actions { grid-column: 1 / -1; }
+}
+
 /* ==========================================================================\n+   Local LLM Configuration\n+   ========================================================================== */
 
 .brand-link {

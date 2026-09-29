@@ -14,7 +14,7 @@ from src.llm_client import LocalLLMClient
 from src.correction_schema import CorrectionItem, ChangesDocument, DiffSummary
 from src.correction_validator import CorrectionValidator
 from src.diff_engine import DiffEngine
-from src.prescreener import find_suspicious_spots, HIGH_PRECISION_CORRECTIONS
+from src.prescreener import find_suspicious_spots, get_high_precision_correction
 
 logger = logging.getLogger(__name__)
 
@@ -149,7 +149,9 @@ class AICorrector:
             valid_block_ids = {b.get("block_id") for b in page_blocks if "block_id" in b}
 
         # 1. Prescreener detection
-        suspect_spots = find_suspicious_spots(raw_text) if use_prescreener else []
+        # Always collect deterministic repairs. Full-text mode additionally
+        # sends the entire text to the model instead of limiting it to spots.
+        suspect_spots = find_suspicious_spots(raw_text)
         if use_prescreener and not suspect_spots:
             # Clean page: no suspicious orthography or OCR error patterns detected
             doc = ChangesDocument(
@@ -168,11 +170,31 @@ class AICorrector:
             )
             return raw_text, doc
 
-        # 2. Build focused prompt
-        if suspect_spots:
+        # 2. Apply deterministic corrections before invoking the small local model.
+        # This prevents a model timeout or a weak model response from losing a
+        # known-safe Thai OCR repair.
+        deterministic_items = []
+        model_spots = []
+        for spot in suspect_spots:
+            corrected, category, reason = get_high_precision_correction(spot["matched_text"])
+            if corrected:
+                deterministic_items.append({
+                    "original_text": spot["matched_text"],
+                    "corrected_text": corrected,
+                    "category": category,
+                    "reason": reason,
+                    "start": spot["start"],
+                    "end": spot["end"],
+                })
+            else:
+                model_spots.append(spot)
+
+        # 3. Build a focused prompt only for corrections that need the model.
+        call_model = (not use_prescreener) or bool(model_spots)
+        if call_model and use_prescreener:
             user_prompt = "คุณเป็นระบบ AI ตรวจแก้คำผิดภาษาไทยจาก OCR\n"
             user_prompt += "จงตรวจคำที่น่าสงสัยต่อไปนี้ตามบริบทแวดล้อม และแก้ไขเฉพาะคำที่สะกดผิดหรือมีสระ/วรรณยุกต์ผิด:\n\n"
-            for i, spot in enumerate(suspect_spots[:10], 1):
+            for i, spot in enumerate(model_spots[:10], 1):
                 ctx_start = max(0, spot["start"] - 40)
                 ctx_end = min(len(raw_text), spot["end"] + 40)
                 snippet = raw_text[ctx_start:ctx_end].replace("\n", " ").strip()
@@ -183,61 +205,49 @@ class AICorrector:
             user_prompt += "- original_text ต้องเป็นคำที่ปรากฏตรงตัวในบริบท\n"
             user_prompt += "- ห้ามแก้หรือตัดคำที่ถูกต้องแล้ว\n"
             user_prompt += "- ส่งผลลัพธ์เป็น JSON ตาม schema ที่กำหนด"
-        else:
-            user_prompt = f"Text to inspect and correct:\n```\n{raw_text[:1500]}\n```\n"
+        elif call_model:
+            user_prompt = f"Text to inspect and correct:\n```\n{raw_text}\n```\n"
             user_prompt += "Inspect words and provide word-level corrections if misspelled. Return JSON schema with 'corrections':"
 
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
-        ]
-
-        # 3. Call Local LLM with structured output schema enforcement
-        resp = self.client.chat_completion(
-            messages=messages,
-            temperature=0.0,
-            max_tokens=600,
-            response_format=CORRECTIONS_JSON_SCHEMA,
-        )
-
-        # 4. Handle client-level failures (timeout, connection error, etc.)
-        if not resp["success"]:
-            doc = ChangesDocument(
-                job_id=job_id,
-                page_id=page_id,
-                source_revision=source_revision,
-                status=resp.get("status", "failed"),
-                model=self.client.model,
-                error_message=resp.get("error", "LLM call failed"),
-                total_corrections=0,
-                corrections=[],
-                diff_summary=DiffSummary(
-                    total_characters_raw=len(raw_text),
-                    total_characters_corrected=len(raw_text),
-                    unchanged=len(raw_text),
-                ),
+        if call_model:
+            messages = [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ]
+            resp = self.client.chat_completion(
+                messages=messages,
+                temperature=0.0,
+                max_tokens=600,
+                response_format=CORRECTIONS_JSON_SCHEMA,
             )
-            return raw_text, doc
-
-        # 5. Extract JSON
-        data = self.extract_json_from_response(resp.get("content", ""))
-        if data is None or "corrections" not in data or not isinstance(data["corrections"], list):
-            doc = ChangesDocument(
-                job_id=job_id,
-                page_id=page_id,
-                source_revision=source_revision,
-                status="malformed_json",
-                model=self.client.model,
-                error_message="Could not parse valid JSON schema from model response",
-                total_corrections=0,
-                corrections=[],
-                diff_summary=DiffSummary(
-                    total_characters_raw=len(raw_text),
-                    total_characters_corrected=len(raw_text),
-                    unchanged=len(raw_text),
-                ),
-            )
-            return raw_text, doc
+            if not resp["success"]:
+                if not deterministic_items:
+                    doc = ChangesDocument(
+                        job_id=job_id, page_id=page_id, source_revision=source_revision,
+                        status=resp.get("status", "failed"), model=self.client.model,
+                        error_message=resp.get("error", "LLM call failed"), total_corrections=0,
+                        corrections=[],
+                        diff_summary=DiffSummary(total_characters_raw=len(raw_text), total_characters_corrected=len(raw_text), unchanged=len(raw_text)),
+                    )
+                    return raw_text, doc
+                data = {"corrections": deterministic_items}
+            else:
+                data = self.extract_json_from_response(resp.get("content", ""))
+                if data is None or "corrections" not in data or not isinstance(data["corrections"], list):
+                    if not deterministic_items:
+                        doc = ChangesDocument(
+                            job_id=job_id, page_id=page_id, source_revision=source_revision,
+                            status="malformed_json", model=self.client.model,
+                            error_message="Could not parse valid JSON schema from model response", total_corrections=0,
+                            corrections=[],
+                            diff_summary=DiffSummary(total_characters_raw=len(raw_text), total_characters_corrected=len(raw_text), unchanged=len(raw_text)),
+                        )
+                        return raw_text, doc
+                    data = {"corrections": deterministic_items}
+                else:
+                    data["corrections"] = deterministic_items + data["corrections"]
+        else:
+            data = {"corrections": deterministic_items}
 
         # 6. Parse raw corrections into CorrectionItem candidates
         candidate_items: List[CorrectionItem] = []

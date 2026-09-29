@@ -28,6 +28,7 @@ from .text_assembler import (
     CharSpanMapping,
 )
 from .oneocr_wrapper import OneOcrEngine
+from .thai_ocr_normalizer import normalize_ocr_line
 
 SCHEMA_VERSION = "2.0.0"
 PAGE_SEPARATOR_TEMPLATE = "\n\n--- Page {page_number} ---\n\n"
@@ -62,6 +63,7 @@ class ProcessingPipeline:
         page_range: Optional[Union[Tuple[int, int], List[int], range]] = None,
         enable_ai_correction: bool = False,
         ai_corrector: Optional[Any] = None,
+        ai_use_prescreener: bool = True,
     ) -> Dict[str, Any]:
         """
         Process any supported file (PDF, PNG, JPG), executing routing, OCR,
@@ -106,6 +108,7 @@ class ProcessingPipeline:
             corrected_text, changes_doc = corrector.correct_text(
                 raw_text=result["raw_text"],
                 job_id=job_id,
+                use_prescreener=ai_use_prescreener,
             )
             result["corrected_text"] = corrected_text
             result["changes_doc"] = changes_doc.model_dump()
@@ -239,6 +242,7 @@ class ProcessingPipeline:
             elif routing.decision == "direct_text":
                 summary_counts["direct_text"] += 1
                 blocks = extract_native_text_blocks(page, dpi=dpi)
+                self._normalize_blocks(blocks)
                 page_text, mappings = assemble_page_text(page_id, blocks)
 
                 summary_counts["completed"] += 1
@@ -286,6 +290,7 @@ class ProcessingPipeline:
                 lines_formatted = detect_and_format_table_lines(raw_lines)
                 for l_dict, fmt_t in zip(raw_lines, lines_formatted):
                     l_dict["text"] = fmt_t
+                self._normalize_ocr_lines(raw_lines)
 
                 # Convert lines into block format
                 blocks = self._ocr_lines_to_blocks(page_id, raw_lines)
@@ -309,6 +314,7 @@ class ProcessingPipeline:
             elif routing.decision == "hybrid":
                 summary_counts["hybrid"] += 1
                 native_blocks = extract_native_text_blocks(page, dpi=dpi)
+                self._normalize_blocks(native_blocks)
 
                 # Mask native text blocks on image copy to avoid duplicate OCR
                 masked_image = ref_image.copy()
@@ -325,6 +331,7 @@ class ProcessingPipeline:
                 # Run OCR on remaining non-native graphics
                 ocr_result = self.engine.recognize_pil(masked_image)
                 raw_lines = ocr_result.get("lines", [])
+                self._normalize_ocr_lines(raw_lines)
                 ocr_blocks = self._ocr_lines_to_blocks(page_id, raw_lines, id_prefix="ocr")
 
                 # Merge and sort
@@ -518,6 +525,7 @@ class ProcessingPipeline:
                 "raw_text": PAGE_SEPARATOR_EMPTY.format(page_number=page_id).lstrip("\n"),
             }
 
+        self._normalize_ocr_lines(raw_lines)
         blocks = self._ocr_lines_to_blocks(page_id, raw_lines)
         page_text, mappings = assemble_page_text(page_id, blocks)
 
@@ -684,6 +692,32 @@ class ProcessingPipeline:
             blocks.append(self._create_block_from_lines(page_id, len(blocks), curr_block_lines, id_prefix))
 
         return blocks
+
+    @staticmethod
+    def _normalize_ocr_lines(lines: List[Dict[str, Any]]) -> None:
+        """Apply conservative Thai OCR repairs while retaining source text for audit."""
+        for line in lines:
+            original = line.get("text", "")
+            normalized = normalize_ocr_line(original)
+            if normalized != original:
+                line["source_text"] = original
+                line["text"] = normalized
+
+    @classmethod
+    def _normalize_blocks(cls, blocks: List[Dict[str, Any]]) -> None:
+        """Normalize text-layer blocks with the same high-precision rules as OCR lines."""
+        for block in blocks:
+            lines = block.get("lines", [])
+            if lines:
+                cls._normalize_ocr_lines(lines)
+                block["text"] = "\n".join(line.get("text", "") for line in lines)
+                continue
+
+            original = block.get("text", "")
+            normalized = normalize_ocr_line(original)
+            if normalized != original:
+                block["source_text"] = original
+                block["text"] = normalized
 
     def _create_block_from_lines(
         self, page_id: int, block_idx: int, lines: List[Dict[str, Any]], id_prefix: str

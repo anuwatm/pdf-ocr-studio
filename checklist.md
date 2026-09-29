@@ -196,7 +196,7 @@ aw.txt ที่ประกอบแล้ว; ระบุ tolerance ของ
 - [x] เก็บสถานะ queued/running/completed/partial/failed/cancelled พร้อมความคืบหน้ารายหน้า (จัดเก็บใน src/database.py และส่งผ่าน JobStatusResponse)
 - [x] ใช้นิยามสถานะจาก README แยก OCR/AI/review; OCR สำเร็จแต่ AI ล้มต้องมี raw และเป็น `partial` เมื่อร้องขอ AI ไม่ถือเป็น `completed` (ทดสอบผ่านใน test_fault_and_limits.py)
 - [x] retry เฉพาะขั้นตอนที่ล้มเหลวได้ เช่น AI ล้มไม่ต้องรัน OCR ที่สำเร็จใหม่; retry หลัง cancel ทำได้เมื่อ attempt เดิมสิ้นสุด และห้ามผลเก่าทับ final (รองรับ failed_only, ai_only, full และ increment attempt)
-- [x] จำกัดขนาดไฟล์ จำนวนหน้า เวลา และขนาดภาพที่ decode เพื่อควบคุมหน่วยความจำ (ไฟล์ไม่เกิน 50 MB, อ่านจำนวนหน้า PDF ก่อนเริ่ม, ผู้ใช้เลือกแปลงจากหน้า 1 ได้ไม่เกิน 100 หน้า/ครั้ง, ปฏิเสธ encrypted PDF)
+- [x] จำกัดขนาดไฟล์ จำนวนหน้า เวลา และขนาดภาพที่ decode เพื่อควบคุมหน่วยความจำ (ไฟล์ไม่เกิน 50 MB, อ่านจำนวนหน้า PDF ก่อนเริ่ม, ผู้ใช้เลือกช่วงหน้าได้และระบบแบ่งประมวลผล batch ละ 200 หน้า, ปฏิเสธ encrypted PDF)
 - [x] รองรับลองใหม่เฉพาะหน้าที่ล้มเหลวโดยไม่ทำผลซ้ำ (ทดสอบผ่านใน test_cancellation_and_retry.py)
 - [x] กำหนด transition ของงาน/หน้า, attempt และสิทธิ์อัปเดตผล ผลจาก attempt เก่าห้ามทับผลล่าสุด; เมื่อเริ่มระบบใหม่ตรวจงานค้าง `running` และกู้คืนตามนโยบายที่บันทึกไว้ (ทดสอบผ่านใน test_system_restart_recovery.py และ test_cancellation_and_retry.py)
 - [x] บันทึกผลรายหน้าให้สมบูรณ์ก่อนประกาศสำเร็จ มีการตรวจความสอดคล้องระหว่างไฟล์กับฐานข้อมูลหลัง crash และจัดการดิสก์เต็ม/เขียนไฟล์ล้มเหลว (ตรวจสอบไฟล์จริงก่อนอัปเดต DB รายหน้า)
@@ -228,7 +228,7 @@ aw.txt ที่ประกอบแล้ว; ระบุ tolerance ของ
 
 - [x] อัปโหลดด้วยลากวางและปุ่มเลือกไฟล์ (พัฒนาครบถ้วนใน static/index.html และ static/app.js รองรับ dragover, file picker, file size validation <= 50MB)
 - [x] เลือก OCR อย่างเดียว หรือ OCR + AI พร้อมบอกสถานะโมเดล (สวิตช์เลือกโหมดชัดเจน พร้อมตัวตรวจจับสถานะ Local AI model /api/ai/status แบบเรียลไทม์)
-- [x] แสดงคิว จำนวนหน้าที่เสร็จ ข้อผิดพลาด และปุ่มยกเลิก/retry (Progress bar, page counter, error alert banner, Cancel & Retry dropdown)
+- [x] แสดงคิว จำนวนหน้าที่เสร็จ หน้าที่กำลัง OCR ข้อผิดพลาด และปุ่มยกเลิก/retry (Progress bar, page counter, current-page status, error alert banner, Cancel & Retry dropdown)
 - [x] แสดงภาพต้นฉบับคู่ข้อความและเปลี่ยนหน้าได้ (Dual-pane layout ฝั่งซ้ายภาพต้นฉบับ ฝั่งขวาข้อความ พร้อม Page Switcher dropdown และปุ่ม Prev/Next)
 - [x] คลิกบรรทัด/บล็อกข้อความเพื่อแสดงกรอบต้นทางบนภาพ โดยใช้พิกัดและ transform จาก Phase 2 (SVG polygon overlays ทาบภาพต้นฉบับ รองรับ bidirectional click highlight ระหว่างข้อความกับกรอบภาพ)
 - [x] ไฮไลต์ diff พร้อมยอมรับ/คืนค่าการแก้ไข (แสดงแท็บ AI Diff ชัดเจน มีปุ่ม ยอมรับ / คืนค่า รายจุด และ ยอมรับทั้งหมด / คืนค่าทั้งหมด)

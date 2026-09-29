@@ -34,14 +34,13 @@ from src.config import HOST, PORT, LOCALHOST_ONLY, get_llm_config, update_llm_co
 from src.database import JobDatabase, DatabaseLockTimeoutError, RevisionConflictError
 from src.job_manager import JobManager
 from src.job_models import (
-    JobStatus, PageStatus, ReviewStatus,
+    OCR_BATCH_SIZE, JobStatus, PageStatus, ReviewStatus,
     JobCreateResponse, JobStartRequest, JobStatusResponse,
     JobRetryRequest, PageEditRequest, PageEditResponse, LocalLLMConfigRequest
 )
 
 # Configuration defaults
 MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024  # 50 MB
-MAX_PAGE_LIMIT = 200                     # 200 pages per job
 DEFAULT_DB_PATH = "data/jobs.db"
 DEFAULT_OUTPUT_DIR = "files"
 
@@ -310,15 +309,10 @@ def start_job(job_id: str, req: JobStartRequest = JobStartRequest()):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Job is already running")
 
     page_start = req.page_start if req.page_start is not None else 1
-    page_end = req.page_end if req.page_end is not None else min(job.total_pages, MAX_PAGE_LIMIT)
+    page_end = req.page_end if req.page_end is not None else job.total_pages
     selected_count = page_end - page_start + 1
     if page_start < 1 or page_end < page_start or page_end > job.total_pages:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ช่วงหน้าที่เลือกไม่อยู่ในเอกสาร")
-    if selected_count > MAX_PAGE_LIMIT:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"แปลงได้สูงสุด {MAX_PAGE_LIMIT} หน้าต่อครั้ง",
-        )
     if not db.configure_job_for_start(
         job_id,
         page_start=page_start,
@@ -338,6 +332,8 @@ def start_job(job_id: str, req: JobStartRequest = JobStartRequest()):
         "processing_pages": selected_count,
         "page_start": page_start,
         "page_end": page_end,
+        "batch_size": OCR_BATCH_SIZE,
+        "total_batches": max(1, (selected_count + OCR_BATCH_SIZE - 1) // OCR_BATCH_SIZE),
     }
 
 
@@ -390,7 +386,7 @@ def retry_job(job_id: str, req: JobRetryRequest = JobRetryRequest()):
     # Enqueue
     success = job_manager.enqueue_job(
         job_id=job_id,
-        enable_ai=job.enable_ai,
+        enable_ai=True if req.retry_mode == "full_text_ai" else job.enable_ai,
         retry_mode=req.retry_mode,
     )
     if not success:

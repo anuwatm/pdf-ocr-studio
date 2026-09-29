@@ -20,6 +20,12 @@
 .\run_server.ps1
 ```
 
+หากใช้ Command Prompt ให้รัน:
+
+```cmd
+.\run_server.cmd
+```
+
 สคริปต์จะสร้าง `venv` และติดตั้ง dependencies ให้เองในครั้งแรก จากนั้นเปิด [http://127.0.0.1:8000/](http://127.0.0.1:8000/) ในเบราว์เซอร์
 
 หาก PowerShell ไม่อนุญาตให้รัน script ให้ใช้คำสั่งนี้เฉพาะหน้าต่างปัจจุบัน แล้วรันใหม่:
@@ -31,7 +37,8 @@ Set-ExecutionPolicy -Scope Process Bypass
 ### โหมด OCR และ Local AI
 
 - ค่าเริ่มต้นคือ **OneOCR อย่างเดียว (Baseline)** จึงใช้งาน OCR ได้แม้ไม่ได้เปิด Local LLM
-- เลือกช่วงหน้าเริ่มต้น–สิ้นสุดได้สูงสุด **200 หน้า/งาน**
+- เลือกช่วงหน้าเริ่มต้น–สิ้นสุดได้ตามจำนวนหน้าของเอกสาร; ระบบแบ่งทำงานเป็น **batch ละ 200 หน้า** ต่อเนื่องจนจบช่วงที่เลือก
+- เมื่อ OCR แต่ละหน้าเสร็จ หน้า Preview จะเปลี่ยนไปแสดงภาพและข้อความของหน้านั้นทันที
 - เมื่อ Local AI เป็น Offline ระบบจะล็อก **OneOCR + Local AI ตรวจแก้คำ** ไว้
 - กด **ทดสอบการเชื่อมต่อ** ข้างสถานะ Local AI; เมื่อเชื่อมต่อและพบโมเดลแล้ว ตัวเลือก AI จะถูกปลดล็อก
 
@@ -69,17 +76,18 @@ Set-ExecutionPolicy -Scope Process Bypass
 3. **Interactive Dual-Pane Web Studio:**
    - หน้าจอทำงานแบบแยก 2 ฝั่ง (ต้นฉบับ vs ข้อความที่แปลงได้)
    - **Bidirectional Bounding Box Sync:** คลิกคำ/บรรทัดบนข้อความ กรอบสีบนภาพต้นฉบับจะเลื่อนและไฮไลต์ตำแหน่งทันที และสามารถคลิกกรอบบนภาพเพื่อวิ่งไปยังข้อความได้เช่นกัน
-   - เครื่องมือขยาย ซูม รีเซ็ตภาพ และรองรับการหมุน/แก้เอียง (Deskew)
+   - แสดงหน้า Preview ที่เพิ่ง OCR เสร็จระหว่างงานทำงาน โดยไม่สลับหน้าหากมีข้อความแก้มือที่ยังไม่บันทึก
 4. **Local AI Correction & Diff Engine:**
-   - เชื่อมต่อกับ Local LLM (เช่น LM Studio, Ollama หรือโมเดล OpenAI-compatible บน localhost) เพื่อตรวจแก้คำผิดและสระลอย
-   - มีระบบ **Diff Engine** คำนวณการเปลี่ยนแปลงละเอียดระดับอักขระ
+   - เริ่มต้นเป็น OneOCR only; เปิด AI ได้เมื่อทดสอบการเชื่อมต่อ Local LLM ผ่านแล้ว
+   - ใช้กฎ deterministic สำหรับ OCR ที่แยก `ำ` เป็น ` า` หรือ ` ้า` ก่อนส่งคำที่เหลือให้ Local LLM เสนอการแก้
+   - ปุ่ม **AI ตรวจคำผิดทั้งหมด** อ่าน `raw.txt` ของทุกหน้าที่ OCR สำเร็จแล้ว โดยไม่ทำ OCR ซ้ำ และเก็บผลเป็นข้อเสนอ
    - ปุ่ม **Accept / Revert** ทีละจุด หรือทั้งหมด พร้อมการันตีคืนค่า raw text byte-for-byte ได้ 100%
 5. **Crash Isolation & Resilient Architecture:**
    - แยก **FastAPI Web Server** ออกจาก **OCR Worker Subprocess** อย่างเด็ดขาด ป้องกัน Native DLL Crash ไม่ให้เซิร์ฟเวอร์หลักหยุดทำงาน
    - จัดการคิวงานด้วย SQLite โหมด Write-Ahead Logging (WAL) พร้อมกู้คืนงานที่ค้าง (`recovering interrupted jobs`) หลังเปิดระบบใหม่
    - กลไกป้องกันการแก้ไขชนกันหลายแท็บ (Multi-tab Conflict Detection ด้วย ETag/Revision คืนค่า HTTP 409)
 6. **Data Retention & Anti-Resurrection:**
-   - ระบบกำจัดไฟล์ชั่วคราวและงานหมดอายุตาม TTL (ค่าเริ่มต้น 24 ชั่วโมง)
+   - หน้า **งาน OCR ก่อนหน้า** เปิดดู ดาวน์โหลด หรือลบงานทีละรายการได้ และลบงานที่เก่ากว่าจำนวนวันที่ผู้ใช้กำหนดได้
    - ป้องกันสภาวะ Race Condition: หากงานถูกลบไปแล้ว Worker จะยุติการเขียนไฟล์กลับคืนทันที (0 Resurrection)
 7. **ความเป็นส่วนตัวและ Offline 100%:**
    - เซิร์ฟเวอร์ผูกเข้ากับ `127.0.0.1` (Loopback Only) ปฏิเสธการเข้าถึงจาก IP ภายนอกด้วย HTTP 403 Forbidden
@@ -89,220 +97,161 @@ Set-ExecutionPolicy -Scope Process Bypass
 
 ## สถาปัตยกรรมและแผนภาพการทำงาน (Architecture & Diagrams)
 
-### 1. แผนภาพสถาปัตยกรรมระบบและการแยก Process
+ส่วนนี้อธิบายเส้นทางข้อมูลที่ใช้งานจริงในรุ่นปัจจุบัน: งาน OCR ทำใน Worker แยก process, ผลลัพธ์เขียนลงดิสก์ทีละหน้า, และหน้าเว็บอ่านสถานะจาก API เพื่อแสดงความคืบหน้าทันที
 
-แผนภาพแสดงการแยก Process ระหว่าง Web Server กับ OCR Worker อย่างเด็ดขาด เพื่อป้องกันปัญหา Native DLL Crash ส่งผลกระทบต่อการให้บริการของระบบ:
+### 1. สถาปัตยกรรมระบบ
 
 ```mermaid
 flowchart TB
-    subgraph Browser ["Web Browser (Localhost 127.0.0.1)"]
-        UI["Web Studio UI (Vanilla JS & Modern CSS)"]
-        ConfigUI["Local LLM Config (config.html)"]
+    subgraph Browser ["Browser: 127.0.0.1"]
+        Upload["Upload และเลือกช่วงหน้า"]
+        Progress["Progress และ Preview รายหน้า"]
+        Studio["Web Studio / Download / History"]
+        Config["Config และ Test Local LLM"]
     end
 
-    subgraph ServerProcess ["FastAPI Web Server (Main Process)"]
-        API["REST API Router (src/server.py)"]
-        JobMgr["Job Supervisor (src/job_manager.py)"]
-        CleanupSvc["Data Retention Daemon (TTL 24h)"]
+    subgraph Server ["FastAPI process"]
+        API["REST API"]
+        Queue["Job Manager / Supervisor"]
+        Cleanup["History และ Cleanup API"]
     end
 
-    subgraph DataStore ["Local Storage & Database"]
-        DB[("SQLite WAL (jobs.db)")]
-        FileStore[("files/{job_id}/<br/>raw.txt, corrected.txt, final.txt")]
+    subgraph Worker ["OCR Worker process"]
+        Runner["worker_process.py"]
+        Pipeline["pipeline.py"]
+        OneOCR["OneOCR via ctypes"]
     end
 
-    subgraph WorkerProcess ["Isolated Worker Subprocess"]
-        WorkerMain["Worker Script (src/worker_process.py)"]
-        Pipeline["Processing Pipeline (src/pipeline.py)"]
-        OneOCR["OneOCR ctypes Wrapper (src/oneocr_wrapper.py)"]
-        DLLs["oneocr.dll + oneocr.onemodel<br/>onnxruntime.dll"]
+    subgraph LocalData ["ข้อมูลภายในเครื่อง"]
+        DB[("SQLite WAL")]
+        Files[("files/job_id<br/>input, raw, corrected,<br/>final, ocr.json, changes.json")]
     end
 
-    subgraph AIService ["Local AI Service (127.0.0.1:1234)"]
-        LocalLLM[("LM Studio / Ollama / Local LLM")]
-    end
+    LLM["Local LLM<br/>127.0.0.1 only"]
 
-    UI <-->|HTTP / JSON| API
-    ConfigUI <-->|HTTP / Config| API
-    API <-->|Read / Write Status| DB
-    API <-->|Read Results & Downloads| FileStore
-    API -->|Enqueue Task| JobMgr
-    JobMgr -->|Spawn subprocess with attempt log| WorkerMain
-    JobMgr -.->|Monitor exit code / Crash recovery| WorkerMain
-    WorkerMain --> Pipeline
-    Pipeline -->|Call via ctypes| OneOCR
-    OneOCR -->|Load & Run native ABI| DLLs
-    WorkerMain <-->|Read / Write Job State| DB
-    WorkerMain -->|Write Output & BBoxes| FileStore
-    WorkerMain <-->|HTTP Loopback only| LocalLLM
-    CleanupSvc -->|Auto-delete expired| DB
-    CleanupSvc -->|Auto-delete expired| FileStore
+    Upload --> API
+    Progress <--> API
+    Studio <--> API
+    Config <--> API
+    API <--> DB
+    API <--> Files
+    API --> Queue --> Runner
+    Runner <--> DB
+    Runner --> Pipeline --> OneOCR
+    Runner --> Files
+    Runner <--> LLM
+    Cleanup --> DB
+    Cleanup --> Files
 ```
+
+OneOCR DLL ถูกโหลดใน Worker เท่านั้น ดังนั้นความขัดข้องของ native OCR ไม่ทำให้ FastAPI process หยุดตามไปด้วย. API และ Local LLM จำกัดการเชื่อมต่อไว้ที่ loopback.
 
 ---
 
-### 2. แผนภาพการประมวลผลและการจัดเส้นทางเอกสาร (Intelligent Page Routing)
-
-ขั้นตอนการตัดสินใจเลือกเส้นทางระหว่าง Digital Text Extraction หรือ OneOCR พร้อมการจัดลำดับการอ่านและการทำ Deep Bounding Box Mapping:
+### 2. เส้นทาง OCR, batch และ Preview
 
 ```mermaid
 flowchart TD
-    Start(["รับไฟล์เอกสาร (PDF หรือ ภาพ PNG/JPG)"]) --> Prescreen{"ตรวจสอบชนิดไฟล์ & Header"}
-    
-    Prescreen -->|ภาพ PNG / JPG| ImgPath["โหลดภาพ & ตรวจสอบ Metadata ทิศทาง"]
-    Prescreen -->|PDF Document| PDFPath["อ่านจำนวนหน้า & ตรวจสอบการเข้ารหัส"]
-    
-    PDFPath --> Encrypted{"มีรหัสผ่านหรือไม่?"}
-    Encrypted -->|มีรหัสผ่าน| ErrPW["แจ้งข้อผิดพลาด: ไม่รองรับ PDF ติดรหัส (HTTP 422)"]
-    Encrypted -->|ไม่มีรหัสผ่าน| PageLoop["ผู้ใช้เลือกช่วงหน้า แล้ววนลูปประมวลผลทีละหน้า (ไม่เกิน 200 หน้า/งาน)"]
-    
-    PageLoop --> BlankCheck{"ตรวจจับหน้าว่าง<br/>(Visual Blank Detection)"}
-    BlankCheck -->|หน้าว่างจริง| MarkBlank["กำหนดสถานะ blank<br/>บันทึก --- Page N [BLANK] ---"]
-    
-    BlankCheck -->|มีเนื้อหา| TextCheck{"มี Digital Text Layer<br/>ที่สมบูรณ์หรือไม่?"}
-    
-    TextCheck -->|มีข้อความดิจิทัลที่อ่านได้| ExtractText["สกัด Unicode Text Layer ตรง<br/>(PyMuPDF / pypdfium2)"]
-    ExtractText --> CheckImg{"มีภาพแทรกในหน้านั้นหรือไม่?"}
-    CheckImg -->|มีภาพสแกนผสม| HybridOCR["เรนเดอร์เฉพาะส่วนภาพส่งเข้า OneOCR"]
-    CheckImg -->|ไม่มีภาพแทรก| AssembleOrder
-    
-    TextCheck -->|หน้าสแกน หรือ Text เสีย| RenderImg["เรนเดอร์หน้า PDF เป็นภาพความละเอียดสูง (200 DPI)"]
-    RenderImg --> ImgPath
-    
-    ImgPath --> Deskew["ตรวจจับองศาเอียง & คำนวณ Affine Matrix"]
-    Deskew --> OneOCREngine["แปลงเป็น BGRA Buffer ส่งเข้า oneocr.dll (ctypes)"]
-    OneOCREngine --> ParseBoxes["สกัดข้อความ, พิกัด Bounding Box 4 จุด<br/>และค่าความเชื่อมั่น (Confidence)"]
-    
-    HybridOCR --> AssembleOrder
-    ParseBoxes --> AssembleOrder["จัดลำดับการอ่าน (Reading Order Algorithm)<br/>- เรียงบนลงล่าง, ซ้ายไปขวา<br/>- จัดรูปแบบคอลัมน์และตารางคั่นด้วย Tab"]
-    
-    AssembleOrder --> Mapping["สร้าง Deep Character Mapping<br/>(เชื่อม Code Point ข้อความกับ Bounding Box บนภาพ)"]
-    
-    Mapping --> SaveRaw["บันทึก raw.txt และ ocr.json ลงดิสก์"]
-    MarkBlank --> SaveRaw
-    SaveRaw --> Done(["เสร็จสิ้นขั้นตอนประกอบข้อความ"])
+    Upload(["อัปโหลด PDF / PNG / JPG"]) --> Count["ตรวจชนิดไฟล์และอ่านจำนวนหน้า"]
+    Count --> Choose["เลือกหน้าเริ่มต้น-สิ้นสุด"]
+    Choose --> Start["สร้างงานและเข้าคิว"]
+    Start --> Batch["Worker แบ่งช่วงที่เลือกเป็น batch ละ 200 หน้า"]
+    Batch --> Page["ประมวลผลหน้าถัดไป"]
+    Page --> Blank{"หน้าว่างหรือไม่?"}
+    Blank -->|ใช่| SaveBlank["บันทึก blank"]
+    Blank -->|ไม่ใช่| Route{"มี PDF Text Layer ที่ใช้ได้หรือไม่?"}
+    Route -->|ใช่| Extract["สกัดข้อความจาก PDF"]
+    Route -->|ไม่ใช่ / เป็นภาพ| OCR["เรนเดอร์ภาพและเรียก OneOCR"]
+    Extract --> Normalize["จัดลำดับข้อความ และ normalize รูปแบบที่ยืนยันได้"]
+    OCR --> Normalize
+    Normalize --> Save["เขียน raw.txt และ ocr.json แบบ UTF-8"]
+    SaveBlank --> Update["อัปเดต SQLite"]
+    Save --> Update
+    Update --> Preview["หน้าเว็บแสดงสถานะและ Preview หน้าที่เสร็จ"]
+    Preview --> More{"มีหน้าถัดไป?"}
+    More -->|มี| Page
+    More -->|ไม่มี| Finish(["OCR เสร็จ"])
 ```
+
+ช่วงหน้าที่เลือกอาจยาวกว่า 200 หน้าได้; Worker จะทำต่อเนื่องเป็น batch ละ 200 หน้าเพื่อคืนทรัพยากร OCR ระหว่าง batch. เมื่อหน้าใดเสร็จ ระบบจะเขียนไฟล์และอัปเดตสถานะก่อนเริ่มหน้าถัดไป ทำให้ Preview แสดงผลหน้านั้นได้ทันที.
 
 ---
 
-### 3. แผนภาพการตรวจแก้ด้วย Local AI และ Diff Engine
-
-กระบวนการส่งข้อความเข้า Local LLM, การตรวจสอบความถูกต้องของโครงสร้างผลลัพธ์ (Schema Validation), การคำนวณ Diff อักขระต่ออักขระ และการให้สิทธิ์ผู้ใช้ตัดสินใจยอมรับหรือคืนค่า:
+### 3. Baseline, Local AI และการตรวจทาน
 
 ```mermaid
 flowchart TD
-    RawInput[("raw.txt (ข้อความดิบจาก OCR/PDF)")] --> Chunker["Text Chunker (แบ่งท่อนข้อความตามย่อหน้า ไม่ตัดกลางคำ)"]
-    Chunker --> BuildPrompt["สร้าง Prompt ระบุข้อกำหนดเคร่งครัด:<br/>- ห้ามสรุป หรือแต่งเติมข้อความ<br/>- ตรวจแก้เฉพาะคำผิด สระลอย วรรณยุกต์ตามต้นฉบับ<br/>- ส่งผลลัพธ์ในรูปแบบ Structured JSON"]
-    
-    BuildPrompt --> CallLLM["เรียก Local LLM ผ่าน Loopback (127.0.0.1:1234/v1)"]
-    
-    CallLLM --> LLMCheck{"Local LLM ตอบสนองสำเร็จหรือไม่?"}
-    LLMCheck -->|ล้มเหลว / Timeout / Crash| FallbackRaw["Fallback: คงข้อความดิบ raw.txt 100%<br/>กำหนดสถานะหน้าเป็น partial (ไม่สูญเสียข้อมูล)"]
-    
-    LLMCheck -->|สำเร็จ| ValidateJSON{"ตรวจ JSON Schema Validation<br/>(Pydantic CorrectionResponse)"}
-    ValidateJSON -->|รูปแบบไม่ถูกต้อง| FallbackRaw
-    
-    ValidateJSON -->|ผ่านเกณฑ์| DiffEngine["Diff Engine (Levenshtein Alignment)"]
-    DiffEngine --> CharDiff["วิเคราะห์ความต่างระดับอักขระ:<br/>- Substitutions (การแทนที่)<br/>- Insertions (การเพิ่มสระ/พยัญชนะ)<br/>- Deletions (การลบอักขระส่วนเกิน)"]
-    
-    CharDiff --> GenProposals["สร้างรายการข้อเสนอการแก้ไข (changes.json)<br/>พร้อมกำหนด Change ID: chg_01, chg_02, ..."]
-    CharDiff --> GenCorrected["สร้าง corrected.txt"]
-    
-    GenProposals --> WebStudio["แสดงผลบนหน้าจอ Web Studio"]
-    GenCorrected --> WebStudio
-    FallbackRaw --> WebStudio
-    
-    WebStudio --> UserAction{"การตัดสินใจของผู้ใช้<br/>(User Final Review)"}
-    UserAction -->|กด Accept ทีละจุด / ทั้งหมด| ApplyChanges["ปรับใช้ข้อเสนอลงในข้อความ"]
-    UserAction -->|กด Revert ทีละจุด / ทั้งหมด| RollbackChanges["คืนค่าเดิมเป็น raw text byte-for-byte 100%"]
-    UserAction -->|พิมพ์แก้ไขด้วยมือใน Editor| ManualEdit["บันทึกฉบับแก้ไขของผู้ใช้ (Ctrl+S)"]
-    
-    ApplyChanges --> SaveFinal[("บันทึก final.txt ฉบับล่าสุด")]
-    RollbackChanges --> SaveFinal
-    ManualEdit --> SaveFinal
+    Raw[("raw.txt จากแต่ละหน้า")] --> Rule["กฎ deterministic<br/>เช่น อักษร + ช่องว่าง + า/วรรณยุกต์+า"]
+    Rule --> Baseline["OneOCR Baseline ที่ normalize แล้ว"]
+    Baseline --> Mode{"เลือก Local AI หรือไม่?"}
+    Mode -->|ไม่เลือก| FinalRaw["สร้าง final.txt จากข้อความ baseline"]
+    Mode -->|เลือก| Detect["Prescreener หาเฉพาะจุดน่าสงสัย"]
+    Detect --> Prompt["สร้าง prompt และเรียก Local LLM ผ่าน loopback"]
+    Prompt --> Response{"ตอบ JSON ที่อ่านได้หรือไม่?"}
+    Response -->|ไม่| Safe["คงข้อความ baseline และบันทึกสถานะ AI failed/partial"]
+    Response -->|ใช่| Validate["ตรวจ exact substring, ตำแหน่ง, block mapping และ edit distance"]
+    Validate --> Proposals["บันทึก changes.json และ corrected.txt"]
+    Safe --> FinalRaw
+    Proposals --> FinalRaw
+    FinalRaw --> Review["ผู้ใช้ตรวจใน Web Studio"]
+    Review --> Accept["Accept ข้อเสนอ / แก้มือ แล้วบันทึก final.txt"]
+    Review --> Revert["Revert หรือไม่แก้: คง final.txt เดิม"]
+    Review -.-> FullAI["AI ตรวจคำผิดทั้งหมด: อ่าน raw.txt ทุกหน้าที่ OCR สำเร็จ<br/>ทีละหน้า โดยไม่ทำ OCR ซ้ำ"]
+    FullAI --> Prompt
 ```
+
+ค่าเริ่มต้นคือ **OneOCR อย่างเดียว (Baseline)**. ตัวเลือก AI จะเปิดหลังการทดสอบการเชื่อมต่อพบ Local LLM เท่านั้น. `corrected.txt` เป็นผลข้อเสนอของ AI ส่วน `final.txt` เป็นฉบับที่ผู้ใช้ควบคุม.
 
 ---
 
-### 4. แผนภาพวงจรสถานะงานและการกู้คืนข้อผิดพลาด (Job Lifecycle & Fault Tolerance)
-
-แผนผังแสดง State Machine ของงาน (Job), การรับมือกรณี Worker Crash, การกู้คืนงานค้างหลังรีสตาร์ต และระบบทำความสะอาดข้อมูลตามอายุงาน (TTL):
+### 4. วงจรสถานะงานและการเก็บข้อมูล
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Uploaded: อัปโหลดไฟล์ (POST /api/upload)
-    Uploaded --> Queued: เลือกช่วงหน้า & เริ่มงาน (POST /api/jobs/{id}/start)
-    
-    state Queued {
-        [*] --> InQueue: อยู่ในคิวรอทำงาน (Max Concurrency = 1)
-        InQueue --> CancelledQueue: ผู้ใช้กดยกเลิก
-    }
-    
-    Queued --> Running: Job Supervisor เรียก Worker Subprocess
-    
-    state Running {
-        [*] --> ProcessingPages: ทยอยประมวลผลทีละหน้า
-        ProcessingPages --> UpdatingStatus: อัปเดต Progress ใน SQLite
-        UpdatingStatus --> ProcessingPages: หน้าถัดไป
-        
-        state CrashDetection <<choice>>
-        ProcessingPages --> CrashDetection: Worker สิ้นสุด
-        CrashDetection --> CleanExit: Exit Code = 0
-        CrashDetection --> WorkerCrashed: Exit Code != 0 (Native Crash)
-    }
-    
-    Running --> Completed: ทุกหน้าสำเร็จ 100%
-    Running --> Partial: สำเร็จบางส่วน หรือ AI ขัดข้อง
-    Running --> Cancelled: ผู้ใช้กดยกเลิกขณะทำงาน
-    Running --> Failed: ข้อผิดพลาดร้ายแรง / ไม่สามารถเปิดไฟล์ได้
-    
-    WorkerCrashed --> Failed: Supervisor ตรวจพบ Crash และบันทึกเหตุผล
-    
-    state RecoveryMechanism {
-        [*] --> SystemRestart: เซิร์ฟเวอร์ปิดตัวกะทันหัน / รีสตาร์ต
-        SystemRestart --> RecoverJobs: Startup Hook สแกนหางานค้าง running
-        RecoverJobs --> Failed: ปรับเป็น Failed ป้องกันค้างไม่รู้จบ
-    }
-    
-    state RetentionAndCleanup {
-        Completed --> Expired: อายุงานเกิน TTL (24 ชั่วโมง)
-        Partial --> Expired: อายุงานเกิน TTL (24 ชั่วโมง)
-        Failed --> Expired: อายุงานเกิน TTL (24 ชั่วโมง)
-        Cancelled --> Expired: อายุงานเกิน TTL (24 ชั่วโมง)
-        Expired --> Deleted: Cleanup Daemon ลบโฟลเดอร์ files/ และ DB
-    }
+    [*] --> Uploaded: upload
+    Uploaded --> Queued: start job
+    Queued --> Cancelled: cancel ก่อนเริ่ม
+    Queued --> Running: supervisor เริ่ม worker
+    Running --> Completed: ทุกหน้าสำเร็จ
+    Running --> Partial: OCR หรือ AI สำเร็จบางส่วน
+    Running --> Failed: เปิดไฟล์หรือ worker ล้มเหลว
+    Running --> Cancelled: ผู้ใช้ยกเลิก
+    Running --> Failed: restart ตรวจพบงานค้าง
+
+    Completed --> Deleted: ผู้ใช้ลบงาน
+    Partial --> Deleted: ผู้ใช้ลบงาน
+    Failed --> Deleted: ผู้ใช้ลบงาน
+    Cancelled --> Deleted: ผู้ใช้ลบงาน
+    Completed --> Deleted: cleanup ตามอายุที่ผู้ใช้ระบุ
+    Partial --> Deleted: cleanup ตามอายุที่ผู้ใช้ระบุ
+    Failed --> Deleted: cleanup ตามอายุที่ผู้ใช้ระบุ
+    Cancelled --> Deleted: cleanup ตามอายุที่ผู้ใช้ระบุ
 ```
+
+หน้า **งาน OCR ก่อนหน้า** แสดงงานล่าสุด เปิดดูหรือดาวน์โหลดงานเดิมได้. การลบรายงานและ cleanup จะไม่ลบงานที่อยู่ในสถานะ `queued` หรือ `running`; Worker ตรวจสถานะก่อนเขียนผลต่อเพื่อไม่ให้ไฟล์ที่ลบแล้วถูกสร้างกลับ.
 
 ---
 
-### 5. แผนภาพขั้นตอนการทำงานของผู้ใช้บนหน้าเว็บ (End-to-End User Experience Flow)
-
-แผนผังแสดงลำดับขั้นตอนการใช้งานจริงตั้งแต่เข้าสู่หน้าเว็บ อัปโหลด กำหนดขอบเขต ตรวจทาน ไปจนถึงการส่งออกไฟล์:
+### 5. ขั้นตอนใช้งานบนหน้าเว็บ
 
 ```mermaid
 flowchart TD
-    Step1["1. เข้าสู่หน้าเว็บหลัก http://127.0.0.1:8000"] --> Step2["2. ลากไฟล์ PDF / PNG / JPG มาวาง หรือคลิกเลือกไฟล์"]
-    Step2 --> Step3["3. ระบบตรวจสอบไฟล์ & อ่านจำนวนหน้าทั้งหมดอัตโนมัติ"]
-    
-    Step3 --> Step4["4. ผู้ใช้กำหนดเงื่อนไขการประมวลผล:<br/>- เลือกหน้าที่เริ่มต้นและหน้าสิ้นสุด (ไม่เกิน 200 หน้า/งาน)<br/>- เริ่มต้นด้วย OneOCR อย่างเดียว; เปิด AI ได้เมื่อ Local LLM พร้อม"]
-    
-    Step4 --> Step5["5. คลิกปุ่ม 'เริ่มแปลงหน้า X–Y'"]
-    Step5 --> Step6["6. หน้าจอแสดง Progress Bar, หน้าที่กำลัง OCR และสถานะแบบ Real-time<br/>(พร้อมปุ่มยกเลิกงาน Cancel Job หากต้องการ)"]
-    
-    Step6 --> Step7["7. เมื่องานเสร็จสิ้น เข้าสู่ 'Web Studio Dual-Pane Viewer'"]
-    
-    subgraph ReviewStudio ["พื้นที่ตรวจทานเอกสาร (Interactive Web Studio)"]
-        direction LR
-        LeftPane["ฝั่งซ้าย: ภาพต้นฉบับความละเอียดสูง<br/>- ซูม เข้า/ออก/รีเซ็ต<br/>- กรอบ Bounding Box สี่เหลี่ยมสีส้มครอบข้อความ"]
-        SyncArrows["<==== โต้ตอบ 2 ทาง (Two-Way Sync) ====>"]
-        RightPane["ฝั่งขวา: แท็บเครื่องมือ 3 รูปแบบ<br/>- แท็บ 'ฉบับสุดท้าย (Final Text)' พร้อม Editor<br/>- แท็บ 'เปรียบเทียบ AI (Diff)' พร้อมปุ่ม Accept/Revert<br/>- แท็บ 'ข้อความดิบ (Raw Text)'"]
-    end
-    
-    Step7 --> ReviewStudio
-    ReviewStudio --> Step8["8. คลิกตรวจทานจุดที่ต้องการแก้ไข:<br/>- คลิกบรรทัดข้อความ -> กรอบบนภาพจะเลื่อนและไฮไลต์ทันที<br/>- หรือคลิกกรอบบนภาพ -> ข้อความฝั่งขวาจะเลื่อนมาแสดงตำแหน่งเดียวกัน"]
-    
-    Step8 --> Step9["9. กดยืนยันการตรวจทาน (Mark as Reviewed) รายหน้า"]
-    Step9 --> Step10["10. ดาวน์โหลดผลลัพธ์:<br/>- raw.txt (ข้อความดิบ)<br/>- corrected.txt (ฉบับ AI)<br/>- final.txt (ฉบับตรวจแก้ล่าสุด)<br/>- ดาวน์โหลดครบชุด (ZIP Bundle)"]
+    A["เปิด http://127.0.0.1:8000"] --> B["ตรวจสถานะ Local AI"]
+    B --> C["อัปโหลด PDF / PNG / JPG"]
+    C --> D["กดตรวจสอบจำนวนหน้า"]
+    D --> E["เลือกหน้าที่เริ่มต้น-สิ้นสุด"]
+    E --> F{"ต้องการ AI หรือไม่?"}
+    F -->|ไม่| G["เริ่ม OneOCR Baseline"]
+    F -->|ใช่ และ Local AI พร้อม| H["เลือก OneOCR + Local AI"]
+    H --> G
+    G --> I["ติดตาม Batch, Progress และ Preview รายหน้า"]
+    I --> J["เปิด Web Studio ตรวจภาพและข้อความ"]
+    J --> K{"ต้องการตรวจคำทั้งเอกสารหลัง OCR หรือไม่?"}
+    K -->|ใช่| L["กด AI ตรวจคำผิดทั้งหมด"]
+    L --> J
+    K -->|ไม่| M["แก้มือ / Accept / Revert แล้วบันทึก"]
+    M --> N["ดาวน์โหลด raw.txt, corrected.txt, final.txt หรือ ZIP"]
+    N --> O["เปิดดูหรือลบงานเดิมจากงาน OCR ก่อนหน้า"]
 ```
 
 ---
@@ -333,7 +282,10 @@ flowchart TD
    ```powershell
    .\run_server.ps1
    ```
-   *(หรือดับเบิลคลิกไฟล์ `run_server.cmd`)*
+   หรือใน Command Prompt:
+   ```cmd
+   .\run_server.cmd
+   ```
 5. เปิดเบราว์เซอร์ไปที่: **`http://127.0.0.1:8000/`**
 
 ---
@@ -391,6 +343,75 @@ flowchart TD
 
 ---
 
+### ผลทดสอบ Local LLM: ปัญหาสระ `ำ` จาก OCR
+
+ทดสอบเมื่อ 2026-09-29 ผ่าน Local OpenAI-compatible API ที่ `127.0.0.1:1234` โดยวัดว่าผลแก้ไขตรงกับคำที่คาดหวังและสามารถนำไป apply กับข้อความต้นทางได้จริง ชุดทดสอบมี 13 คำ เช่น `ท างาน` → `ทำงาน`, `น ้าท่วม` → `น้ำท่วม`, `ด าน า` → `ดำนำ`, `ข้าวย า` → `ข้าวยำ` และ `เงื่อนง า` → `เงื่อนงำ`.
+
+| วิธี / โมเดล | ผลถูกต้อง | เวลาโดยประมาณ | ข้อสรุป |
+|---|---:|---:|---|
+| Baseline deterministic rule | **13/13** | ทันที | ใช้เป็นแนวป้องกันหลักสำหรับรูปแบบ “อักษร + เว้นวรรค + า/วรรณยุกต์+า” |
+| `google/gemma-4-e2b` | **10/13** | ~108 วินาที | แก้ `ด าน า` ผิดเป็น `ด้านำ`, `ข าขัน` ผิดเป็น `ข้าขัน`, และ `ข้าวย า` ผิดเป็น `ข้าวยา`; ไม่เหมาะเป็นค่าเริ่มต้น |
+| `google/gemma-3-1b` | **0/13** | ~64 วินาที | เสนอ `original_text` ไม่ตรงข้อความต้นทางและแก้คำไม่ถูกต้อง จึง apply ผลจริงไม่ได้ |
+
+`gemma-4-e2b` สร้าง `reasoning_content` ก่อนคำตอบ: เมื่อใช้ `max_tokens=600` คำตอบสุดท้ายว่าง เพราะ reasoning ใช้ token หมด; การทดสอบข้างต้นจึงใช้ `max_tokens=1600` และพบ reasoning 685 token. ระบบจึงยังคงใช้กฎ deterministic กับปัญหาสระ `ำ` และให้ Local LLM เสนอการแก้กรณีอื่นเพื่อให้ผู้ใช้ตรวจทานก่อนยอมรับ
+
+#### ตรวจสอบผลของ Prompt กับ `google/gemma-3-1b`
+
+ทดสอบเพิ่มเมื่อ 2026-09-29 ผ่าน API เดิม โดยใช้ `temperature=0` และ `max_tokens=800` เพื่อแยกปัญหา prompt ออกจากการเชื่อมต่อโมเดล ผลพบว่า prompt มีผลต่อรูปแบบคำตอบ แต่โมเดลยังไม่เสถียรกับการประกอบอักขระไทยและ Structured JSON จึงไม่ใช่สาเหตุเดียวของผล 0/13.
+
+| ชุดทดลอง | Prompt ที่ใช้ | ผลตอบกลับ | สรุป |
+|---|---|---|---|
+| Prompt ระบบปัจจุบัน + 12 คำ | `You are a Thai OCR correction engine. Return only valid JSON ... Do not romanize Thai.` และ `Correct only OCR spelling mistakes ... original_text must be copied exactly from the input.` | ส่ง fenced JSON ที่มี object ราก 2 ตัว; `original_text` ตัดช่องว่างและ `corrected_text` ไม่แก้เป็น `ำ` | JSON ใช้ไม่ได้และไม่ผ่าน validator |
+| Prompt ไทยแบบ few-shot + 12 คำ | `ตัวอย่าง: ข้อความ \`ท างาน\` -> {"corrections":[{"original_text":"ท างาน","corrected_text":"ทำงาน"}]}` แล้วสั่งให้แก้รูปแบบอักษร+ช่องว่าง+า โดยคัดลอก `original_text` ตรงตัว | แก้ `ท างาน` → `ทำงาน` ได้ แต่ตอบเพียง 1 รายการจาก 12 | few-shot ช่วยเฉพาะกรณีตัวอย่าง แต่ไม่รองรับงานหลายรายการ |
+| คำถามเดี่ยว | `ข้อความ OCR คือ \`ผู้อ านวยการ\` คำที่ถูกต้องคืออะไร? ตอบเฉพาะคำไทยหนึ่งคำ ห้ามอธิบาย ห้ามใช้อักษรอังกฤษ` | `ผู้อานวยการ` | ยังลบช่องว่างแต่ไม่สร้าง `ำ` |
+| คำถามสั้น | `รวม \`ท างาน\` ให้เป็นคำไทยที่ถูกต้อง แล้วตอบเฉพาะผลลัพธ์` | ตอบเป็นรายการคำหลายคำ เช่น `การทำงาน`, `การทำหน้าที่` | ไม่ทำตามรูปแบบผลลัพธ์และมีการแต่งเติม |
+
+ข้อความ prompt เต็มของชุด few-shot ที่ให้ผลดีที่สุดในการทดสอบนี้:
+
+```text
+ตอบ JSON เท่านั้น ห้ามอธิบาย ห้ามแปลไทยเป็นอักษรโรมัน
+
+ตัวอย่าง: ข้อความ `ท างาน` -> {"corrections":[{"original_text":"ท างาน","corrected_text":"ทำงาน"}]}
+
+จงแก้เฉพาะช่องว่างที่ทำให้สระ ำ กลายเป็น อักษร+ช่องว่าง+า ในรายการนี้ โดยคัดลอก original_text ตรงตัว:
+ท างาน
+ผู้อ านวยการ
+ส ารวจ
+ก าลัง
+น ้าท่วม
+น าเกลือ
+ด าน า
+ข าขัน
+ค าพูด
+ข้าวย า
+ล าน ้า
+เงื่อนง า
+```
+
+ข้อความ prompt อื่นที่ใช้ในการทดสอบ (รายการ 12 คำใช้ชุดเดียวกับด้านบน):
+
+```text
+[system]
+You are a Thai OCR correction engine. Return only valid JSON:
+{"corrections":[{"original_text":"exact substring","corrected_text":"corrected Thai","category":"spelling","reason":"short"}]}
+Do not romanize Thai.
+
+[user]
+Correct only OCR spelling mistakes in this text. original_text must be copied exactly from the input.
+<รายการ 12 คำด้านบน>
+
+[single question]
+ข้อความ OCR คือ `ผู้อ านวยการ`
+คำที่ถูกต้องคืออะไร? ตอบเฉพาะคำไทยหนึ่งคำ ห้ามอธิบาย ห้ามใช้อักษรอังกฤษ
+
+[short question]
+รวม `ท างาน` ให้เป็นคำไทยที่ถูกต้อง แล้วตอบเฉพาะผลลัพธ์
+```
+
+ดังนั้นระบบใช้กฎ deterministic ที่ตรวจสอบได้สำหรับรูปแบบนี้ต่อไป; Local LLM ใช้เสนอการแก้กรณีอื่นเท่านั้น และทุกผลต้องผ่าน validator ก่อนนำไปใช้
+
+---
+
 ## สัญญาข้อมูลและไฟล์ผลลัพธ์ (Data Contract)
 
 ไฟล์ต้นฉบับและผลลัพธ์ของแต่ละงานจะถูกจัดเก็บแยกตามโฟลเดอร์ใน `files/{job_id}/`:
@@ -418,7 +439,7 @@ publish/
 │   ├── oneocr_wrapper.py   # OneOCR ctypes Wrapper & ABI Definitions
 │   ├── diff_engine.py      # Character-level Diff & Proposal Engine
 │   ├── llm_client.py       # Local LLM OpenAI-compatible Client
-│   └── cleanup_service.py  # Background Data Retention & TTL Daemon
+│   └── cleanup_service.py  # ลบงานตามคำสั่งจากหน้า History / API
 ├── static/                 # หน้าเว็บและส่วนติดต่อผู้ใช้ (Frontend)
 │   ├── index.html          # หน้าจอหลัก Web Studio Dual-Pane Viewer
 │   ├── config.html         # หน้าจอตั้งค่า Local LLM
@@ -430,6 +451,7 @@ publish/
 ├── checklist.md            # จุดตรวจบังคับและเกณฑ์การตรวจรับราย Phase
 ├── manual.md               # คู่มือการติดตั้ง เริ่ม/หยุดระบบ และการบำรุงรักษา
 ├── install.ps1             # สร้าง virtual environment และติดตั้ง dependencies
+├── run_server.cmd          # เริ่ม server จาก Command Prompt
 ├── run_server.ps1          # เริ่ม FastAPI server
 ├── requirements.txt        # Python dependencies
 └── readme.md               # เอกสารภาพรวมและขอบเขตของโครงการ (หน้านี้)
@@ -453,11 +475,14 @@ publish/
 | **การทำงานแบบออฟไลน์ (Network Isolation)** | 0 คำขอนอก Loopback | บล็อกทุก external network request 100% | **PASSED** |
 | **Browser Automation (Chrome & Edge)** | ทำงานสมบูรณ์ผ่านเว็บ | ผ่าน 100% ทั้ง Google Chrome และ Edge | **PASSED** |
 | **Backend, queue และ recovery** | สถานะงานและการกู้คืนถูกต้อง | ผ่าน 21/21 tests | **PASSED** |
-| **หน้าเว็บเลือกช่วง OCR** | เลือกช่วง, จำกัด 200 หน้า และตรวจ scope | ผ่าน 4/4 tests | **PASSED** |
+| **หน้าเว็บเลือกช่วงและ batch OCR** | เลือกช่วง, แบ่ง batch ละ 200 หน้า และตรวจ scope | ผ่าน 5/5 tests | **PASSED** |
 
 ### ไม่ผ่าน
 
-ไม่มีกรณีทดสอบที่บันทึกผลเป็น **FAILED** ในหลักฐานปัจจุบัน
+| รายการทดสอบ | ผล | สาเหตุ |
+|---|:---:|---|
+| Local LLM `google/gemma-3-1b` สำหรับชุดทดสอบสระ `ำ` 13 คำ | **FAILED (0/13)** | ผลแก้ไม่ตรงต้นฉบับหรือคำที่คาดหวัง จึงไม่ผ่าน validator และไม่ใช้เป็น baseline |
+| Local LLM `google/gemma-4-e2b` สำหรับชุดทดสอบสระ `ำ` 13 คำ | **PARTIAL (10/13)** | มีคำแก้ผิด 3 คำและใช้เวลานาน จึงไม่ใช้เป็น default |
 
 ### ยังไม่ได้ทดสอบ / รอหลักฐาน / ยกเว้นชั่วคราว
 

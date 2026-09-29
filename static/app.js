@@ -16,6 +16,7 @@
     jobStatus: null,
     currentPageNum: 1,
     selectedPageIds: [],
+    previewedCompletedPageIds: [],
     currentPageData: null,
     currentRevision: 1,
     hasUnsavedChanges: false,
@@ -51,6 +52,13 @@
     inputPageEnd: document.getElementById("input-page-end"),
     pageRangeLimit: document.getElementById("page-range-limit"),
 
+    // Previous jobs
+    historyList: document.getElementById("history-list"),
+    historyMessage: document.getElementById("history-message"),
+    btnRefreshHistory: document.getElementById("btn-refresh-history"),
+    inputRetentionDays: document.getElementById("input-retention-days"),
+    btnCleanupHistory: document.getElementById("btn-cleanup-history"),
+
     // Progress Section
     sectionProgress: document.getElementById("section-progress"),
     jobIdBadge: document.getElementById("job-id-badge"),
@@ -62,6 +70,7 @@
     currentProcessingPage: document.getElementById("current-processing-page"),
     btnCancelJob: document.getElementById("btn-cancel-job"),
     btnRetryJob: document.getElementById("btn-retry-job"),
+    btnFullTextAi: document.getElementById("btn-full-text-ai"),
     retryMenu: document.getElementById("retry-menu"),
     jobAlertBanner: document.getElementById("job-alert-banner"),
     jobAlertTitle: document.getElementById("job-alert-title"),
@@ -133,6 +142,7 @@
     setupDropzone();
     setupEventListeners();
     checkAiStatus();
+    loadJobHistory();
     setInterval(checkAiStatus, 10000);
   }
 
@@ -261,6 +271,8 @@
   function resetFileSelection() {
     state.selectedFile = null;
     state.uploadedJob = null;
+    state.previewedCompletedPageIds = [];
+    state.currentPageData = null;
     el.fileInput.value = "";
     el.fileSelectedBox.classList.add("hidden");
     el.dropzone.classList.remove("hidden");
@@ -283,11 +295,14 @@
 
   function setupEventListeners() {
     el.btnStartJob.addEventListener("click", startJobFlow);
+    el.btnRefreshHistory.addEventListener("click", loadJobHistory);
+    el.btnCleanupHistory.addEventListener("click", cleanupOldJobs);
     el.btnTestAiConnection.addEventListener("click", testAiConnection);
     [el.inputPageStart, el.inputPageEnd]
       .filter(Boolean)
       .forEach(input => input.addEventListener("input", updateRangeButton));
     el.btnCancelJob.addEventListener("click", cancelCurrentJob);
+    el.btnFullTextAi.addEventListener("click", () => retryCurrentJob("full_text_ai"));
 
     // Retry dropdown toggle
     el.btnRetryJob.addEventListener("click", (e) => {
@@ -373,7 +388,8 @@
           throw new Error("หน้าเว็บเป็นเวอร์ชันเก่า กรุณากด Ctrl+F5 เพื่อโหลดหน้าเลือกช่วงหน้าใหม่");
         }
         const sourcePages = state.uploadedJob.total_pages;
-        const endPage = Math.min(sourcePages, 200);
+        const endPage = sourcePages;
+        const totalBatches = Math.ceil(sourcePages / 200);
         el.pdfPageSummary.textContent = `เอกสารนี้มี ${sourcePages} หน้า`;
         el.inputPageStart.min = "1";
         el.inputPageStart.max = String(sourcePages);
@@ -383,7 +399,7 @@
         el.inputPageEnd.value = String(endPage);
         el.inputPageStart.disabled = false;
         el.inputPageEnd.disabled = false;
-        el.pageRangeLimit.textContent = `เลือก ${endPage} หน้า • จำกัดสูงสุด 200 หน้า`;
+        el.pageRangeLimit.textContent = `เลือก ${endPage} หน้า • ระบบแบ่ง ${totalBatches} batch ละ 200 หน้า`;
         el.pageOptions.classList.remove("hidden");
         el.btnStartJob.disabled = false;
         updateRangeButton();
@@ -393,13 +409,15 @@
       const pageStart = Number.parseInt(el.inputPageStart.value, 10);
       const pageEnd = Number.parseInt(el.inputPageEnd.value, 10);
       const selectedPages = pageEnd - pageStart + 1;
-      if (!Number.isInteger(pageStart) || !Number.isInteger(pageEnd) || pageStart < 1 || pageEnd < pageStart || selectedPages > 200) {
-        throw new Error("กรุณาเลือกช่วงหน้าที่ถูกต้อง และไม่เกิน 200 หน้า");
+      if (!Number.isInteger(pageStart) || !Number.isInteger(pageEnd) || pageStart < 1 || pageEnd < pageStart || pageEnd > state.uploadedJob.total_pages) {
+        throw new Error("กรุณาเลือกช่วงหน้าที่ถูกต้อง");
       }
 
       el.btnStartJob.innerHTML = "<span>กำลังเริ่มงาน...</span>";
       const enableAi = el.modeOcrAi.checked;
       state.currentJobId = state.uploadedJob.job_id;
+      state.previewedCompletedPageIds = [];
+      state.currentPageData = null;
       const startRes = await fetch(`/api/jobs/${state.currentJobId}/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -453,14 +471,7 @@
         updatePageSelector(job.pages);
       }
 
-      // If at least one page completed, show workspace
-      const hasCompletedPages = job.pages.some(p => p.status === "completed" || p.status === "blank");
-      if (hasCompletedPages && el.sectionWorkspace.classList.contains("hidden")) {
-        el.sectionWorkspace.classList.remove("hidden");
-        switchPage(state.selectedPageIds[0]);
-      } else if (hasCompletedPages && !state.currentPageData) {
-        switchPage(state.selectedPageIds[0]);
-      }
+      previewNewlyCompletedPage(job);
 
       // Update downloads
       updateDownloadLinks(job);
@@ -474,10 +485,26 @@
         if (state.currentPageNum) {
           loadPageData(state.currentJobId, state.currentPageNum);
         }
+        loadJobHistory();
       }
     } catch (err) {
       console.error("Status poll error:", err);
     }
+  }
+
+  function previewNewlyCompletedPage(job) {
+    const completedIds = job.pages
+      .filter(page => page.status === "completed" || page.status === "blank")
+      .map(page => page.page_id);
+    const newlyCompletedIds = completedIds.filter(pageId => !state.previewedCompletedPageIds.includes(pageId));
+    if (newlyCompletedIds.length === 0) return;
+
+    state.previewedCompletedPageIds.push(...newlyCompletedIds);
+    if (state.hasUnsavedChanges) return;
+
+    const latestPageId = newlyCompletedIds[newlyCompletedIds.length - 1];
+    el.sectionWorkspace.classList.remove("hidden");
+    switchPage(latestPageId);
   }
 
   function updateProgressUI(job) {
@@ -497,17 +524,20 @@
     el.progressTextPages.textContent = `ประมวลผลแล้ว ${completed} / ${total} หน้า`;
     el.progressTextPercent.textContent = `${pct}%`;
     const runningPage = job.pages.find(page => page.status === "running");
+    const batchText = job.total_batches > 1 ? `Batch ${job.current_batch}/${job.total_batches} • ` : "";
     el.currentProcessingPage.textContent = runningPage
-      ? `กำลัง OCR หน้า ${runningPage.page_num}`
-      : job.status === "queued" ? "รอคิวประมวลผล" : `ประมวลผลแล้ว ${completed} หน้า`;
+      ? `${batchText}กำลัง OCR หน้า ${runningPage.page_num}`
+      : job.status === "queued" ? `${batchText}รอคิวประมวลผล` : `${batchText}ประมวลผลแล้ว ${completed} หน้า`;
 
     // Action buttons
     if (job.status === "queued" || job.status === "running") {
       el.btnCancelJob.classList.remove("hidden");
       el.btnRetryJob.classList.add("hidden");
+      el.btnFullTextAi.classList.add("hidden");
     } else {
       el.btnCancelJob.classList.add("hidden");
       el.btnRetryJob.classList.remove("hidden");
+      el.btnFullTextAi.classList.toggle("hidden", !state.aiConnected);
     }
 
     // Error banner
@@ -561,6 +591,110 @@
     }
   }
 
+  /* ========================================================================
+     Previous Jobs & Storage Cleanup
+     ======================================================================== */
+
+  function escapeHtml(value) {
+    return String(value || "").replace(/[&<>'"]/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]);
+  }
+
+  function formatHistoryDate(value) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleString("th-TH");
+  }
+
+  function formatFileSize(bytes) {
+    if (!Number.isFinite(bytes)) return "-";
+    return bytes < 1024 * 1024 ? `${Math.ceil(bytes / 1024)} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  async function loadJobHistory() {
+    try {
+      const res = await fetch("/api/jobs?limit=100");
+      if (!res.ok) throw new Error("โหลดประวัติงานไม่สำเร็จ");
+      const jobs = await res.json();
+      if (!jobs.length) {
+        el.historyMessage.textContent = "ยังไม่มีงาน OCR ที่บันทึกไว้";
+        el.historyList.innerHTML = "";
+        return;
+      }
+      el.historyMessage.textContent = `พบ ${jobs.length} งานล่าสุด`;
+      el.historyList.innerHTML = jobs.map(job => `
+        <article class="history-row">
+          <div class="history-job-info">
+            <strong>${escapeHtml(job.filename)}</strong>
+            <span>${escapeHtml(job.job_id)} · ${job.total_pages} หน้า · ${formatFileSize(job.file_size_bytes)}</span>
+            <small>${formatHistoryDate(job.updated_at)}</small>
+          </div>
+          <span class="badge badge-${getStatusBadgeType(job.status)}">${escapeHtml(job.status)}</span>
+          <div class="history-row-actions">
+            <button class="btn btn-outline btn-xs" data-history-open="${escapeHtml(job.job_id)}" type="button">เปิดดู</button>
+            <button class="btn btn-outline btn-danger btn-xs" data-history-delete="${escapeHtml(job.job_id)}" type="button">ลบ</button>
+          </div>
+        </article>`).join("");
+      el.historyList.querySelectorAll("[data-history-open]").forEach(btn => btn.addEventListener("click", () => openPreviousJob(btn.dataset.historyOpen)));
+      el.historyList.querySelectorAll("[data-history-delete]").forEach(btn => btn.addEventListener("click", () => deletePreviousJob(btn.dataset.historyDelete)));
+    } catch (err) {
+      el.historyMessage.textContent = `โหลดประวัติงานไม่สำเร็จ: ${err.message}`;
+    }
+  }
+
+  async function openPreviousJob(jobId) {
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/status`);
+      if (!res.ok) throw new Error("ไม่พบงานนี้");
+      const job = await res.json();
+      state.currentJobId = jobId;
+      state.jobStatus = job;
+      state.selectedPageIds = job.pages.map(page => page.page_id);
+      state.previewedCompletedPageIds = [...state.selectedPageIds];
+      state.currentPageNum = state.selectedPageIds[0] || 1;
+      el.sectionProgress.classList.remove("hidden");
+      el.sectionWorkspace.classList.remove("hidden");
+      updateProgressUI(job);
+      updatePageSelector(job.pages);
+      updateDownloadLinks(job);
+      await switchPage(state.currentPageNum);
+      window.scrollTo({ top: el.sectionWorkspace.offsetTop - 16, behavior: "smooth" });
+    } catch (err) {
+      alert(`เปิดงานเก่าไม่สำเร็จ: ${err.message}`);
+    }
+  }
+
+  async function deletePreviousJob(jobId) {
+    if (!confirm("ลบไฟล์ต้นฉบับ ผล OCR และประวัติของงานนี้ถาวรหรือไม่?")) return;
+    try {
+      const res = await fetch(`/api/jobs/${jobId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || "ลบงานไม่สำเร็จ");
+      }
+      if (state.currentJobId === jobId) state.currentJobId = null;
+      await loadJobHistory();
+    } catch (err) {
+      alert(`ลบงานไม่สำเร็จ: ${err.message}`);
+    }
+  }
+
+  async function cleanupOldJobs() {
+    const days = Number.parseInt(el.inputRetentionDays.value, 10);
+    if (!Number.isInteger(days) || days < 1) {
+      alert("กรุณาระบุจำนวนวันตั้งแต่ 1 วันขึ้นไป");
+      return;
+    }
+    if (!confirm(`ลบงานที่เสร็จแล้วและเก่ากว่า ${days} วันถาวรหรือไม่? งานที่กำลังทำจะไม่ถูกลบ`)) return;
+    try {
+      const res = await fetch(`/api/admin/cleanup?max_age_seconds=${days * 86400}`, { method: "POST" });
+      if (!res.ok) throw new Error("ลบงานเก่าไม่สำเร็จ");
+      const data = await res.json();
+      el.historyMessage.textContent = `ลบงานเก่าแล้ว ${data.cleaned_count} งาน${data.skipped_active_jobs.length ? ` · ข้ามงานที่กำลังทำ ${data.skipped_active_jobs.length} งาน` : ""}`;
+      await loadJobHistory();
+    } catch (err) {
+      alert(`ลบงานเก่าไม่สำเร็จ: ${err.message}`);
+    }
+  }
+
   /* ==========================================================================
      Dual-Pane Workspace: Page Viewer & Image Overlays
      ========================================================================== */
@@ -607,12 +741,13 @@
     const start = Number.parseInt(el.inputPageStart.value, 10);
     const end = Number.parseInt(el.inputPageEnd.value, 10);
     const count = end - start + 1;
-    const valid = Number.isInteger(start) && Number.isInteger(end) && start >= 1 && end >= start && end <= state.uploadedJob.total_pages && count <= 200;
+    const valid = Number.isInteger(start) && Number.isInteger(end) && start >= 1 && end >= start && end <= state.uploadedJob.total_pages;
     el.btnStartJob.disabled = !valid;
+    const totalBatches = Math.ceil(count / 200);
     el.pageRangeLimit.textContent = valid
-      ? `เลือก ${count} หน้า • จำกัดสูงสุด 200 หน้า`
-      : "ช่วงหน้าไม่ถูกต้อง หรือเกิน 200 หน้า";
-    if (valid) el.btnStartJob.innerHTML = `<span>เริ่มแปลงหน้า ${start}–${end}</span>`;
+      ? `เลือก ${count} หน้า • ระบบแบ่ง ${totalBatches} batch ละ 200 หน้า`
+      : "ช่วงหน้าไม่ถูกต้อง";
+    if (valid) el.btnStartJob.innerHTML = `<span>เริ่มแปลงหน้า ${start}–${end} (${totalBatches} batch)</span>`;
   }
 
   async function loadPageData(jobId, pageNum) {

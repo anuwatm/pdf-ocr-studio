@@ -3,7 +3,7 @@ setlocal
 cd /d "%~dp0"
 
 if not exist "venv\Scripts\python.exe" (
-  echo ยังไม่ได้ติดตั้งระบบ กรุณารัน install.ps1 ก่อน
+  echo Python virtual environment not found. Run install.ps1 first.
   exit /b 1
 )
 

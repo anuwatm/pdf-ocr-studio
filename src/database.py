@@ -14,7 +14,7 @@ from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime, timezone
 from contextlib import contextmanager
 
-from src.job_models import JobStatus, PageStatus, StageStatus, ReviewStatus, PageProgress, JobStatusResponse
+from src.job_models import OCR_BATCH_SIZE, JobStatus, PageStatus, StageStatus, ReviewStatus, PageProgress, JobStatusResponse
 
 
 class DatabaseLockTimeoutError(Exception):
@@ -372,6 +372,13 @@ class JobDatabase:
                     has_manual_edit=bool(p["has_manual_edit"]) if "has_manual_edit" in p_keys else False,
                 ))
 
+            total_batches = max(1, (job_row["total_pages"] + OCR_BATCH_SIZE - 1) // OCR_BATCH_SIZE)
+            next_page_index = next(
+                (index for index, page in enumerate(pages) if page.status in (PageStatus.QUEUED, PageStatus.RUNNING)),
+                None,
+            )
+            current_batch = total_batches if next_page_index is None else (next_page_index // OCR_BATCH_SIZE) + 1
+
             return JobStatusResponse(
                 job_id=job_row["job_id"],
                 status=JobStatus(job_row["status"]),
@@ -379,6 +386,9 @@ class JobDatabase:
                 filename=job_row["filename"],
                 file_size_bytes=job_row["file_size_bytes"],
                 total_pages=job_row["total_pages"],
+                batch_size=OCR_BATCH_SIZE,
+                total_batches=total_batches,
+                current_batch=current_batch,
                 completed_pages=completed_pages,
                 failed_pages=failed_pages,
                 cancelled_pages=cancelled_pages,

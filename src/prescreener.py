@@ -18,6 +18,8 @@ import unicodedata
 
 # Suspicious patterns in Thai text
 SUSPICIOUS_PATTERNS = [
+    # OCR split the vowel ำ into a space plus า (optionally after a tone mark)
+    (re.compile(r"[\u0e01-\u0e2e][ \u00a0]+[\u0e48-\u0e4b]?\u0e32"), "split_sara_am"),
     # Double tone marks
     (re.compile(r"[\u0e48-\u0e4b]{2,}"), "double_tone_mark"),
     # Double upper vowels
@@ -51,6 +53,21 @@ HIGH_PRECISION_CORRECTIONS = {
     "ป้ามี่": ("ป้าที่", "spelling", "OCR confusion: มี่ -> ที่"),
 }
 
+_SPLIT_SARA_AM = re.compile(r"([\u0e01-\u0e2e])[ \u00a0]+([\u0e48-\u0e4b]?)(\u0e32)")
+
+
+def get_high_precision_correction(text: str) -> Tuple[str | None, str | None, str | None]:
+    """Return a safe deterministic correction when the matched text is unambiguous."""
+    known = HIGH_PRECISION_CORRECTIONS.get(text)
+    if known:
+        return known
+
+    if _SPLIT_SARA_AM.fullmatch(text):
+        corrected = _SPLIT_SARA_AM.sub(r"\1\2ำ", text)
+        return corrected, "vowel_tone", "OCR split the vowel ำ with a space"
+
+    return None, None, None
+
 
 def find_suspicious_spots(text: str) -> List[Dict[str, Any]]:
     """
@@ -70,7 +87,7 @@ def find_suspicious_spots(text: str) -> List[Dict[str, Any]]:
                     "end": span[1],
                     "matched_text": m.group(0),
                     "reason": reason,
-                    "suggested_correction": HIGH_PRECISION_CORRECTIONS.get(m.group(0), (None, None, None))[0]
+                    "suggested_correction": get_high_precision_correction(m.group(0))[0]
                 })
 
     return sorted(spots, key=lambda s: s["start"])

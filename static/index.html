@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Sarabun:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/app.css?v=20260929-ai-mode-1">
+  <link rel="stylesheet" href="/static/app.css?v=20260929-history-1">
 </head>
 <body class="theme-dark">
   <div class="app-container">
@@ -66,7 +66,7 @@
       <section id="section-upload" class="card upload-card">
         <div class="card-header">
           <h2 class="card-title">1. อัปโหลดเอกสาร</h2>
-          <span class="badge badge-info">PDF / PNG / JPG • สูงสุด 50 MB • แปลงครั้งละ 200 หน้า</span>
+          <span class="badge badge-info">PDF / PNG / JPG • สูงสุด 50 MB • Batch ละ 200 หน้า</span>
         </div>
 
         <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="ลากไฟล์มาวางที่นี่ หรือคลิกเพื่อเลือกไฟล์">
@@ -109,7 +109,7 @@
             <span class="range-arrow">→</span>
             <input id="input-page-end" type="number" min="1" value="1" disabled aria-label="หน้าสิ้นสุด">
           </div>
-          <p id="page-range-limit">เลือกช่วงได้สูงสุด 200 หน้า</p>
+          <p id="page-range-limit">ระบบจะแบ่งประมวลผล Batch ละ 200 หน้า</p>
         </div>
 
         <!-- Engine / AI Mode Options -->
@@ -149,6 +149,22 @@
         </div>
       </section>
 
+      <section id="section-history" class="card history-card">
+        <div class="history-header">
+          <div>
+            <h2 class="card-title">งาน OCR ก่อนหน้า</h2>
+            <p class="history-subtitle">เปิดดู ดาวน์โหลด หรือลบงานที่เสร็จแล้วเพื่อคืนพื้นที่</p>
+          </div>
+          <div class="history-actions">
+            <button id="btn-refresh-history" class="btn btn-outline btn-sm" type="button">รีเฟรช</button>
+            <label class="retention-control">ลบงานเกิน <input id="input-retention-days" type="number" min="1" max="3650" value="30"> วัน</label>
+            <button id="btn-cleanup-history" class="btn btn-outline btn-danger btn-sm" type="button">ลบงานเก่า</button>
+          </div>
+        </div>
+        <p id="history-message" class="history-message">กำลังโหลดประวัติงาน...</p>
+        <div id="history-list" class="history-list"></div>
+      </section>
+
       <!-- 2. Job Queue & Processing Progress -->
       <section id="section-progress" class="card progress-card hidden">
         <div class="progress-header">
@@ -184,6 +200,9 @@
                 <button class="dropdown-item" data-retry-mode="full">รันใหม่ทั้งหมด (full)</button>
               </div>
             </div>
+            <button id="btn-full-text-ai" class="btn btn-outline btn-sm hidden" type="button" title="ให้ Local AI อ่านข้อความทุกหน้าที่ OCR สำเร็จแล้ว">
+              <span>AI ตรวจคำผิดทั้งหมด</span>
+            </button>
           </div>
         </div>
 
@@ -468,6 +487,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=20260929-ai-mode-1"></script>
+  <script src="/static/app.js?v=20260929-history-1"></script>
 </body>
 </html>
