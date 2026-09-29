@@ -321,6 +321,10 @@ def start_job(job_id: str, req: JobStartRequest = JobStartRequest()):
     ):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Job cannot be configured for processing")
 
+    job_dir = os.path.abspath(os.path.join(DEFAULT_OUTPUT_DIR, job_id))
+    with open(os.path.join(job_dir, "assembly_options.json"), "w", encoding="utf-8") as f:
+        json.dump({"include_page_numbers": req.include_page_numbers}, f)
+
     success = job_manager.enqueue_job(job_id=job_id, enable_ai=req.enable_ai)
     if not success:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not enqueue job")
@@ -334,6 +338,7 @@ def start_job(job_id: str, req: JobStartRequest = JobStartRequest()):
         "page_end": page_end,
         "batch_size": OCR_BATCH_SIZE,
         "total_batches": max(1, (selected_count + OCR_BATCH_SIZE - 1) // OCR_BATCH_SIZE),
+        "include_page_numbers": req.include_page_numbers,
     }
 
 

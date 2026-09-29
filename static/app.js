@@ -25,6 +25,7 @@
     aiConnected: false,
     pollTimer: null,
     activeBoxIndex: null,
+    activeMainTab: "upload",
   };
 
   // DOM Elements
@@ -36,6 +37,10 @@
     aiAvailableBadge: document.getElementById("ai-available-badge"),
     modeOcrAi: document.getElementById("mode-ocr-ai"),
     modeOcrOnly: document.getElementById("mode-ocr-only"),
+    includePageNumbers: document.getElementById("include-page-numbers"),
+    mainTabButtons: [...document.querySelectorAll("[data-main-tab]")],
+    mainTabPanels: [...document.querySelectorAll("[data-main-panel]")],
+    tabProgressEmpty: document.getElementById("tab-progress-empty"),
 
     // Upload
     dropzone: document.getElementById("dropzone"),
@@ -58,6 +63,7 @@
     btnRefreshHistory: document.getElementById("btn-refresh-history"),
     inputRetentionDays: document.getElementById("input-retention-days"),
     btnCleanupHistory: document.getElementById("btn-cleanup-history"),
+    btnDeleteAllHistory: document.getElementById("btn-delete-all-history"),
 
     // Progress Section
     sectionProgress: document.getElementById("section-progress"),
@@ -141,6 +147,7 @@
     setupTheme();
     setupDropzone();
     setupEventListeners();
+    activateMainTab("upload");
     checkAiStatus();
     loadJobHistory();
     setInterval(checkAiStatus, 10000);
@@ -294,9 +301,13 @@
      ========================================================================== */
 
   function setupEventListeners() {
+    el.mainTabButtons.forEach(button => {
+      button.addEventListener("click", () => activateMainTab(button.dataset.mainTab));
+    });
     el.btnStartJob.addEventListener("click", startJobFlow);
     el.btnRefreshHistory.addEventListener("click", loadJobHistory);
     el.btnCleanupHistory.addEventListener("click", cleanupOldJobs);
+    el.btnDeleteAllHistory.addEventListener("click", deleteAllFinishedJobs);
     el.btnTestAiConnection.addEventListener("click", testAiConnection);
     [el.inputPageStart, el.inputPageEnd]
       .filter(Boolean)
@@ -367,6 +378,25 @@
     });
   }
 
+  function activateMainTab(tabName) {
+    const validTabs = new Set(["upload", "progress", "history"]);
+    if (!validTabs.has(tabName)) return;
+
+    state.activeMainTab = tabName;
+    el.mainTabButtons.forEach(button => {
+      const isActive = button.dataset.mainTab === tabName;
+      button.classList.toggle("active", isActive);
+      button.setAttribute("aria-selected", String(isActive));
+    });
+    el.mainTabPanels.forEach(panel => {
+      panel.classList.toggle("main-tab-hidden", panel.dataset.mainPanel !== tabName);
+    });
+
+    const hasJob = Boolean(state.currentJobId);
+    el.tabProgressEmpty.classList.toggle("hidden", tabName !== "progress" || hasJob);
+    if (tabName === "history") loadJobHistory();
+  }
+
   async function startJobFlow() {
     if (!state.selectedFile) return;
 
@@ -421,7 +451,7 @@
       const startRes = await fetch(`/api/jobs/${state.currentJobId}/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enable_ai: enableAi, page_start: pageStart, page_end: pageEnd }),
+        body: JSON.stringify({ enable_ai: enableAi, page_start: pageStart, page_end: pageEnd, include_page_numbers: el.includePageNumbers.checked }),
       });
       if (!startRes.ok) {
         const err = await startRes.json();
@@ -437,6 +467,7 @@
 
       // 3. Show Progress & Workspace
       el.sectionProgress.classList.remove("hidden");
+      activateMainTab("progress");
       el.jobIdBadge.textContent = state.currentJobId;
       startStatusPolling();
     } catch (err) {
@@ -652,6 +683,7 @@
       state.currentPageNum = state.selectedPageIds[0] || 1;
       el.sectionProgress.classList.remove("hidden");
       el.sectionWorkspace.classList.remove("hidden");
+      activateMainTab("progress");
       updateProgressUI(job);
       updatePageSelector(job.pages);
       updateDownloadLinks(job);
@@ -692,6 +724,23 @@
       await loadJobHistory();
     } catch (err) {
       alert(`ลบงานเก่าไม่สำเร็จ: ${err.message}`);
+    }
+  }
+
+  async function deleteAllFinishedJobs() {
+    if (!confirm("ลบงานที่จบแล้วทั้งหมด รวมไฟล์ต้นฉบับ ผล OCR และประวัติแบบถาวรหรือไม่? งานที่กำลังรอคิวหรือกำลังประมวลผลจะไม่ถูกลบ")) return;
+    try {
+      const res = await fetch("/api/admin/cleanup?max_age_seconds=0", { method: "POST" });
+      if (!res.ok) throw new Error("ลบงานทั้งหมดไม่สำเร็จ");
+      const data = await res.json();
+      if (data.cleaned_jobs.includes(state.currentJobId)) {
+        state.currentJobId = null;
+        state.jobStatus = null;
+      }
+      el.historyMessage.textContent = `ลบงานที่จบแล้วทั้งหมด ${data.cleaned_count} งาน${data.skipped_active_jobs.length ? ` · ข้ามงานที่กำลังทำ ${data.skipped_active_jobs.length} งาน` : ""}`;
+      await loadJobHistory();
+    } catch (err) {
+      alert(`ลบงานทั้งหมดไม่สำเร็จ: ${err.message}`);
     }
   }
 

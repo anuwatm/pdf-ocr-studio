@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Sarabun:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/app.css?v=20260929-history-1">
+  <link rel="stylesheet" href="/static/app.css?v=20260929-tabs-3">
 </head>
 <body class="theme-dark">
   <div class="app-container">
@@ -60,10 +60,25 @@
       </div>
     </header>
 
+    <nav class="main-tabs" aria-label="เมนูการทำงานหลัก" role="tablist">
+      <button class="main-tab-btn active" type="button" role="tab" aria-selected="true" aria-controls="section-upload" data-main-tab="upload">
+        <span class="main-tab-number">1</span>
+        <span>อัปโหลดเอกสาร</span>
+      </button>
+      <button class="main-tab-btn" type="button" role="tab" aria-selected="false" aria-controls="section-progress" data-main-tab="progress">
+        <span class="main-tab-number">2</span>
+        <span>สถานะการประมวลผล</span>
+      </button>
+      <button class="main-tab-btn" type="button" role="tab" aria-selected="false" aria-controls="section-history" data-main-tab="history">
+        <span class="main-tab-number">3</span>
+        <span>งาน OCR ก่อนหน้า</span>
+      </button>
+    </nav>
+
     <!-- Main Workspace -->
     <main class="app-main">
       <!-- 1. Upload & Options Section -->
-      <section id="section-upload" class="card upload-card">
+      <section id="section-upload" class="card upload-card" data-main-panel="upload">
         <div class="card-header">
           <h2 class="card-title">1. อัปโหลดเอกสาร</h2>
           <span class="badge badge-info">PDF / PNG / JPG • สูงสุด 50 MB • Batch ละ 200 หน้า</span>
@@ -141,6 +156,14 @@
           </div>
         </div>
 
+        <label class="page-marker-option">
+          <input id="include-page-numbers" type="checkbox" checked>
+          <span>
+            <strong>ใส่เลขหน้าลงในไฟล์ข้อความ</strong>
+            <small>เพิ่มหัวข้อ เช่น <code>--- Page 1 ---</code> ใน raw.txt, corrected.txt และ final.txt</small>
+          </span>
+        </label>
+
         <!-- Start Processing CTA -->
         <div class="action-footer">
           <button id="btn-start-job" class="btn btn-primary btn-large" disabled>
@@ -149,7 +172,7 @@
         </div>
       </section>
 
-      <section id="section-history" class="card history-card">
+      <section id="section-history" class="card history-card main-tab-hidden" data-main-panel="history">
         <div class="history-header">
           <div>
             <h2 class="card-title">งาน OCR ก่อนหน้า</h2>
@@ -159,14 +182,20 @@
             <button id="btn-refresh-history" class="btn btn-outline btn-sm" type="button">รีเฟรช</button>
             <label class="retention-control">ลบงานเกิน <input id="input-retention-days" type="number" min="1" max="3650" value="30"> วัน</label>
             <button id="btn-cleanup-history" class="btn btn-outline btn-danger btn-sm" type="button">ลบงานเก่า</button>
+            <button id="btn-delete-all-history" class="btn btn-danger btn-sm" type="button">ลบงานที่จบแล้วทั้งหมด</button>
           </div>
         </div>
         <p id="history-message" class="history-message">กำลังโหลดประวัติงาน...</p>
         <div id="history-list" class="history-list"></div>
       </section>
 
+      <section id="tab-progress-empty" class="tab-empty-state main-tab-hidden" data-main-panel="progress">
+        <strong>ยังไม่มีงานที่กำลังแสดง</strong>
+        <span>อัปโหลดเอกสารและเริ่มแปลง หรือลองเปิดงานจากรายการงาน OCR ก่อนหน้า</span>
+      </section>
+
       <!-- 2. Job Queue & Processing Progress -->
-      <section id="section-progress" class="card progress-card hidden">
+      <section id="section-progress" class="card progress-card hidden main-tab-hidden" data-main-panel="progress">
         <div class="progress-header">
           <div class="job-meta">
             <h2 class="card-title">2. สถานะการประมวลผล</h2>
@@ -231,7 +260,7 @@
       </section>
 
       <!-- 3. Dual-Pane Document & Review Workspace -->
-      <section id="section-workspace" class="card workspace-card hidden">
+      <section id="section-workspace" class="card workspace-card hidden main-tab-hidden" data-main-panel="progress">
         <!-- Page Navigation Bar -->
         <div class="workspace-toolbar">
           <div class="page-navigation-controls">
@@ -487,6 +516,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=20260929-history-1"></script>
+  <script src="/static/app.js?v=20260929-tabs-3"></script>
 </body>
 </html>

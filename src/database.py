@@ -10,6 +10,7 @@ Strictly adheres to:
 import sqlite3
 import os
 import time
+import json
 from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime, timezone
 from contextlib import contextmanager
@@ -628,15 +629,31 @@ class JobDatabase:
         if not job:
             return
         job_dir = os.path.abspath(os.path.join(output_dir, job_id))
+        include_page_numbers = True
+        try:
+            with open(os.path.join(job_dir, "assembly_options.json"), "r", encoding="utf-8") as f:
+                include_page_numbers = bool(json.load(f).get("include_page_numbers", True))
+        except (OSError, ValueError, json.JSONDecodeError):
+            pass
+
+        def page_chunk(header: str, text: str) -> str:
+            return f"{header}\n{text}\n" if include_page_numbers else f"{text}\n"
+
+        def remove_internal_page_header(text: str, page_num: int) -> str:
+            header = f"--- Page {page_num} ---"
+            if text.startswith(header):
+                return text[len(header):].lstrip("\r\n")
+            return text
+
         final_lines = []
         for p in job.pages:
             p_num = p.page_num
             p_dir = os.path.join(job_dir, f"page_{p_num:02d}")
             header = f"--- Page {p_num} ---"
             if p.status == PageStatus.FAILED:
-                final_lines.append(f"{header}\n[PAGE {p_num}: PROCESSING FAILED - {p.error_message or 'Error'}]\n")
+                final_lines.append(page_chunk(header, f"[PAGE {p_num}: PROCESSING FAILED - {p.error_message or 'Error'}]"))
             elif p.status == PageStatus.CANCELLED:
-                final_lines.append(f"{header}\n[PAGE {p_num}: CANCELLED]\n")
+                final_lines.append(page_chunk(header, f"[PAGE {p_num}: CANCELLED]"))
             else:
                 p_text = ""
                 p_final = os.path.join(p_dir, "final.txt")
@@ -651,7 +668,8 @@ class JobDatabase:
                 elif os.path.exists(p_raw):
                     with open(p_raw, "r", encoding="utf-8") as f:
                         p_text = f.read()
-                final_lines.append(f"{header}\n{p_text}\n")
+                p_text = remove_internal_page_header(p_text, p_num)
+                final_lines.append(page_chunk(header, p_text))
 
         with open(os.path.join(job_dir, "final.txt"), "w", encoding="utf-8") as f:
             f.write("\f\n".join(final_lines))

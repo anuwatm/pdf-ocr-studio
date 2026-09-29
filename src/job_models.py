@@ -72,6 +72,7 @@ class JobStartRequest(BaseModel):
     enable_ai: bool = True
     page_start: Optional[int] = Field(default=None, ge=1)
     page_end: Optional[int] = Field(default=None, ge=1)
+    include_page_numbers: bool = True
 
 
 class JobStatusResponse(BaseModel):

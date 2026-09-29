@@ -14,13 +14,7 @@
 
 ## เริ่มใช้งานด่วนจาก GitHub
 
-หลัง clone repository แล้ว ให้เปิด PowerShell ที่โฟลเดอร์โครงการและรัน:
-
-```powershell
-.\run_server.ps1
-```
-
-หากใช้ Command Prompt ให้รัน:
+หลัง clone repository แล้ว ให้เปิด Command Prompt ที่โฟลเดอร์โครงการและรัน:
 
 ```cmd
 .\run_server.cmd
@@ -28,16 +22,19 @@
 
 สคริปต์จะสร้าง `venv` และติดตั้ง dependencies ให้เองในครั้งแรก จากนั้นเปิด [http://127.0.0.1:8000/](http://127.0.0.1:8000/) ในเบราว์เซอร์
 
-หาก PowerShell ไม่อนุญาตให้รัน script ให้ใช้คำสั่งนี้เฉพาะหน้าต่างปัจจุบัน แล้วรันใหม่:
+หยุด server:
 
-```powershell
-Set-ExecutionPolicy -Scope Process Bypass
+```cmd
+.\stop_server.cmd
 ```
+
 
 ### โหมด OCR และ Local AI
 
 - ค่าเริ่มต้นคือ **OneOCR อย่างเดียว (Baseline)** จึงใช้งาน OCR ได้แม้ไม่ได้เปิด Local LLM
 - เลือกช่วงหน้าเริ่มต้น–สิ้นสุดได้ตามจำนวนหน้าของเอกสาร; ระบบแบ่งทำงานเป็น **batch ละ 200 หน้า** ต่อเนื่องจนจบช่วงที่เลือก
+- ก่อนเริ่มงานเลือกได้ว่าจะใส่หัวข้อเลขหน้า เช่น `--- Page 1 ---` ในไฟล์ข้อความรวม (`raw.txt`, `corrected.txt`, `final.txt`) หรือไม่; ค่าเริ่มต้นคือใส่
+- ก่อนเริ่มงานเลือกได้ว่าจะใส่หัวข้อเลขหน้า เช่น `--- Page 1 ---` ในไฟล์ข้อความรวม (`raw.txt`, `corrected.txt`, `final.txt`) หรือไม่; ค่าเริ่มต้นคือใส่
 - เมื่อ OCR แต่ละหน้าเสร็จ หน้า Preview จะเปลี่ยนไปแสดงภาพและข้อความของหน้านั้นทันที
 - เมื่อ Local AI เป็น Offline ระบบจะล็อก **OneOCR + Local AI ตรวจแก้คำ** ไว้
 - กด **ทดสอบการเชื่อมต่อ** ข้างสถานะ Local AI; เมื่อเชื่อมต่อและพบโมเดลแล้ว ตัวเลือก AI จะถูกปลดล็อก
@@ -269,30 +266,22 @@ flowchart TD
 
 ชุดนี้มีไฟล์ binary, model, backend และหน้าเว็บครบแล้ว:
 
-1. เปิด **PowerShell** ในโฟลเดอร์นี้
-2. หาก PowerShell บล็อกการรันสคริปต์ ให้ปลดล็อกชั่วคราว:
-   ```powershell
-   Set-ExecutionPolicy -Scope Process Bypass
+1. เปิด **Command Prompt** ในโฟลเดอร์นี้
+2. รันสคริปต์ติดตั้งระบบ (จะสร้าง virtual environment และดาวน์โหลด dependencies อัตโนมัติ):
+   ```cmd
+   .\install.cmd
    ```
-3. รันสคริปต์ติดตั้งระบบ (จะสร้าง virtual environment และดาวน์โหลด dependencies อัตโนมัติ):
-   ```powershell
-   .\install.ps1
-   ```
-4. เริ่มต้นเซิร์ฟเวอร์:
-   ```powershell
-   .\run_server.ps1
-   ```
-   หรือใน Command Prompt:
+3. เริ่มต้นเซิร์ฟเวอร์:
    ```cmd
    .\run_server.cmd
    ```
-5. เปิดเบราว์เซอร์ไปที่: **`http://127.0.0.1:8000/`**
+4. เปิดเบราว์เซอร์ไปที่: **`http://127.0.0.1:8000/`**
 
 ---
 
 ### ติดตั้ง dependencies ด้วยตนเอง
 
-ใช้เมื่อต้องการสร้าง virtual environment เองแทน `install.ps1`:
+ใช้เมื่อต้องการสร้าง virtual environment เองแทน `install.cmd`:
 
 1. **ตรวจสอบโฟลเดอร์โมเดล OneOCR:**  
    ตรวจสอบว่ามีไฟล์ binary ครบถ้วนในโฟลเดอร์ `oneOCR/`:
@@ -450,9 +439,9 @@ publish/
 ├── files/                  # ไฟล์อัปโหลดและผลลัพธ์ (สร้างขณะใช้งาน)
 ├── checklist.md            # จุดตรวจบังคับและเกณฑ์การตรวจรับราย Phase
 ├── manual.md               # คู่มือการติดตั้ง เริ่ม/หยุดระบบ และการบำรุงรักษา
-├── install.ps1             # สร้าง virtual environment และติดตั้ง dependencies
-├── run_server.cmd          # เริ่ม server จาก Command Prompt
-├── run_server.ps1          # เริ่ม FastAPI server
+├── install.cmd             # สร้าง virtual environment และติดตั้ง dependencies
+├── run_server.cmd          # เริ่ม FastAPI server
+├── stop_server.cmd         # หยุด FastAPI server ที่ port 8000
 ├── requirements.txt        # Python dependencies
 └── readme.md               # เอกสารภาพรวมและขอบเขตของโครงการ (หน้านี้)
 ```

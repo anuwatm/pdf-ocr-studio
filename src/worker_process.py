@@ -381,6 +381,24 @@ def _assemble_job_text_files(job_dir: str, job_status: JobStatusResponse):
     if not os.path.exists(job_dir):
         return
 
+    include_page_numbers = True
+    options_path = os.path.join(job_dir, "assembly_options.json")
+    try:
+        with open(options_path, "r", encoding="utf-8") as f:
+            include_page_numbers = bool(json.load(f).get("include_page_numbers", True))
+    except (OSError, ValueError, json.JSONDecodeError):
+        pass
+
+    def page_chunk(header: str, text: str) -> str:
+        return f"{header}\n{text}\n" if include_page_numbers else f"{text}\n"
+
+    def remove_internal_page_header(text: str, page_num: int) -> str:
+        """Pipeline page artifacts may already carry a page header; control it here."""
+        header = f"--- Page {page_num} ---"
+        if text.startswith(header):
+            return text[len(header):].lstrip("\r\n")
+        return text
+
     raw_lines = []
     corr_lines = []
     final_lines = []
@@ -392,16 +410,16 @@ def _assemble_job_text_files(job_dir: str, job_status: JobStatusResponse):
 
         if page_info and page_info.status == PageStatus.FAILED:
             marker = f"[PAGE {p_num}: PROCESSING FAILED - {page_info.error_message or 'Error'}]"
-            raw_lines.append(f"{page_header}\n{marker}\n")
-            corr_lines.append(f"{page_header}\n{marker}\n")
-            final_lines.append(f"{page_header}\n{marker}\n")
+            raw_lines.append(page_chunk(page_header, marker))
+            corr_lines.append(page_chunk(page_header, marker))
+            final_lines.append(page_chunk(page_header, marker))
             continue
 
         if page_info and page_info.status == PageStatus.CANCELLED:
             marker = f"[PAGE {p_num}: CANCELLED]"
-            raw_lines.append(f"{page_header}\n{marker}\n")
-            corr_lines.append(f"{page_header}\n{marker}\n")
-            final_lines.append(f"{page_header}\n{marker}\n")
+            raw_lines.append(page_chunk(page_header, marker))
+            corr_lines.append(page_chunk(page_header, marker))
+            final_lines.append(page_chunk(page_header, marker))
             continue
 
         raw_file = os.path.join(page_dir, "raw.txt")
@@ -423,9 +441,13 @@ def _assemble_job_text_files(job_dir: str, job_status: JobStatusResponse):
             with open(final_file, "r", encoding="utf-8") as f:
                 p_final = f.read()
 
-        raw_lines.append(f"{page_header}\n{p_raw}\n")
-        corr_lines.append(f"{page_header}\n{p_corr}\n")
-        final_lines.append(f"{page_header}\n{p_final}\n")
+        p_raw = remove_internal_page_header(p_raw, p_num)
+        p_corr = remove_internal_page_header(p_corr, p_num)
+        p_final = remove_internal_page_header(p_final, p_num)
+
+        raw_lines.append(page_chunk(page_header, p_raw))
+        corr_lines.append(page_chunk(page_header, p_corr))
+        final_lines.append(page_chunk(page_header, p_final))
 
     # Write document-level outputs with UTF-8
     with open(os.path.join(job_dir, "raw.txt"), "w", encoding="utf-8") as f:

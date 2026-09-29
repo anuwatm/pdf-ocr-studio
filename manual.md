@@ -85,11 +85,7 @@
 ## 3. การเริ่มต้นและหยุดการทำงานของระบบ (Start / Stop Operations)
 
 ### การเริ่มต้นระบบ (Start):
-เปิด Terminal หรือ PowerShell แล้วรันสคริปต์:
-```powershell
-.\run_server.ps1
-```
-หากใช้ Command Prompt ให้รัน:
+เปิด Command Prompt แล้วรันสคริปต์:
 ```cmd
 .\run_server.cmd
 ```
@@ -113,7 +109,11 @@ INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
 
 ### การหยุดระบบ (Stop):
 - กด `Ctrl + C` ในหน้าต่าง Terminal ที่รันเซิร์ฟเวอร์
-- ระบบจะทำ Graceful Shutdown อัตโนมัติ: ยุติการทำงานของ Worker Subprocess ที่กำลังทำงาน, บันทึกสถานะลงฐานข้อมูล SQLite, และปิดการเชื่อมต่อโดยไม่ทำให้ไฟล์เสียหาย
+- หรือเปิด Command Prompt ในโฟลเดอร์ `publish/` แล้วรัน:
+  ```cmd
+  .\stop_server.cmd
+  ```
+- การกด `Ctrl + C` จะทำ Graceful Shutdown; ส่วน `stop_server.cmd` ใช้หยุด process และ subprocess ทันที จึงควรรอให้งาน OCR ปัจจุบันเสร็จก่อน
 
 ---
 

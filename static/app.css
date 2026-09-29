@@ -96,6 +96,94 @@ body {
   gap: 1.5rem;
 }
 
+/* ========================================================================== 
+   Main Work Tabs
+   ========================================================================== */
+
+.main-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.35rem;
+  overflow-x: auto;
+  background: var(--bg-secondary);
+  border: 1px solid var(--bg-card-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.main-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  min-height: 40px;
+  padding: 0.55rem 0.9rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.main-tab-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.main-tab-btn.active {
+  background: var(--accent-primary);
+  color: #ffffff;
+}
+
+.main-tab-btn:focus-visible {
+  outline: 3px solid var(--accent-primary-glow);
+  outline-offset: 2px;
+}
+
+.main-tab-number {
+  display: inline-grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+}
+
+.main-tab-btn.active .main-tab-number {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.main-tab-hidden {
+  display: none !important;
+}
+
+.tab-empty-state {
+  display: grid;
+  gap: 0.25rem;
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  color: var(--text-secondary);
+  border: 1px dashed var(--bg-card-border);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+}
+
+.tab-empty-state strong {
+  color: var(--text-primary);
+}
+
 /* ==========================================================================
    Header
    ========================================================================== */
@@ -472,6 +560,31 @@ body.theme-light .icon-sun { display: none; }
   color: var(--text-secondary);
   line-height: 1.4;
 }
+
+.page-marker-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--bg-card-border);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.page-marker-option input {
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.2rem;
+  accent-color: var(--accent-primary);
+}
+
+.page-marker-option span { display: grid; gap: 0.1rem; }
+.page-marker-option strong { color: var(--text-primary); font-size: 0.9rem; }
+.page-marker-option small { font-size: 0.78rem; }
+.page-marker-option code { font-family: var(--font-mono); color: var(--text-primary); }
 
 .action-footer {
   margin-top: 1.5rem;
@@ -1348,6 +1461,8 @@ kbd {
 .history-job-info span, .history-job-info small { color: var(--text-secondary); font-size: 0.75rem; }
 
 @media (max-width: 640px) {
+  .main-tabs { width: 100%; }
+  .main-tab-btn { flex: 1 0 auto; padding-inline: 0.7rem; font-size: 0.8rem; }
   .history-card { padding: 1rem; }
   .history-actions { width: 100%; }
   .history-row { grid-template-columns: 1fr auto; }
