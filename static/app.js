@@ -130,6 +130,7 @@
     btnDownloadCorrected: document.getElementById("btn-download-corrected"),
     btnDownloadFinal: document.getElementById("btn-download-final"),
     btnDownloadBundle: document.getElementById("btn-download-bundle"),
+    btnDownloadPageImages: document.getElementById("btn-download-page-images"),
 
     // Conflict Modal
     modalConflict: document.getElementById("modal-conflict"),
@@ -273,6 +274,16 @@
     el.btnStartJob.disabled = false;
     el.btnStartJob.innerHTML = "<span>ตรวจสอบจำนวนหน้า</span>";
     el.pageOptions.classList.add("hidden");
+
+    // PDF page count is needed before the user can choose a range, so upload
+    // and inspect it immediately after selection rather than waiting for a click.
+    if (ext === ".pdf") {
+      uploadSelectedFileAndPrepare().catch(err => {
+        alert(`ตรวจสอบ PDF ไม่สำเร็จ: ${err.message}`);
+        el.btnStartJob.disabled = false;
+        el.btnStartJob.innerHTML = "<span>ตรวจสอบจำนวนหน้า</span>";
+      });
+    }
   }
 
   function resetFileSelection() {
@@ -294,6 +305,41 @@
     const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  }
+
+  async function uploadSelectedFileAndPrepare() {
+    if (!state.selectedFile || state.uploadedJob) return;
+    el.btnStartJob.disabled = true;
+    el.btnStartJob.innerHTML = "<span>กำลังตรวจสอบจำนวนหน้า...</span>";
+
+    const formData = new FormData();
+    formData.append("file", state.selectedFile);
+    const upRes = await fetch("/api/upload", { method: "POST", body: formData });
+    if (!upRes.ok) {
+      const err = await upRes.json();
+      throw new Error(err.detail || "Upload failed");
+    }
+
+    state.uploadedJob = await upRes.json();
+    if (!el.inputPageStart || !el.inputPageEnd || !el.pageRangeLimit) {
+      throw new Error("หน้าเว็บเป็นเวอร์ชันเก่า กรุณากด Ctrl+F5 เพื่อโหลดหน้าเลือกช่วงหน้าใหม่");
+    }
+    const sourcePages = state.uploadedJob.total_pages;
+    const endPage = sourcePages;
+    const totalBatches = Math.ceil(sourcePages / 200);
+    el.pdfPageSummary.textContent = `เอกสารนี้มี ${sourcePages} หน้า`;
+    el.inputPageStart.min = "1";
+    el.inputPageStart.max = String(sourcePages);
+    el.inputPageStart.value = "1";
+    el.inputPageEnd.min = "1";
+    el.inputPageEnd.max = String(sourcePages);
+    el.inputPageEnd.value = String(endPage);
+    el.inputPageStart.disabled = false;
+    el.inputPageEnd.disabled = false;
+    el.pageRangeLimit.textContent = `เลือก ${endPage} หน้า • ระบบแบ่ง ${totalBatches} batch ละ 200 หน้า`;
+    el.pageOptions.classList.remove("hidden");
+    el.btnStartJob.disabled = false;
+    updateRangeButton();
   }
 
   /* ==========================================================================
@@ -404,35 +450,12 @@
 
     try {
       if (!state.uploadedJob) {
-        el.btnStartJob.innerHTML = "<span>กำลังอัปโหลด...</span>";
-        const formData = new FormData();
-        formData.append("file", state.selectedFile);
+        await uploadSelectedFileAndPrepare();
+        return;
+      }
 
-        const upRes = await fetch("/api/upload", { method: "POST", body: formData });
-        if (!upRes.ok) {
-          const err = await upRes.json();
-          throw new Error(err.detail || "Upload failed");
-        }
-        state.uploadedJob = await upRes.json();
-        if (!el.inputPageStart || !el.inputPageEnd || !el.pageRangeLimit) {
-          throw new Error("หน้าเว็บเป็นเวอร์ชันเก่า กรุณากด Ctrl+F5 เพื่อโหลดหน้าเลือกช่วงหน้าใหม่");
-        }
-        const sourcePages = state.uploadedJob.total_pages;
-        const endPage = sourcePages;
-        const totalBatches = Math.ceil(sourcePages / 200);
-        el.pdfPageSummary.textContent = `เอกสารนี้มี ${sourcePages} หน้า`;
-        el.inputPageStart.min = "1";
-        el.inputPageStart.max = String(sourcePages);
-        el.inputPageStart.value = "1";
-        el.inputPageEnd.min = "1";
-        el.inputPageEnd.max = String(sourcePages);
-        el.inputPageEnd.value = String(endPage);
-        el.inputPageStart.disabled = false;
-        el.inputPageEnd.disabled = false;
-        el.pageRangeLimit.textContent = `เลือก ${endPage} หน้า • ระบบแบ่ง ${totalBatches} batch ละ 200 หน้า`;
-        el.pageOptions.classList.remove("hidden");
-        el.btnStartJob.disabled = false;
-        updateRangeButton();
+      if (state.jobStatus?.status === "cancelled" && state.currentJobId === state.uploadedJob.job_id) {
+        await retryCurrentJob("failed_only");
         return;
       }
 
@@ -462,7 +485,7 @@
         // An already-running server can retain an older API that ignores the
         // selected range. Stop it before it OCRs the wrong pages.
         await fetch(`/api/jobs/${state.currentJobId}/cancel`, { method: "POST" });
-        throw new Error("server ยังเป็นเวอร์ชันเก่า กรุณาปิดแล้วเปิด run_server.ps1 ใหม่ แล้วลองอีกครั้ง");
+        throw new Error("server ยังเป็นเวอร์ชันเก่า กรุณาปิดแล้วเปิด run_server.cmd ใหม่ แล้วลองอีกครั้ง");
       }
 
       // 3. Show Progress & Workspace
@@ -517,6 +540,10 @@
           loadPageData(state.currentJobId, state.currentPageNum);
         }
         loadJobHistory();
+        if (job.status === "cancelled" && state.uploadedJob?.job_id === job.job_id) {
+          el.btnStartJob.disabled = false;
+          el.btnStartJob.innerHTML = "<span>เริ่มงานต่อจากหน้าที่เหลือ</span>";
+        }
       }
     } catch (err) {
       console.error("Status poll error:", err);
@@ -596,10 +623,17 @@
     if (!confirm("คุณแน่ใจหรือไม่ว่าต้องการยกเลิกงานนี้?")) return;
 
     try {
-      await fetch(`/api/jobs/${state.currentJobId}/cancel`, { method: "POST" });
+      el.btnCancelJob.disabled = true;
+      const res = await fetch(`/api/jobs/${state.currentJobId}/cancel`, { method: "POST" });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || "Cancel failed");
+      }
       pollJobStatus();
     } catch (err) {
       alert(`ยกเลิกงานไม่สำเร็จ: ${err.message}`);
+    } finally {
+      el.btnCancelJob.disabled = false;
     }
   }
 
@@ -1135,7 +1169,9 @@
     el.btnDownloadCorrected.href = `/api/jobs/${jId}/download/corrected.txt`;
     el.btnDownloadFinal.href = `/api/jobs/${jId}/download/final.txt`;
     el.btnDownloadBundle.href = `/api/jobs/${jId}/download/bundle.zip`;
+    el.btnDownloadPageImages.href = `/api/jobs/${jId}/download/page-images.zip`;
     el.btnDownloadCorrected.classList.toggle("hidden", !job.enable_ai);
+    el.btnDownloadPageImages.classList.toggle("hidden", !job.filename.toLowerCase().endsWith(".pdf"));
 
     // Warning banner if failed or partial
     const hasFailures = job.failed_pages > 0 || job.status === "partial" || job.status === "failed" || job.status === "cancelled";

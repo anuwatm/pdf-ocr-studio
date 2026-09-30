@@ -361,6 +361,12 @@ def cancel_job(job_id: str):
     success = job_manager.cancel_job(job_id)
     if not success:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Job cannot be cancelled or already finished")
+    # The active worker is terminated to release OneOCR promptly.  Assemble the
+    # files here as well, otherwise a cancelled job can expose only page_01.
+    from .worker_process import _assemble_job_text_files
+    cancelled_job = db.get_job_status(job_id)
+    if cancelled_job:
+        _assemble_job_text_files(os.path.join(DEFAULT_OUTPUT_DIR, job_id), cancelled_job)
     return {"message": "Cancellation requested", "job_id": job_id, "status": "cancelled"}
 
 
@@ -408,7 +414,7 @@ def retry_job(job_id: str, req: JobRetryRequest = JobRetryRequest()):
 @app.get("/api/jobs/{job_id}/download/{file_type}")
 def download_output(job_id: str, file_type: str):
     """
-    Downloads raw.txt, corrected.txt, final.txt, ocr.json, changes.json, or bundle.zip.
+    Downloads text results, JSON results, PDF page images, or bundle.zip.
     Includes page breaks and status warnings for partial/failed results.
     """
     job = db.get_job_status(job_id)
@@ -430,6 +436,27 @@ def download_output(job_id: str, file_type: str):
                         rel_f = os.path.relpath(full_f, job_dir)
                         zf.write(full_f, rel_f)
         return FileResponse(zip_path, media_type="application/zip", filename=f"{job_id}_bundle.zip", headers=headers)
+
+    if file_type == "page-images.zip":
+        if not job.filename.lower().endswith(".pdf"):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Page image export is available for PDF files only")
+        source_path = db.get_job_raw_path(job_id)
+        if not source_path or not os.path.exists(source_path):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Original PDF file is unavailable")
+
+        image_zip_path = os.path.join(job_dir, "page-images.zip")
+        try:
+            import fitz
+            with fitz.open(source_path) as pdf, zipfile.ZipFile(image_zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                for page_info in job.pages:
+                    page_index = page_info.page_num - 1
+                    if page_index < 0 or page_index >= len(pdf):
+                        continue
+                    pix = pdf[page_index].get_pixmap(dpi=200, alpha=False)
+                    zf.writestr(f"page_{page_info.page_num:04d}.png", pix.tobytes("png"))
+        except Exception as e:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to convert PDF pages to images: {e}")
+        return FileResponse(image_zip_path, media_type="application/zip", filename=f"{job_id}_page-images.zip", headers=headers)
 
     valid_files = {
         "raw.txt": ("text/plain; charset=utf-8", "raw.txt"),

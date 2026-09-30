@@ -341,6 +341,9 @@ def process_job_worker(
                 )
         db.update_job_status(job_id, JobStatus.CANCELLED, error_message="Job cancelled by user")
         db.finalize_attempt(job_id, attempt_number, JobStatus.CANCELLED, error_message="Cancelled by user")
+        cancelled_job = db.get_job_status(job_id)
+        if cancelled_job and os.path.exists(job_dir):
+            _assemble_job_text_files(job_dir, cancelled_job)
         return
 
     # Assemble overall job files (raw.txt, corrected.txt, final.txt) across pages
