@@ -13,6 +13,7 @@ from typing import Dict, List, Optional, Any, Tuple, Union, Set
 from PIL import Image, ImageOps, ImageDraw
 import fitz  # PyMuPDF
 
+from .file_utils import atomic_write_text, atomic_write_json
 from .file_detector import validate_file, FileValidationResult
 from .geometry import Rect, AffineTransform, quad_to_rect
 from .pdf_extractor import (
@@ -105,26 +106,36 @@ class ProcessingPipeline:
         if enable_ai_correction:
             from .ai_corrector import AICorrector
             corrector = ai_corrector or AICorrector()
+            
+            # Bug 6: Pass actual page_id, page_blocks, char_mapping, and job_id
+            pages = result.get("pages", [])
+            p_id = pages[0].get("page_id", 1) if pages else 1
+            all_blocks = []
+            all_mappings = []
+            for p in pages:
+                all_blocks.extend(p.get("blocks", []))
+                all_mappings.extend(p.get("char_mapping", []))
+
             corrected_text, changes_doc = corrector.correct_text(
                 raw_text=result["raw_text"],
                 job_id=job_id,
+                page_id=p_id,
+                page_blocks=all_blocks,
+                char_mapping=all_mappings,
                 use_prescreener=ai_use_prescreener,
             )
             result["corrected_text"] = corrected_text
             result["changes_doc"] = changes_doc.model_dump()
 
-        # 3. Output persistence if requested
+        # 3. Output persistence if requested (S3: Atomic writes)
         if output_dir:
             os.makedirs(output_dir, exist_ok=True)
             raw_path = os.path.join(output_dir, "raw.txt")
             json_path = os.path.join(output_dir, "ocr.json")
 
             raw_content = result["raw_text"]
-            with open(raw_path, "w", encoding="utf-8", newline="\n") as f:
-                f.write(raw_content)
-
-            with open(json_path, "w", encoding="utf-8") as f:
-                json.dump(result, f, ensure_ascii=False, indent=2)
+            atomic_write_text(raw_path, raw_content)
+            atomic_write_json(json_path, result)
 
             # 4. Verify 100% roundtrip UTF-8 integrity
             with open(raw_path, "r", encoding="utf-8") as f:
@@ -146,10 +157,8 @@ class ProcessingPipeline:
             if enable_ai_correction and "corrected_text" in result:
                 corr_path = os.path.join(output_dir, "corrected.txt")
                 changes_path = os.path.join(output_dir, "changes.json")
-                with open(corr_path, "w", encoding="utf-8", newline="\n") as f:
-                    f.write(result["corrected_text"])
-                with open(changes_path, "w", encoding="utf-8") as f:
-                    json.dump(result["changes_doc"], f, ensure_ascii=False, indent=2)
+                atomic_write_text(corr_path, result["corrected_text"])
+                atomic_write_json(changes_path, result["changes_doc"])
 
                 # Readback verification
                 with open(corr_path, "r", encoding="utf-8") as f:

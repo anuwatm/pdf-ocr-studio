@@ -18,9 +18,9 @@ import shutil
 import gc
 from typing import Optional, List, Dict, Any
 
+from src.file_utils import atomic_write_text, atomic_write_json
 from src.database import JobDatabase
-from src.job_models import OCR_BATCH_SIZE, JobStatus, PageStatus, StageStatus, JobStatusResponse
-from src.pipeline import ProcessingPipeline
+from src.job_models import OCR_BATCH_SIZE, JobStatus, PageStatus, StageStatus, JobStatusResponse, RETRY_MODES
 
 
 def _run_full_text_ai_review(page_dir: str, job_id: str, page_num: int, revision: int) -> Dict[str, Any]:
@@ -47,10 +47,8 @@ def _run_full_text_ai_review(page_dir: str, job_id: str, page_num: int, revision
         char_mapping=page_data.get("char_mapping"),
         use_prescreener=False,
     )
-    with open(os.path.join(page_dir, "corrected.txt"), "w", encoding="utf-8", newline="\n") as f:
-        f.write(corrected_text)
-    with open(os.path.join(page_dir, "changes.json"), "w", encoding="utf-8") as f:
-        json.dump(changes_doc.model_dump(), f, ensure_ascii=False, indent=2)
+    atomic_write_text(os.path.join(page_dir, "corrected.txt"), corrected_text)
+    atomic_write_json(os.path.join(page_dir, "changes.json"), changes_doc.model_dump())
     return {"raw_text": raw_text}
 
 
@@ -74,6 +72,9 @@ def process_job_worker(
     """
     Main worker function executing in separate process.
     """
+    # Import here so parser/unit tests do not initialize the OCR pipeline or DLL.
+    from src.pipeline import ProcessingPipeline
+
     db = JobDatabase(db_path=db_path)
     job = db.get_job_status(job_id)
     if not job:
@@ -172,6 +173,20 @@ def process_job_worker(
         page_dir = os.path.join(job_dir, f"page_{page_num:02d}")
         os.makedirs(page_dir, exist_ok=True)
 
+        # S8: In full retry mode (re-OCR), if page has no manual edit, clear stale outputs
+        has_manual = db.has_page_manual_edit(job_id, page_num)
+        if retry_mode == "full":
+            if not has_manual:
+                for stale_name in ("corrected.txt", "changes.json"):
+                    stale_file = os.path.join(page_dir, stale_name)
+                    if os.path.exists(stale_file):
+                        try:
+                            os.remove(stale_file)
+                        except OSError:
+                            pass
+            else:
+                print(f"[Worker] Page {page_num} has manual edits; preserving user final.txt during full retry.")
+
         try:
             # Check if simulating write failure (e.g. disk full)
             if simulate_write_failure_at_page is not None and page_num == simulate_write_failure_at_page:
@@ -185,6 +200,7 @@ def process_job_worker(
             else:
                 result = pipeline.process_file(
                     file_path=file_path,
+                    job_id=job_id,
                     output_dir=page_dir,
                     page_range=[page_num],
                     enable_ai_correction=actual_enable_ai,
@@ -200,19 +216,17 @@ def process_job_worker(
                 is_cancelled = True
                 break
 
-            # Ensure corrected.txt exists when AI is disabled
+            # Ensure corrected.txt exists when AI is disabled (S3: atomic write)
             corrected_path = os.path.join(page_dir, "corrected.txt")
             if not os.path.exists(corrected_path):
-                with open(corrected_path, "w", encoding="utf-8") as f:
-                    f.write(result.get("raw_text", ""))
+                atomic_write_text(corrected_path, result.get("raw_text", ""))
 
-            # Phase 5 Requirement: final.txt starts from raw.txt.
-            # If final.txt already exists (e.g. user manually edited during AI or retry),
-            # DO NOT OVERWRITE! Preserve user manual edit.
+            # S8: final.txt writing logic:
+            # If page has NO manual edit, always refresh final.txt from the newly produced raw_text!
+            # If page HAS manual edit, preserve the user's manual edit.
             final_page_path = os.path.join(page_dir, "final.txt")
-            if not os.path.exists(final_page_path):
-                with open(final_page_path, "w", encoding="utf-8") as f:
-                    f.write(result.get("raw_text", ""))
+            if not has_manual or not os.path.exists(final_page_path):
+                atomic_write_text(final_page_path, result.get("raw_text", ""))
 
             latency = (time.perf_counter() - t_start) * 1000.0
 
@@ -452,40 +466,73 @@ def _assemble_job_text_files(job_dir: str, job_status: JobStatusResponse):
         corr_lines.append(page_chunk(page_header, p_corr))
         final_lines.append(page_chunk(page_header, p_final))
 
-    # Write document-level outputs with UTF-8
-    with open(os.path.join(job_dir, "raw.txt"), "w", encoding="utf-8") as f:
-        f.write("\f\n".join(raw_lines))
+    # Write document-level outputs with UTF-8 atomically (S3)
+    atomic_write_text(os.path.join(job_dir, "raw.txt"), "\f\n".join(raw_lines))
+    atomic_write_text(os.path.join(job_dir, "corrected.txt"), "\f\n".join(corr_lines))
+    atomic_write_text(os.path.join(job_dir, "final.txt"), "\f\n".join(final_lines))
 
-    with open(os.path.join(job_dir, "corrected.txt"), "w", encoding="utf-8") as f:
-        f.write("\f\n".join(corr_lines))
-
-    # Document final.txt assembled from page final.txt (preserving user edits)
-    final_path = os.path.join(job_dir, "final.txt")
-    with open(final_path, "w", encoding="utf-8") as f:
-        f.write("\f\n".join(final_lines))
-
-    # Copy page_01 metadata to document-level if available
-    p1_json = os.path.join(job_dir, "page_01", "ocr.json")
-    if os.path.exists(p1_json) and not os.path.exists(os.path.join(job_dir, "ocr.json")):
-        shutil.copy(p1_json, os.path.join(job_dir, "ocr.json"))
-    p1_changes = os.path.join(job_dir, "page_01", "changes.json")
-    if os.path.exists(p1_changes) and not os.path.exists(os.path.join(job_dir, "changes.json")):
-        shutil.copy(p1_changes, os.path.join(job_dir, "changes.json"))
+    # Bug 7: Merge all page ocr.json and changes.json into job-level JSON atomically
+    _merge_page_json(job_dir, job_status)
 
 
-if __name__ == "__main__":
+def _merge_page_json(job_dir: str, job_status: JobStatusResponse) -> None:
+    """
+    Merges page-level ocr.json and changes.json across all selected pages
+    into job-level ocr.json and changes.json (Bug 7).
+    Guarantees no stale records from previous attempts and no missing pages when page 1 is excluded.
+    """
+    pages_ocr = []
+    pages_changes = []
+
+    for p in job_status.pages:
+        pd = os.path.join(job_dir, f"page_{p.page_num:02d}")
+        ocr_file = os.path.join(pd, "ocr.json")
+        if os.path.exists(ocr_file):
+            try:
+                with open(ocr_file, "r", encoding="utf-8") as f:
+                    ocr_data = json.load(f)
+                for page_entry in ocr_data.get("pages", []):
+                    pages_ocr.append(page_entry)
+            except Exception:
+                pass
+
+        changes_file = os.path.join(pd, "changes.json")
+        if os.path.exists(changes_file):
+            try:
+                with open(changes_file, "r", encoding="utf-8") as f:
+                    chg_data = json.load(f)
+                pages_changes.append(chg_data)
+            except Exception:
+                pass
+
+    # Always write job-level JSON (even if pages is empty) to overwrite any stale attempt files (Bug 7)
+    atomic_write_json(
+        os.path.join(job_dir, "ocr.json"),
+        {"job_id": job_status.job_id, "pages": pages_ocr}
+    )
+    atomic_write_json(
+        os.path.join(job_dir, "changes.json"),
+        {"job_id": job_status.job_id, "pages": pages_changes}
+    )
+
+
+def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Standalone OCR Worker Process")
     parser.add_argument("--job-id", required=True, help="Job ID to process")
     parser.add_argument("--db-path", default="data/jobs.db", help="Path to SQLite database")
     parser.add_argument("--output-dir", default="data/jobs", help="Base output directory")
     parser.add_argument("--enable-ai", type=lambda x: str(x).lower() in ("true", "1", "yes"), default=True, help="Enable AI correction")
     parser.add_argument("--attempt", type=int, default=1, help="Attempt number")
-    parser.add_argument("--retry-mode", default="failed_only", choices=["failed_only", "ai_only", "full"])
+    parser.add_argument("--retry-mode", default="failed_only", choices=list(RETRY_MODES))
     parser.add_argument("--simulate-crash-at-page", type=int, default=None)
     parser.add_argument("--simulate-write-failure-at-page", type=int, default=None)
     parser.add_argument("--simulate-ai-failure", action="store_true", default=False)
 
-    args = parser.parse_args()
+    return parser
+
+
+if __name__ == "__main__":
+    args = build_arg_parser().parse_args()
 
     process_job_worker(
         job_id=args.job_id,

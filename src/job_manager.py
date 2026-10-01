@@ -14,6 +14,7 @@ import threading
 from typing import Dict, Optional, List, Tuple, Any
 from collections import deque
 
+from src.file_utils import atomic_write_json
 from src.database import JobDatabase
 from src.job_models import JobStatus, PageStatus
 
@@ -52,6 +53,60 @@ class JobManager:
                 self._stop_event.clear()
                 self._supervisor_thread = threading.Thread(target=self._supervisor_loop, daemon=True)
                 self._supervisor_thread.start()
+
+    def configure_and_enqueue_job(
+        self,
+        job_id: str,
+        page_start: int,
+        page_end: int,
+        enable_ai: bool = True,
+        include_page_numbers: Optional[bool] = None,
+    ) -> bool:
+        """
+        P1 S11: Combines page configuration and enqueueing into a single atomic state transition.
+        Prevents race conditions where concurrent start requests reconfigure pages of an already-queued job.
+        """
+        self.ensure_started()
+        with self._lock:
+            # 1. If an existing process is active
+            if job_id in self._active_processes:
+                proc = self._active_processes[job_id]
+                if proc.poll() is not None:
+                    self._active_processes.pop(job_id, None)
+                    self._active_attempts.pop(job_id, None)
+                else:
+                    return False
+
+            # 2. Check if job is already waiting in queue
+            if any(item["job_id"] == job_id for item in self._queue):
+                return False
+
+            # 3. Atomically configure pages in DB before enqueuing
+            if not self.db.configure_job_for_start(
+                job_id=job_id,
+                page_start=page_start,
+                page_end=page_end,
+                enable_ai=enable_ai,
+            ):
+                return False
+
+            # 4. Save assembly options atomically
+            if include_page_numbers is not None:
+                job_dir = os.path.abspath(os.path.join(self.output_dir, job_id))
+                os.makedirs(job_dir, exist_ok=True)
+                atomic_write_json(os.path.join(job_dir, "assembly_options.json"), {"include_page_numbers": include_page_numbers})
+
+            # 5. Enqueue task
+            self._queue.append({
+                "job_id": job_id,
+                "enable_ai": enable_ai,
+                "retry_mode": "failed_only",
+                "simulate_crash_at_page": None,
+                "simulate_write_failure_at_page": None,
+                "simulate_ai_failure": False,
+            })
+            self.db.update_job_status(job_id, JobStatus.QUEUED)
+            return True
 
     def enqueue_job(
         self,
@@ -94,6 +149,7 @@ class JobManager:
     def cancel_job(self, job_id: str) -> bool:
         """
         Cancels a queued or currently executing job.
+        Uses compare-and-set and verifies process state to prevent race conditions (S7).
         """
         with self._lock:
             # 1. If in queue, remove immediately
@@ -106,23 +162,31 @@ class JobManager:
 
             if queued_item:
                 self.db.mark_job_cancelled(job_id, error_message="Cancelled while queued")
+                attempt = self._active_attempts.pop(job_id, 1)
+                self.db.finalize_attempt(job_id, attempt, JobStatus.CANCELLED, error_message="Cancelled while queued")
                 return True
 
-            # 2. If actively running, signal cancellation in DB and terminate process
+            # 2. If actively running, verify process state
             if job_id in self._active_processes:
-                self.db.mark_job_cancelled(job_id, error_message="Cancelled by user")
                 proc = self._active_processes.get(job_id)
+                attempt = self._active_attempts.get(job_id, 1)
+                # Only cancel if process is actually still running
                 if proc and proc.poll() is None:
+                    self.db.mark_job_cancelled(job_id, error_message="Cancelled by user")
+                    self.db.finalize_attempt(job_id, attempt, JobStatus.CANCELLED, error_message="Cancelled by user")
                     try:
                         proc.terminate()
                     except Exception:
                         pass
-                return True
+                    return True
+                else:
+                    return False
 
-            # Check if job exists in DB
+            # Check if job exists in DB in queued/running status
             job = self.db.get_job_status(job_id)
             if job and job.status in (JobStatus.QUEUED, JobStatus.RUNNING):
                 self.db.mark_job_cancelled(job_id, error_message="Cancelled by user")
+                self.db.finalize_attempt(job_id, job.current_attempt, JobStatus.CANCELLED, error_message="Cancelled by user")
                 return True
 
             return False
@@ -162,60 +226,73 @@ class JobManager:
         if task.get("simulate_ai_failure", False):
             cmd.append("--simulate-ai-failure")
 
-        # Spawn subprocess redirecting to attempt log file to avoid pipe buffer deadlocks
-        job_dir = os.path.abspath(os.path.join(self.output_dir, job_id))
-        os.makedirs(job_dir, exist_ok=True)
-        log_path = os.path.join(job_dir, f"worker_attempt_{attempt}.log")
-        log_f = open(log_path, "a", encoding="utf-8")
-        proc = subprocess.Popen(
-            cmd,
-            stdout=log_f,
-            stderr=subprocess.STDOUT,
-            cwd=os.getcwd(),
-        )
-        log_f.close()
-
-        with self._lock:
-            self._active_processes[job_id] = proc
-            self._active_attempts[job_id] = attempt
+        # Spawn subprocess redirecting to attempt log file to avoid pipe buffer deadlocks (S6)
+        log_f = None
+        try:
+            job_dir = os.path.abspath(os.path.join(self.output_dir, job_id))
+            os.makedirs(job_dir, exist_ok=True)
+            log_path = os.path.join(job_dir, f"worker_attempt_{attempt}.log")
+            log_f = open(log_path, "a", encoding="utf-8")
+            proc = subprocess.Popen(
+                cmd,
+                stdout=log_f,
+                stderr=subprocess.STDOUT,
+                cwd=os.getcwd(),
+            )
+            with self._lock:
+                self._active_processes[job_id] = proc
+                self._active_attempts[job_id] = attempt
+        except Exception as e:
+            err_msg = f"Failed to spawn worker process: {str(e)}"
+            self.db.update_job_status(job_id, JobStatus.FAILED, error_message=err_msg)
+            self.db.finalize_attempt(job_id, attempt, JobStatus.FAILED, error_message=err_msg)
+        finally:
+            if log_f:
+                try:
+                    log_f.close()
+                except Exception:
+                    pass
 
     def _supervisor_loop(self):
         """
-        Background loop monitoring active workers and scheduling queued jobs.
+        Background loop monitoring active workers and scheduling queued jobs (S6).
         """
         while not self._stop_event.is_set():
             time.sleep(0.1)
 
-            # 1. Check active processes
-            finished_jobs = []
-            with self._lock:
-                for job_id, proc in list(self._active_processes.items()):
-                    ret_code = proc.poll()
-                    if ret_code is not None:
-                        finished_jobs.append((job_id, ret_code))
-
-            for job_id, exit_code in finished_jobs:
+            try:
+                # 1. Check active processes
+                finished_jobs = []
                 with self._lock:
-                    proc = self._active_processes.pop(job_id, None)
-                    attempt = self._active_attempts.pop(job_id, 1)
+                    for job_id, proc in list(self._active_processes.items()):
+                        ret_code = proc.poll()
+                        if ret_code is not None:
+                            finished_jobs.append((job_id, ret_code))
 
+                for job_id, exit_code in finished_jobs:
+                    with self._lock:
+                        proc = self._active_processes.pop(job_id, None)
+                        attempt = self._active_attempts.pop(job_id, 1)
 
-                # If worker terminated with non-zero exit code (e.g. crash)
-                if exit_code != 0:
-                    current_job = self.db.get_job_status(job_id)
-                    if current_job and current_job.status not in (JobStatus.CANCELLED, JobStatus.COMPLETED):
-                        # Determine if some pages were saved
-                        completed = current_job.completed_pages
-                        st = JobStatus.PARTIAL if completed > 0 else JobStatus.FAILED
-                        err_msg = f"Worker process crashed (exit code {exit_code})"
-                        self.db.update_job_status(job_id, st, error_message=err_msg)
-                        self.db.finalize_attempt(job_id, attempt, st, error_message=err_msg)
+                    # If worker terminated with non-zero exit code (e.g. crash)
+                    if exit_code != 0:
+                        current_job = self.db.get_job_status(job_id)
+                        if current_job and current_job.status not in (JobStatus.CANCELLED, JobStatus.COMPLETED):
+                            # Determine if some pages were saved
+                            completed = current_job.completed_pages
+                            st = JobStatus.PARTIAL if completed > 0 else JobStatus.FAILED
+                            err_msg = f"Worker process crashed (exit code {exit_code})"
+                            self.db.update_job_status(job_id, st, error_message=err_msg)
+                            self.db.finalize_attempt(job_id, attempt, st, error_message=err_msg)
 
-            # 2. Schedule from queue if slots available
-            with self._lock:
-                while len(self._active_processes) < self.max_concurrent_workers and len(self._queue) > 0:
-                    task = self._queue.popleft()
-                    self._spawn_worker_subprocess(task)
+                # 2. Schedule from queue if slots available
+                with self._lock:
+                    while len(self._active_processes) < self.max_concurrent_workers and len(self._queue) > 0:
+                        task = self._queue.popleft()
+                        self._spawn_worker_subprocess(task)
+            except Exception as e:
+                # Keep supervisor thread alive despite unexpected exceptions
+                print(f"[Supervisor] Exception in loop: {e}")
 
     def shutdown(self, timeout: float = 2.0):
         self._stop_event.set()

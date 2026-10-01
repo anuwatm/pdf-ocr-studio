@@ -15,6 +15,7 @@ from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime, timezone
 from contextlib import contextmanager
 
+from src.file_utils import atomic_write_text, atomic_write_json
 from src.job_models import OCR_BATCH_SIZE, JobStatus, PageStatus, StageStatus, ReviewStatus, PageProgress, JobStatusResponse
 
 
@@ -38,6 +39,47 @@ def get_iso_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def rebuild_from_accepted(raw_text: str, corrections: List[Dict[str, Any]]) -> str:
+    """
+    Reconstructs final text deterministically from raw_text and accepted proposals
+    using character offsets. Replaces from right to left so earlier offsets remain valid.
+    """
+    accepted = sorted((c for c in corrections if c.get("status") == "accepted"),
+                      key=lambda c: c.get("start", 0), reverse=True)
+    out = raw_text
+    boundary = len(raw_text) + 1
+    for c in accepted:
+        s, e = c.get("start", 0), c.get("end", 0)
+        orig = c.get("original_text", "")
+        corr = c.get("corrected_text", "")
+        if e > boundary or raw_text[s:e] != orig:
+            continue
+        out = out[:s] + corr + out[e:]
+        boundary = s
+    return out
+
+
+def replace_near(current: str, needle: str, replacement: str, expected_pos: int) -> Optional[str]:
+    """
+    Finds occurrence of needle closest to expected_pos in current text.
+    Returns None if needle is not found or if the position is ambiguous.
+    """
+    if not needle:
+        return None
+    pos = current.find(needle)
+    hits = []
+    while pos != -1:
+        hits.append(pos)
+        pos = current.find(needle, pos + 1)
+    if not hits:
+        return None
+    hits.sort(key=lambda p: abs(p - expected_pos))
+    if len(hits) > 1 and abs(hits[0] - expected_pos) == abs(hits[1] - expected_pos):
+        return None  # ambiguous
+    p = hits[0]
+    return current[:p] + replacement + current[p + len(needle):]
+
+
 class JobDatabase:
     """
     Thread-safe SQLite database manager for jobs, pages, and attempts.
@@ -58,61 +100,44 @@ class JobDatabase:
     @contextmanager
     def transaction(self, timeout: Optional[float] = None, max_retries: int = 5, base_delay: float = 0.05):
         """
-        Executes a short, bounded SQLite write transaction with automatic retry
-        on transient lock contention (sqlite3.OperationalError: database is locked / busy).
-        If lock contention cannot be resolved within retries/timeout,
-        raises DatabaseLockTimeoutError with explicit failure/retry notification.
-        Never drops modifications silently.
+        Executes a short, bounded SQLite write transaction using isolation_level=None
+        and explicit BEGIN IMMEDIATE / COMMIT / ROLLBACK.
+        Translates busy/locked OperationalError to DatabaseLockTimeoutError.
+        Eliminates generator yield-retry hazards (S4).
         """
         t_timeout = timeout if timeout is not None else (self.busy_timeout_ms / 1000.0)
-        start_time = time.time()
-        conn = None
-        for attempt in range(max_retries):
+        conn = sqlite3.connect(self.db_path, timeout=t_timeout, isolation_level=None)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys=ON;")
+        conn.execute(f"PRAGMA busy_timeout={int(t_timeout * 1000)};")
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            yield conn
+            conn.execute("COMMIT")
+        except sqlite3.OperationalError as e:
+            if conn.in_transaction:
+                try:
+                    conn.execute("ROLLBACK")
+                except Exception:
+                    pass
+            msg = str(e).lower()
+            if "locked" in msg or "busy" in msg:
+                raise DatabaseLockTimeoutError(
+                    f"SQLite lock contention timed out ({msg}). Action: failure/retry required."
+                ) from e
+            raise
+        except BaseException:
+            if conn.in_transaction:
+                try:
+                    conn.execute("ROLLBACK")
+                except Exception:
+                    pass
+            raise
+        finally:
             try:
-                conn = sqlite3.connect(self.db_path, timeout=t_timeout)
-                conn.row_factory = sqlite3.Row
-                conn.execute("PRAGMA journal_mode=WAL;")
-                conn.execute(f"PRAGMA busy_timeout={int(t_timeout * 1000)};")
-                conn.execute("PRAGMA foreign_keys=ON;")
-                yield conn
-                conn.commit()
-                return
-            except sqlite3.OperationalError as e:
-                err_str = str(e).lower()
-                if "locked" in err_str or "busy" in err_str:
-                    if conn:
-                        try:
-                            conn.rollback()
-                        except Exception:
-                            pass
-                    elapsed = time.time() - start_time
-                    if attempt < max_retries - 1 and elapsed < t_timeout:
-                        time.sleep(base_delay * (2 ** attempt))
-                        continue
-                    raise DatabaseLockTimeoutError(
-                        f"SQLite lock contention timed out after {attempt + 1} attempts ({elapsed:.2f}s). "
-                        "Database is busy/locked. Action: failure/retry required."
-                    ) from e
-                else:
-                    if conn:
-                        try:
-                            conn.rollback()
-                        except Exception:
-                            pass
-                    raise
+                conn.close()
             except Exception:
-                if conn:
-                    try:
-                        conn.rollback()
-                    except Exception:
-                        pass
-                raise
-            finally:
-                if conn:
-                    try:
-                        conn.close()
-                    except Exception:
-                        pass
+                pass
 
     @contextmanager
     def read_connection(self, timeout: Optional[float] = None):
@@ -151,6 +176,13 @@ class JobDatabase:
         return conn
 
     def _init_db(self):
+        # Enable WAL mode once during initialization
+        conn = sqlite3.connect(self.db_path, timeout=self.busy_timeout_ms / 1000.0)
+        try:
+            conn.execute("PRAGMA journal_mode=WAL;")
+        finally:
+            conn.close()
+
         with self.transaction() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -211,9 +243,6 @@ class JobDatabase:
                 FOREIGN KEY (job_id) REFERENCES jobs(job_id) ON DELETE CASCADE
             );
             """)
-
-        # Run startup crash recovery
-        self.recover_interrupted_jobs()
 
     def recover_interrupted_jobs(self) -> int:
         """
@@ -411,17 +440,20 @@ class JobDatabase:
         now = get_iso_now()
         with self.transaction() as conn:
             cursor = conn.cursor()
+            # If status is CANCELLED or QUEUED (e.g. retry), allow updating from any state.
+            # Otherwise (e.g. worker setting running/completed/failed), do not overwrite CANCELLED (S7).
+            where_clause = "WHERE job_id = ?" if status in (JobStatus.CANCELLED, JobStatus.QUEUED) else "WHERE job_id = ? AND status != 'cancelled'"
             if review_status:
-                cursor.execute("""
+                cursor.execute(f"""
                     UPDATE jobs
                     SET status = ?, error_message = ?, review_status = ?, updated_at = ?
-                    WHERE job_id = ?
+                    {where_clause}
                 """, (status.value, error_message, review_status.value, now, job_id))
             else:
-                cursor.execute("""
+                cursor.execute(f"""
                     UPDATE jobs
                     SET status = ?, error_message = ?, updated_at = ?
-                    WHERE job_id = ?
+                    {where_clause}
                 """, (status.value, error_message, now, job_id))
 
     def configure_job_for_start(self, job_id: str, page_start: int, page_end: int, enable_ai: bool) -> bool:
@@ -462,11 +494,12 @@ class JobDatabase:
                 WHERE job_id = ? AND status IN (?, ?)
             """, (PageStatus.CANCELLED.value, error_message, now, job_id, PageStatus.QUEUED.value, PageStatus.RUNNING.value))
 
+            # Compare-and-set: only cancel queued or running jobs, never overwrite completed/failed (S7)
             cursor.execute("""
                 UPDATE jobs
                 SET status = ?, error_message = ?, updated_at = ?
-                WHERE job_id = ?
-            """, (JobStatus.CANCELLED.value, error_message, now, job_id))
+                WHERE job_id = ? AND status IN (?, ?)
+            """, (JobStatus.CANCELLED.value, error_message, now, job_id, JobStatus.QUEUED.value, JobStatus.RUNNING.value))
 
     def update_page_progress(
         self,
@@ -512,8 +545,8 @@ class JobDatabase:
                 new_review_st = ReviewStatus.IN_REVIEW.value
 
             cursor.execute("""
-                UPDATE jobs SET current_attempt = ?, review_status = ?, updated_at = ? WHERE job_id = ?
-            """, (new_attempt, new_review_st, now, job_id))
+                UPDATE jobs SET status = ?, current_attempt = ?, review_status = ?, updated_at = ? WHERE job_id = ?
+            """, (JobStatus.QUEUED.value, new_attempt, new_review_st, now, job_id))
 
             cursor.execute("""
                 INSERT INTO attempts (job_id, attempt_number, status, started_at)
@@ -556,6 +589,13 @@ class JobDatabase:
             row = cursor.fetchone()
             return row["revision"] if row and "revision" in row.keys() else 1
 
+    def has_page_manual_edit(self, job_id: str, page_id: int) -> bool:
+        with self.read_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT has_manual_edit FROM pages WHERE job_id = ? AND page_id = ?", (job_id, page_id))
+            row = cursor.fetchone()
+            return bool(row["has_manual_edit"]) if row and "has_manual_edit" in row.keys() else False
+
     def save_page_edit(
         self,
         job_id: str,
@@ -564,58 +604,118 @@ class JobDatabase:
         edited_text: str,
         output_dir: str = "data/jobs",
         check_conflict: bool = False,
+        manual: bool = True,
+        changes_path: Optional[str] = None,
+        changes_data: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Saves user manual edit to page final.txt with revision conflict checking.
         - If check_conflict and source_revision != current_revision: raises RevisionConflictError.
         - Increments revision to current_revision + 1.
-        - Sets has_manual_edit = 1.
+        - Updates has_manual_edit = 1 ONLY if manual=True. If manual=False, keeps existing flag (Bug 4b).
         - Automatically transitions job review_status to 'in_review'.
-        - Writes page final.txt and reassembles document-level final.txt.
+        - Writes page final.txt and reassembles document-level final.txt atomically (S3).
+        - If changes_path and changes_data are provided, writes changes.json atomically in the same operation.
+        - Guarantees DB revision, final.txt, and changes.json remain consistent even on write failure (Bug 4-5/S3).
         - Never silently overwrites.
         """
-        import json
-        now = get_iso_now()
-        with self.transaction() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT revision, has_manual_edit FROM pages WHERE job_id = ? AND page_id = ?", (job_id, page_id))
-            row = cursor.fetchone()
-            if not row:
-                raise ValueError(f"Page {page_id} not found in job {job_id}")
-
-            current_rev = row["revision"]
-            if check_conflict and source_revision != current_rev:
-                raise RevisionConflictError(
-                    f"Conflict detected: page {page_id} is currently at revision {current_rev}, "
-                    f"but client submitted edit based on revision {source_revision}. "
-                    "Another edit was saved. Edits will not be silently overwritten."
-                )
-
-            new_revision = current_rev + 1
-
-            # Update page revision & manual edit flag
-            cursor.execute("""
-                UPDATE pages
-                SET revision = ?, has_manual_edit = 1, updated_at = ?
-                WHERE job_id = ? AND page_id = ?
-            """, (new_revision, now, job_id, page_id))
-
-            # When user edits, transition job review_status to in_review
-            new_review_st = ReviewStatus.IN_REVIEW.value
-            cursor.execute("""
-                UPDATE jobs SET review_status = ?, updated_at = ? WHERE job_id = ?
-            """, (new_review_st, now, job_id))
-
-        # Write final.txt to page directory
         job_dir = os.path.abspath(os.path.join(output_dir, job_id))
         page_dir = os.path.join(job_dir, f"page_{page_id:02d}")
         os.makedirs(page_dir, exist_ok=True)
         final_file = os.path.join(page_dir, "final.txt")
-        with open(final_file, "w", encoding="utf-8") as f:
-            f.write(edited_text)
 
-        # Reassemble document-level final.txt
-        self._reassemble_job_final(job_id, output_dir)
+        # Snapshot existing file contents for rollback on write/commit failure
+        prev_final_exists = os.path.exists(final_file)
+        prev_final_content = None
+        if prev_final_exists:
+            try:
+                with open(final_file, "r", encoding="utf-8") as f:
+                    prev_final_content = f.read()
+            except Exception:
+                pass
+
+        prev_changes_exists = False
+        prev_changes_content = None
+        if changes_path and os.path.exists(changes_path):
+            prev_changes_exists = True
+            try:
+                with open(changes_path, "r", encoding="utf-8") as f:
+                    prev_changes_content = f.read()
+            except Exception:
+                pass
+
+        now = get_iso_now()
+        final_written = False
+        changes_written = False
+
+        try:
+            with self.transaction() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT revision, has_manual_edit FROM pages WHERE job_id = ? AND page_id = ?", (job_id, page_id))
+                row = cursor.fetchone()
+                if not row:
+                    raise ValueError(f"Page {page_id} not found in job {job_id}")
+
+                current_rev = row["revision"]
+                if check_conflict and source_revision != current_rev:
+                    raise RevisionConflictError(
+                        f"Conflict detected: page {page_id} is currently at revision {current_rev}, "
+                        f"but client submitted edit based on revision {source_revision}. "
+                        "Another edit was saved. Edits will not be silently overwritten."
+                    )
+
+                new_revision = current_rev + 1
+
+                # Update page revision & manual edit flag:
+                # Set to 1 if manual is True; otherwise preserve existing value
+                cursor.execute("""
+                    UPDATE pages
+                    SET revision = ?,
+                        has_manual_edit = CASE WHEN ? = 1 THEN 1 ELSE has_manual_edit END,
+                        updated_at = ?
+                    WHERE job_id = ? AND page_id = ?
+                """, (new_revision, 1 if manual else 0, now, job_id, page_id))
+
+                # When user edits, transition job review_status to in_review
+                new_review_st = ReviewStatus.IN_REVIEW.value
+                cursor.execute("""
+                    UPDATE jobs SET review_status = ?, updated_at = ? WHERE job_id = ?
+                """, (new_review_st, now, job_id))
+
+                # Write files before transaction block exits/commits
+                atomic_write_text(final_file, edited_text)
+                final_written = True
+                if changes_path and changes_data is not None:
+                    atomic_write_json(changes_path, changes_data)
+                    changes_written = True
+                self._reassemble_job_final(job_id, output_dir)
+
+        except BaseException:
+            # If DB commit fails or file writing fails, rollback any file modifications
+            if final_written:
+                try:
+                    if prev_final_exists and prev_final_content is not None:
+                        atomic_write_text(final_file, prev_final_content)
+                    elif not prev_final_exists and os.path.exists(final_file):
+                        os.remove(final_file)
+                except Exception:
+                    pass
+
+            if changes_written:
+                try:
+                    if prev_changes_exists and prev_changes_content is not None:
+                        atomic_write_text(changes_path, prev_changes_content)
+                    elif not prev_changes_exists and os.path.exists(changes_path):
+                        os.remove(changes_path)
+                except Exception:
+                    pass
+
+            if final_written or changes_written:
+                try:
+                    self._reassemble_job_final(job_id, output_dir)
+                except Exception:
+                    pass
+            raise
 
         return {
             "page_id": page_id,
@@ -671,8 +771,7 @@ class JobDatabase:
                 p_text = remove_internal_page_header(p_text, p_num)
                 final_lines.append(page_chunk(header, p_text))
 
-        with open(os.path.join(job_dir, "final.txt"), "w", encoding="utf-8") as f:
-            f.write("\f\n".join(final_lines))
+        atomic_write_text(os.path.join(job_dir, "final.txt"), "\f\n".join(final_lines))
 
     def apply_proposal_action(
         self,
@@ -683,14 +782,14 @@ class JobDatabase:
         output_dir: str = "data/jobs",
     ) -> Dict[str, Any]:
         """
-        Accepts or reverts an AI proposal for a page.
-        - Loads changes.json and updates proposal status ('accepted' / 'rejected' / 'pending').
-        - Updates page final.txt with the accepted/reverted text.
-        - Increments revision.
-        - Reassembles job final.txt.
-        - If review_status was 'reviewed', transitions back to 'in_review'.
+        Accepts or reverts an AI proposal for a page (Bug 4a, 4b).
+        - If not has_manual_edit: reconstructs deterministically from raw_text and accepted
+          proposals via rebuild_from_accepted (using start/end character offsets).
+        - If has_manual_edit: locates needle near expected_pos via replace_near.
+          If not found or ambiguous, raises RevisionConflictError (409) without changing status.
+        - Atomically saves page final.txt via save_page_edit(manual=False).
+        - Atomically updates changes.json.
         """
-        import json
         job_dir = os.path.abspath(os.path.join(output_dir, job_id))
         page_dir = os.path.join(job_dir, f"page_{page_id:02d}")
         changes_path = os.path.join(page_dir, "changes.json")
@@ -712,35 +811,61 @@ class JobDatabase:
         if not target_item:
             raise ValueError(f"Correction proposal '{change_id}' not found")
 
-        # Load current text
+        orig_status = target_item.get("status", "pending")
+        if action == "accept":
+            target_item["status"] = "accepted"
+        elif action == "revert":
+            target_item["status"] = "rejected"
+        else:
+            raise ValueError(f"Unknown action: {action}")
+
+        has_manual = self.has_page_manual_edit(job_id, page_id)
+
+        raw_text = ""
+        if os.path.exists(raw_path):
+            with open(raw_path, "r", encoding="utf-8") as f:
+                raw_text = f.read()
+
+        current_text = ""
         if os.path.exists(final_path):
             with open(final_path, "r", encoding="utf-8") as f:
                 current_text = f.read()
-        elif os.path.exists(raw_path):
-            with open(raw_path, "r", encoding="utf-8") as f:
-                current_text = f.read()
-        else:
-            current_text = ""
+        elif raw_text:
+            current_text = raw_text
 
         orig = target_item.get("original_text", "")
         corr = target_item.get("corrected_text", "")
 
-        if action == "accept":
-            target_item["status"] = "accepted"
-            if orig in current_text:
-                new_text = current_text.replace(orig, corr, 1)
-            else:
-                new_text = current_text
-        elif action == "revert":
-            target_item["status"] = "rejected"
-            if corr in current_text:
-                new_text = current_text.replace(corr, orig, 1)
-            else:
-                new_text = current_text
+        if not has_manual:
+            # Deterministic rebuild from raw + accepted
+            new_text = rebuild_from_accepted(raw_text, changes_data.get("corrections", []))
         else:
-            raise ValueError(f"Unknown action: {action}")
+            # Manual edit exists: find needle near expected position
+            target_start = target_item.get("start", 0)
+            accepted_before = [
+                c for c in changes_data.get("corrections", [])
+                if c.get("status") == "accepted" and c.get("change_id") != change_id and c.get("end", 0) <= target_start
+            ]
+            shift = sum(len(c.get("corrected_text", "")) - len(c.get("original_text", "")) for c in accepted_before)
+            expected_pos = target_start + shift
 
-        # Update counters
+            if action == "accept":
+                needle = orig
+                replacement = corr
+            else:
+                needle = corr
+                replacement = orig
+
+            res_text = replace_near(current_text, needle, replacement, expected_pos)
+            if res_text is None:
+                # Rollback in-memory status
+                target_item["status"] = orig_status
+                raise RevisionConflictError(
+                    f"ไม่สามารถระบุตำแหน่งของข้อเสนอ '{change_id}' ได้อย่างชัดเจนหรือข้อความถูกแก้ไขไปแล้ว"
+                )
+            new_text = res_text
+
+        # 1. Update changes.json counters
         acc = sum(1 for c in changes_data.get("corrections", []) if c.get("status") == "accepted")
         rej = sum(1 for c in changes_data.get("corrections", []) if c.get("status") == "rejected")
         pend = sum(1 for c in changes_data.get("corrections", []) if c.get("status") == "pending")
@@ -748,9 +873,7 @@ class JobDatabase:
         changes_data["rejected_corrections"] = rej
         changes_data["pending_corrections"] = pend
 
-        with open(changes_path, "w", encoding="utf-8") as f:
-            json.dump(changes_data, f, ensure_ascii=False, indent=2)
-
+        # 2. Save page edit and changes.json atomically in a single coordinated transaction (Bug 4-5/S3)
         curr_rev = self.get_page_revision(job_id, page_id)
         res = self.save_page_edit(
             job_id=job_id,
@@ -758,7 +881,11 @@ class JobDatabase:
             source_revision=curr_rev,
             edited_text=new_text,
             output_dir=output_dir,
+            manual=False,
+            changes_path=changes_path,
+            changes_data=changes_data,
         )
+
         res["target_item"] = target_item
         res["final_text"] = new_text
         return res
@@ -769,39 +896,116 @@ class JobDatabase:
         page_id: int,
         action: str,  # 'accept' or 'revert'
         output_dir: str = "data/jobs",
+        source_revision: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
-        Accepts or reverts all proposals for a page in batch.
+        Accepts or reverts all proposals for a page in batch (Bug 5).
+        - If source_revision provided and differs from current revision, raises RevisionConflictError(409).
+        - If not has_manual_edit:
+            If action == "accept": Marks pending as accepted. Rebuilds from raw via rebuild_from_accepted.
+            If action == "revert": Marks all as rejected. Restores raw.txt.
+        - If has_manual_edit:
+            Applies/reverts item-by-item using replace_near.
+            Preserves user's manual additions.
+            Items that cannot be placed unambiguously are skipped.
+        - Returns {"applied": count, "skipped": [change_id, ...], ...}
         """
-        import json
         job_dir = os.path.abspath(os.path.join(output_dir, job_id))
         page_dir = os.path.join(job_dir, f"page_{page_id:02d}")
         changes_path = os.path.join(page_dir, "changes.json")
         raw_path = os.path.join(page_dir, "raw.txt")
-        corr_path = os.path.join(page_dir, "corrected.txt")
+        final_path = os.path.join(page_dir, "final.txt")
 
         if not os.path.exists(changes_path):
             raise FileNotFoundError(f"changes.json not found for job {job_id} page {page_id}")
 
+        curr_rev = self.get_page_revision(job_id, page_id)
+        if source_revision is not None and source_revision != curr_rev:
+            raise RevisionConflictError(
+                f"Revision conflict: current revision is {curr_rev}, requested {source_revision}"
+            )
+
         with open(changes_path, "r", encoding="utf-8") as f:
             changes_data = json.load(f)
 
-        if action == "accept":
-            if os.path.exists(corr_path):
-                with open(corr_path, "r", encoding="utf-8") as f:
-                    new_text = f.read()
+        raw_text = ""
+        if os.path.exists(raw_path):
+            with open(raw_path, "r", encoding="utf-8") as f:
+                raw_text = f.read()
+
+        current_text = ""
+        if os.path.exists(final_path):
+            with open(final_path, "r", encoding="utf-8") as f:
+                current_text = f.read()
+        elif raw_text:
+            current_text = raw_text
+
+        has_manual = self.has_page_manual_edit(job_id, page_id)
+        applied_count = 0
+        skipped_ids = []
+
+        if not has_manual:
+            if action == "accept":
+                for item in changes_data.get("corrections", []):
+                    if item.get("status") == "pending":
+                        item["status"] = "accepted"
+                        applied_count += 1
+                new_text = rebuild_from_accepted(raw_text, changes_data.get("corrections", []))
+            elif action == "revert":
+                for item in changes_data.get("corrections", []):
+                    if item.get("status") in ("accepted", "pending"):
+                        item["status"] = "rejected"
+                        applied_count += 1
+                new_text = raw_text
             else:
-                new_text = ""
-            for item in changes_data.get("corrections", []):
-                item["status"] = "accepted"
+                raise ValueError(f"Unknown action: {action}")
         else:
-            if os.path.exists(raw_path):
-                with open(raw_path, "r", encoding="utf-8") as f:
-                    new_text = f.read()
+            # Page has manual edit: process item by item, preserving user additions
+            working_text = current_text
+            if action == "accept":
+                targets = [c for c in changes_data.get("corrections", []) if c.get("status") == "pending"]
+                for item in sorted(targets, key=lambda c: c.get("start", 0), reverse=True):
+                    orig = item.get("original_text", "")
+                    corr = item.get("corrected_text", "")
+                    target_start = item.get("start", 0)
+                    accepted_before = [
+                        c for c in changes_data.get("corrections", [])
+                        if c.get("status") == "accepted" and c.get("end", 0) <= target_start
+                    ]
+                    shift = sum(len(c.get("corrected_text", "")) - len(c.get("original_text", "")) for c in accepted_before)
+                    expected_pos = target_start + shift
+
+                    res_text = replace_near(working_text, orig, corr, expected_pos)
+                    if res_text is not None:
+                        working_text = res_text
+                        item["status"] = "accepted"
+                        applied_count += 1
+                    else:
+                        skipped_ids.append(item.get("change_id"))
+            elif action == "revert":
+                targets = [c for c in changes_data.get("corrections", []) if c.get("status") == "accepted"]
+                for item in sorted(targets, key=lambda c: c.get("start", 0), reverse=True):
+                    orig = item.get("original_text", "")
+                    corr = item.get("corrected_text", "")
+                    target_start = item.get("start", 0)
+                    accepted_before = [
+                        c for c in changes_data.get("corrections", [])
+                        if c.get("status") == "accepted" and c.get("change_id") != item.get("change_id") and c.get("end", 0) <= target_start
+                    ]
+                    shift = sum(len(c.get("corrected_text", "")) - len(c.get("original_text", "")) for c in accepted_before)
+                    expected_pos = target_start + shift
+
+                    res_text = replace_near(working_text, corr, orig, expected_pos)
+                    if res_text is not None:
+                        working_text = res_text
+                        item["status"] = "rejected"
+                        applied_count += 1
+                    else:
+                        skipped_ids.append(item.get("change_id"))
             else:
-                new_text = ""
-            for item in changes_data.get("corrections", []):
-                item["status"] = "rejected"
+                raise ValueError(f"Unknown action: {action}")
+
+            new_text = working_text
 
         acc = sum(1 for c in changes_data.get("corrections", []) if c.get("status") == "accepted")
         rej = sum(1 for c in changes_data.get("corrections", []) if c.get("status") == "rejected")
@@ -810,17 +1014,20 @@ class JobDatabase:
         changes_data["rejected_corrections"] = rej
         changes_data["pending_corrections"] = pend
 
-        with open(changes_path, "w", encoding="utf-8") as f:
-            json.dump(changes_data, f, ensure_ascii=False, indent=2)
-
-        curr_rev = self.get_page_revision(job_id, page_id)
+        # Save page edit and changes.json atomically in a single coordinated transaction (Bug 4-5/S3)
         res = self.save_page_edit(
             job_id=job_id,
             page_id=page_id,
             source_revision=curr_rev,
             edited_text=new_text,
             output_dir=output_dir,
+            manual=False,
+            changes_path=changes_path,
+            changes_data=changes_data,
         )
+
+        res["applied"] = applied_count
+        res["skipped"] = skipped_ids
         res["final_text"] = new_text
         return res
 

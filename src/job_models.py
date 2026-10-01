@@ -3,11 +3,13 @@ Phase 4: Job & API Schema Definitions.
 Defines Pydantic models and Enums for Job Queue, Worker, and FastAPI REST endpoints.
 Strictly follows README and Checklist specifications.
 """
-from typing import List, Optional, Dict, Any, Literal
+from typing import List, Optional, Dict, Any, Literal, get_args
 from enum import Enum
 from pydantic import BaseModel, Field
 
 OCR_BATCH_SIZE = 200
+RetryMode = Literal["failed_only", "ai_only", "full", "full_text_ai"]
+RETRY_MODES = get_args(RetryMode)
 
 
 class JobStatus(str, Enum):
@@ -97,7 +99,7 @@ class JobStatusResponse(BaseModel):
 
 
 class JobRetryRequest(BaseModel):
-    retry_mode: Literal["failed_only", "ai_only", "full", "full_text_ai"] = "failed_only"
+    retry_mode: RetryMode = "failed_only"
 
 
 class PageEditRequest(BaseModel):

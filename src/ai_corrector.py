@@ -9,7 +9,7 @@ import re
 import logging
 from pathlib import Path
 
-from src.config import LLM_MODEL
+from src.config import LLM_MODEL, LLM_MAX_TOKENS
 from src.llm_client import LocalLLMClient
 from src.correction_schema import CorrectionItem, ChangesDocument, DiffSummary
 from src.correction_validator import CorrectionValidator
@@ -206,8 +206,33 @@ class AICorrector:
             user_prompt += "- ห้ามแก้หรือตัดคำที่ถูกต้องแล้ว\n"
             user_prompt += "- ส่งผลลัพธ์เป็น JSON ตาม schema ที่กำหนด"
         elif call_model:
-            user_prompt = f"Text to inspect and correct:\n```\n{raw_text}\n```\n"
-            user_prompt += "Inspect words and provide word-level corrections if misspelled. Return JSON schema with 'corrections':"
+            from src.text_chunker import TextChunker
+            if len(raw_text) > 2000:
+                chunker = TextChunker(chunk_size=1500, overlap_size=200)
+                chunks = chunker.chunk_text(raw_text)
+                all_chunk_corrections = []
+                for c_info in chunks:
+                    c_prompt = f"Text to inspect and correct:\n```\n{c_info['text']}\n```\nInspect words and provide word-level corrections if misspelled. Return JSON schema with 'corrections':"
+                    c_resp = self.client.chat_completion(
+                        messages=[
+                            {"role": "system", "content": SYSTEM_PROMPT},
+                            {"role": "user", "content": c_prompt},
+                        ],
+                        temperature=0.0,
+                        max_tokens=LLM_MAX_TOKENS,
+                        response_format=CORRECTIONS_JSON_SCHEMA,
+                    )
+                    if c_resp.get("success"):
+                        c_data = self.extract_json_from_response(c_resp.get("content", ""))
+                        if c_data and isinstance(c_data.get("corrections"), list):
+                            for item in c_data["corrections"]:
+                                if isinstance(item, dict):
+                                    all_chunk_corrections.append(item)
+                data = {"corrections": deterministic_items + all_chunk_corrections}
+                call_model = False
+            else:
+                user_prompt = f"Text to inspect and correct:\n```\n{raw_text}\n```\n"
+                user_prompt += "Inspect words and provide word-level corrections if misspelled. Return JSON schema with 'corrections':"
 
         if call_model:
             messages = [
@@ -217,14 +242,15 @@ class AICorrector:
             resp = self.client.chat_completion(
                 messages=messages,
                 temperature=0.0,
-                max_tokens=600,
+                max_tokens=LLM_MAX_TOKENS,
                 response_format=CORRECTIONS_JSON_SCHEMA,
             )
             if not resp["success"]:
+                err_status = resp.get("status", "failed")
                 if not deterministic_items:
                     doc = ChangesDocument(
                         job_id=job_id, page_id=page_id, source_revision=source_revision,
-                        status=resp.get("status", "failed"), model=self.client.model,
+                        status=err_status, model=self.client.model,
                         error_message=resp.get("error", "LLM call failed"), total_corrections=0,
                         corrections=[],
                         diff_summary=DiffSummary(total_characters_raw=len(raw_text), total_characters_corrected=len(raw_text), unchanged=len(raw_text)),
@@ -246,7 +272,7 @@ class AICorrector:
                     data = {"corrections": deterministic_items}
                 else:
                     data["corrections"] = deterministic_items + data["corrections"]
-        else:
+        elif not call_model and "corrections" not in locals().get("data", {}):
             data = {"corrections": deterministic_items}
 
         # 6. Parse raw corrections into CorrectionItem candidates

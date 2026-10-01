@@ -10,6 +10,7 @@ Strictly coordinates retention lifecycle with Worker and JobManager:
 import os
 import shutil
 import time
+import re
 from typing import List, Dict, Any, Optional
 
 from src.database import JobDatabase
@@ -17,6 +18,24 @@ from src.job_models import JobStatus
 
 # Default retention configuration (24 hours)
 DEFAULT_RETENTION_SECONDS: float = float(os.getenv("RETENTION_SECONDS", "86400.0"))
+JOB_ID_PATTERN = r"^[A-Za-z0-9_-]{1,64}$"
+
+
+def safe_job_dir(output_base_dir: str, job_id: str) -> str:
+    """Return a job directory only when it is a direct child of output_base_dir."""
+    if not re.fullmatch(JOB_ID_PATTERN, job_id):
+        raise ValueError("Invalid job path")
+
+    base_dir = os.path.realpath(output_base_dir)
+    job_dir = os.path.realpath(os.path.join(base_dir, job_id))
+    try:
+        is_child = os.path.commonpath([base_dir, job_dir]) == base_dir
+    except ValueError:
+        # Windows raises ValueError for paths on different drives.
+        is_child = False
+    if not is_child or job_dir == base_dir:
+        raise ValueError("Invalid job path")
+    return job_dir
 
 
 class RetentionPolicy:
@@ -50,10 +69,12 @@ def delete_single_job(
     Explicitly deletes a single job and its artifacts from disk and database.
     If the job is currently actively running and force=False, refuses deletion.
     """
+    # Validate before consulting the database so an unsafe ID never reaches any
+    # deletion branch, including the orphaned-directory path.
+    job_dir = safe_job_dir(output_base_dir, job_id)
     job = db.get_job_status(job_id)
     if not job:
         # Check if orphaned folder exists on disk
-        job_dir = os.path.abspath(os.path.join(output_base_dir, job_id))
         if os.path.exists(job_dir):
             shutil.rmtree(job_dir, ignore_errors=True)
             return {"job_id": job_id, "deleted": True, "details": "Removed orphaned directory"}
@@ -71,7 +92,6 @@ def delete_single_job(
             job_manager.cancel_job(job_id)
 
     # 1. Remove disk directory and all artifacts (source, images, results, logs)
-    job_dir = os.path.abspath(os.path.join(output_base_dir, job_id))
     if os.path.exists(job_dir):
         shutil.rmtree(job_dir, ignore_errors=True)
 

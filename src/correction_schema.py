@@ -68,7 +68,7 @@ class ChangesDocument(BaseModel):
     page_id: int = Field(..., description="Page number/ID")
     source_revision: int = Field(1, description="Origin revision number (1 = raw.txt)")
     current_revision: Optional[int] = Field(None, description="Current revision number of target document")
-    status: Literal["completed", "partial", "timeout", "connection_error", "malformed_json", "failed", "stale"] = Field(
+    status: Literal["completed", "partial", "timeout", "connection_error", "malformed_json", "failed", "stale", "truncated"] = Field(
         "completed", description="Execution status of AI correction"
     )
     model: str = Field("google/gemma-3-1b", description="Model name used")

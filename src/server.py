@@ -20,13 +20,14 @@ import tempfile
 import time
 import json
 from urllib.parse import urlparse
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Annotated
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Query, status, Request
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query, Path, status, Request
 from fastapi.responses import FileResponse, PlainTextResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+import asyncio
 import pypdfium2 as pdfium
 
 from src.config import HOST, PORT, LOCALHOST_ONLY, get_llm_config, update_llm_config
@@ -48,6 +49,9 @@ DEFAULT_OUTPUT_DIR = "files"
 db = JobDatabase(db_path=DEFAULT_DB_PATH)
 job_manager = JobManager(db_path=DEFAULT_DB_PATH, output_dir=DEFAULT_OUTPUT_DIR)
 
+JOB_ID_PATTERN = r"^[A-Za-z0-9_-]{1,64}$"
+JobId = Annotated[str, Path(pattern=JOB_ID_PATTERN, description="Unique job identifier")]
+
 
 def sanitize_filename(filename: str) -> str:
     """
@@ -68,9 +72,12 @@ def is_path_traversal(target_path: str, base_dir: str) -> bool:
     """
     Checks if target_path escapes outside base_dir.
     """
-    abs_target = os.path.abspath(target_path)
-    abs_base = os.path.abspath(base_dir)
-    return not abs_target.startswith(abs_base)
+    target = os.path.realpath(target_path)
+    base = os.path.realpath(base_dir)
+    try:
+        return os.path.commonpath([base, target]) != base or target == base
+    except ValueError:
+        return True
 
 
 @asynccontextmanager
@@ -88,12 +95,29 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+ALLOWED_ORIGINS = {
+    f"http://127.0.0.1:{PORT}",
+    f"http://localhost:{PORT}",
+    "http://testserver",
+    f"http://testserver:{PORT}",
+}
+ALLOWED_HOSTS = {
+    f"127.0.0.1:{PORT}",
+    f"localhost:{PORT}",
+    f"[::1]:{PORT}",
+    "testserver",
+    f"testserver:{PORT}",
+}
+if PORT == 80:
+    ALLOWED_ORIGINS.update({"http://127.0.0.1", "http://localhost"})
+    ALLOWED_HOSTS.update({"127.0.0.1", "localhost", "::1", "[::1]"})
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=sorted(ALLOWED_ORIGINS),
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type"],
 )
 
 
@@ -105,12 +129,20 @@ async def enforce_loopback_only(request: Request, call_next):
     """
     if LOCALHOST_ONLY:
         client_host = request.client.host if request.client else "unknown"
-        allowed_hosts = {"127.0.0.1", "::1", "localhost", "testclient"}
-        if client_host not in allowed_hosts:
+        allowed_client_hosts = {"127.0.0.1", "::1", "localhost", "testclient"}
+        if client_host not in allowed_client_hosts:
             return JSONResponse(
                 status_code=status.HTTP_403_FORBIDDEN,
                 content={"detail": f"Access denied: server is bound to localhost loopback only. Client IP '{client_host}' is blocked."},
             )
+        # Check Host header: strictly bound to configured PORT or testserver (Bug 2)
+        host = (request.headers.get("host") or "").lower()
+        if host not in ALLOWED_HOSTS:
+            return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"detail": "Forbidden host"})
+        # Check Origin header: strictly bound to configured PORT or testserver (Bug 2)
+        origin = request.headers.get("origin")
+        if origin and origin not in ALLOWED_ORIGINS:
+            return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"detail": "Forbidden origin"})
     return await call_next(request)
 
 
@@ -124,6 +156,7 @@ async def handle_database_lock_timeout(request, exc: DatabaseLockTimeoutError):
         },
         headers={"Retry-After": "1"},
     )
+
 
 
 @app.exception_handler(RevisionConflictError)
@@ -201,13 +234,23 @@ def save_ai_config(payload: LocalLLMConfigRequest):
     return update_llm_config(**config)
 
 
+def _inspect_pdf_page_count(file_path: str) -> int:
+    pdf_doc = pdfium.PdfDocument(file_path)
+    try:
+        return len(pdf_doc)
+    finally:
+        pdf_doc.close()
+
+
 @app.post("/api/upload", response_model=JobCreateResponse)
 async def upload_file(
     file: UploadFile = File(...),
+    max_pages_limit: Optional[int] = Form(None),
+    max_size_limit: Optional[int] = Form(None),
 ):
     """
     Uploads a document into files/{job_id}, reads its page count, and rejects
-    unsupported or encrypted files.  The processing page limit is applied when
+    unsupported or encrypted files. The processing page limit is applied when
     the user starts the job after choosing how many pages to convert.
     """
     original_filename = file.filename or "file.pdf"
@@ -238,18 +281,22 @@ async def upload_file(
 
     # 4. Stream and validate file size
     size_bytes = 0
+    effective_max_size = MAX_FILE_SIZE_BYTES
+    if max_size_limit is not None and max_size_limit > 0:
+        effective_max_size = min(effective_max_size, max_size_limit)
+
     with open(saved_file_path, "wb") as f_out:
         while True:
             chunk = await file.read(64 * 1024)
             if not chunk:
                 break
             size_bytes += len(chunk)
-            if size_bytes > MAX_FILE_SIZE_BYTES:
+            if size_bytes > effective_max_size:
                 f_out.close()
                 shutil.rmtree(job_dir, ignore_errors=True)
                 raise HTTPException(
                     status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                    detail=f"File exceeds maximum allowed size ({MAX_FILE_SIZE_BYTES} bytes)"
+                    detail=f"File exceeds maximum allowed size ({effective_max_size} bytes)"
                 )
             f_out.write(chunk)
 
@@ -257,8 +304,7 @@ async def upload_file(
     total_pages = 1
     if ext == ".pdf":
         try:
-            pdf_doc = pdfium.PdfDocument(saved_file_path)
-            total_pages = len(pdf_doc)
+            total_pages = await asyncio.to_thread(_inspect_pdf_page_count, saved_file_path)
         except Exception as e:
             err_str = str(e).lower()
             shutil.rmtree(job_dir, ignore_errors=True)
@@ -270,6 +316,13 @@ async def upload_file(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Cannot parse PDF file: {e}"
+            )
+
+        if max_pages_limit is not None and max_pages_limit > 0 and total_pages > max_pages_limit:
+            shutil.rmtree(job_dir, ignore_errors=True)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"PDF has {total_pages} pages, which exceeds the limit of {max_pages_limit} pages"
             )
 
     else:
@@ -297,7 +350,7 @@ async def upload_file(
 
 
 @app.post("/api/jobs/{job_id}/start")
-def start_job(job_id: str, req: JobStartRequest = JobStartRequest()):
+def start_job(job_id: JobId, req: JobStartRequest = JobStartRequest()):
     """
     Enqueues job for processing.
     """
@@ -313,21 +366,17 @@ def start_job(job_id: str, req: JobStartRequest = JobStartRequest()):
     selected_count = page_end - page_start + 1
     if page_start < 1 or page_end < page_start or page_end > job.total_pages:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ช่วงหน้าที่เลือกไม่อยู่ในเอกสาร")
-    if not db.configure_job_for_start(
-        job_id,
+
+    # P1 S11: Atomic state transition combining configure and enqueue under JobManager lock
+    success = job_manager.configure_and_enqueue_job(
+        job_id=job_id,
         page_start=page_start,
         page_end=page_end,
         enable_ai=req.enable_ai,
-    ):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Job cannot be configured for processing")
-
-    job_dir = os.path.abspath(os.path.join(DEFAULT_OUTPUT_DIR, job_id))
-    with open(os.path.join(job_dir, "assembly_options.json"), "w", encoding="utf-8") as f:
-        json.dump({"include_page_numbers": req.include_page_numbers}, f)
-
-    success = job_manager.enqueue_job(job_id=job_id, enable_ai=req.enable_ai)
+        include_page_numbers=req.include_page_numbers,
+    )
     if not success:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not enqueue job")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="งานนี้อยู่ในคิว กำลังดำเนินการ หรือไม่สามารถตั้งค่าได้")
 
     return {
         "message": "Job enqueued successfully",
@@ -343,7 +392,7 @@ def start_job(job_id: str, req: JobStartRequest = JobStartRequest()):
 
 
 @app.get("/api/jobs/{job_id}/status", response_model=JobStatusResponse)
-def get_job_status(job_id: str):
+def get_job_status(job_id: JobId):
     """
     Retrieves job status with sub-second p95 latency.
     """
@@ -354,7 +403,7 @@ def get_job_status(job_id: str):
 
 
 @app.post("/api/jobs/{job_id}/cancel")
-def cancel_job(job_id: str):
+def cancel_job(job_id: JobId):
     """
     Cancels queued or running job.
     """
@@ -371,7 +420,7 @@ def cancel_job(job_id: str):
 
 
 @app.post("/api/jobs/{job_id}/retry")
-def retry_job(job_id: str, req: JobRetryRequest = JobRetryRequest()):
+def retry_job(job_id: JobId, req: JobRetryRequest = JobRetryRequest()):
     """
     Retries failed steps or failed pages with attempt increment.
     Old attempt results cannot overwrite new attempt.
@@ -412,7 +461,7 @@ def retry_job(job_id: str, req: JobRetryRequest = JobRetryRequest()):
 
 
 @app.get("/api/jobs/{job_id}/download/{file_type}")
-def download_output(job_id: str, file_type: str):
+def download_output(job_id: JobId, file_type: str):
     """
     Downloads text results, JSON results, PDF page images, or bundle.zip.
     Includes page breaks and status warnings for partial/failed results.
@@ -490,7 +539,7 @@ def download_output(job_id: str, file_type: str):
 
 
 @app.put("/api/jobs/{job_id}/pages/{page_id}/edit", response_model=PageEditResponse)
-def edit_page_text(job_id: str, page_id: int, req: PageEditRequest):
+def edit_page_text(job_id: JobId, page_id: int, req: PageEditRequest):
     """
     Saves user manual edit to final.txt for a page with strict revision checking.
     Raises 409 Conflict if source_revision does not match current database revision.
@@ -514,14 +563,18 @@ def edit_page_text(job_id: str, page_id: int, req: PageEditRequest):
             status="saved",
             message=res["message"],
         )
-    except RevisionConflictError:
+    except (RevisionConflictError, DatabaseLockTimeoutError):
         raise
-    except Exception as e:
+    except HTTPException:
+        raise
+    except (ValueError, FileNotFoundError) as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @app.post("/api/jobs/{job_id}/pages/{page_id}/corrections/{change_id}/accept")
-def accept_correction(job_id: str, page_id: int, change_id: str):
+def accept_correction(job_id: JobId, page_id: int, change_id: str):
     """
     Accepts an AI proposal, applying replacement to final.txt and incrementing revision.
     """
@@ -534,12 +587,18 @@ def accept_correction(job_id: str, page_id: int, change_id: str):
             output_dir=DEFAULT_OUTPUT_DIR,
         )
         return res
-    except Exception as e:
+    except (RevisionConflictError, DatabaseLockTimeoutError):
+        raise
+    except HTTPException:
+        raise
+    except (ValueError, FileNotFoundError) as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @app.post("/api/jobs/{job_id}/pages/{page_id}/corrections/{change_id}/revert")
-def revert_correction(job_id: str, page_id: int, change_id: str):
+def revert_correction(job_id: JobId, page_id: int, change_id: str):
     """
     Reverts an AI proposal back to raw text and increments revision.
     """
@@ -552,14 +611,24 @@ def revert_correction(job_id: str, page_id: int, change_id: str):
             output_dir=DEFAULT_OUTPUT_DIR,
         )
         return res
-    except Exception as e:
+    except (RevisionConflictError, DatabaseLockTimeoutError):
+        raise
+    except HTTPException:
+        raise
+    except (ValueError, FileNotFoundError) as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @app.post("/api/jobs/{job_id}/pages/{page_id}/corrections/accept-all")
-def accept_all_corrections(job_id: str, page_id: int):
+def accept_all_corrections(
+    job_id: JobId,
+    page_id: int,
+    source_revision: Optional[int] = Query(None, description="Optional revision expected for conflict check"),
+):
     """
-    Accepts all AI proposals for a page in batch.
+    Accepts all AI proposals for a page in batch (Bug 5).
     """
     try:
         res = db.apply_all_proposals(
@@ -567,16 +636,27 @@ def accept_all_corrections(job_id: str, page_id: int):
             page_id=page_id,
             action="accept",
             output_dir=DEFAULT_OUTPUT_DIR,
+            source_revision=source_revision,
         )
         return res
-    except Exception as e:
+    except (RevisionConflictError, DatabaseLockTimeoutError):
+        raise
+    except HTTPException:
+        raise
+    except (ValueError, FileNotFoundError) as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @app.post("/api/jobs/{job_id}/pages/{page_id}/corrections/revert-all")
-def revert_all_corrections(job_id: str, page_id: int):
+def revert_all_corrections(
+    job_id: JobId,
+    page_id: int,
+    source_revision: Optional[int] = Query(None, description="Optional revision expected for conflict check"),
+):
     """
-    Reverts all AI proposals for a page in batch.
+    Reverts all AI proposals for a page in batch (Bug 5).
     """
     try:
         res = db.apply_all_proposals(
@@ -584,14 +664,21 @@ def revert_all_corrections(job_id: str, page_id: int):
             page_id=page_id,
             action="revert",
             output_dir=DEFAULT_OUTPUT_DIR,
+            source_revision=source_revision,
         )
         return res
-    except Exception as e:
+    except (RevisionConflictError, DatabaseLockTimeoutError):
+        raise
+    except HTTPException:
+        raise
+    except (ValueError, FileNotFoundError) as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @app.get("/api/jobs/{job_id}/pages/{page_id}/image")
-def get_page_image(job_id: str, page_id: int):
+def get_page_image(job_id: JobId, page_id: int):
     """
     Serves the reference image of a page for the dual-pane viewer.
     Renders from original document if not already cached.
@@ -637,7 +724,7 @@ def get_page_image(job_id: str, page_id: int):
 
 
 @app.get("/api/jobs/{job_id}/pages/{page_id}/data")
-def get_page_data(job_id: str, page_id: int):
+def get_page_data(job_id: JobId, page_id: int):
     """
     Returns full structured data for a page: raw text, corrected text, final text,
     revision, bounding boxes, character mappings, and AI change proposals.
@@ -738,7 +825,7 @@ def get_page_data(job_id: str, page_id: int):
 
 
 @app.post("/api/jobs/{job_id}/review")
-def update_review_status(job_id: str, new_status: ReviewStatus = Query(...)):
+def update_review_status(job_id: JobId, new_status: ReviewStatus = Query(...)):
     """
     Updates review status: unreviewed -> in_review -> reviewed.
     """
@@ -799,7 +886,7 @@ def trigger_cleanup(max_age_seconds: Optional[float] = Query(None, description="
 
 
 @app.delete("/api/jobs/{job_id}")
-def delete_job_endpoint(job_id: str, force: bool = Query(False)):
+def delete_job_endpoint(job_id: JobId, force: bool = Query(False)):
     """
     Explicitly deletes a job and its artifacts from filesystem and database.
     If job is currently running or queued and force=False, returns HTTP 400.

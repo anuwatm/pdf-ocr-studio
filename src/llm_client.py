@@ -94,12 +94,16 @@ class LocalLLMClient:
                 kwargs["response_format"] = response_format
 
             resp = self._client.chat.completions.create(**kwargs)
-            content = resp.choices[0].message.content or ""
+            choice = resp.choices[0]
+            content = choice.message.content or ""
+            finish_reason = getattr(choice, "finish_reason", None)
+            is_truncated = finish_reason == "length"
             return {
-                "success": True,
-                "status": "completed",
+                "success": not is_truncated,
+                "status": "truncated" if is_truncated else "completed",
+                "finish_reason": finish_reason,
                 "content": content,
-                "error": None,
+                "error": "Generation truncated by max_tokens limit" if is_truncated else None,
                 "raw_response": resp,
             }
         except APITimeoutError as e:

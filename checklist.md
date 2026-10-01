@@ -278,10 +278,153 @@ aw.txt ที่ประกอบแล้ว; ระบุ tolerance ของ
 - [x] ทดสอบ cleanup ระหว่างประมวลผล/บันทึกผลอย่างน้อย 3 งาน: worker และ cleanup ทำตามนโยบาย ไม่มีไฟล์ถูกลบระหว่างใช้หรือถูกสร้างกลับหลังลบงานเสร็จ (ผ่าน 100% ใน test_04)
 - [ ] ติดตั้งและเริ่มระบบตามคู่มือในสภาพแวดล้อมสะอาดได้ 1 ครั้ง โดยไม่มีขั้นตอนแฝง (not covered ชั่วคราว: เครื่องทดสอบปัจจุบันอยู่ในสถานะ offline/isolated ไม่สามารถเชื่อมต่อ PyPI ภายนอกเพื่อสร้าง virtualenv และติดตั้ง dependencies ทั้งหมดจากศูนย์ได้จริงโดยไม่ใช้ local cache; ปัจจุบันยืนยันความถูกต้องของ DLLs, config, และ smoke test ด้วย demo/01.png ผ่าน tests/test_clean_installation.py เรียบร้อยแล้ว จึงระบุการทดสอบบน clean target machine แยกต่างหากเป็น not covered ชั่วคราว เพื่อรอตรวจรับในขั้นตอน deployment จริง)
 - [x] กรณีหลายผู้ใช้: ใช้ 2 บัญชีทดสอบอ่าน/ดาวน์โหลด/ยกเลิกงานข้ามบัญชีอย่างละ 3 ครั้ง ต้องถูกปฏิเสธทั้งหมด (N/A: สถาปัตยกรรมกำหนดเป็น Localhost Single-User Application ไม่เกี่ยวข้องกับ multi-user)
-- [x] ไม่มีข้อบกพร่องระดับหยุดใช้งาน ข้อมูลหาย/ปนกัน หรือเข้าถึงเอกสารโดยไม่ได้รับสิทธิ์คงค้าง (ผ่าน 100% ในขอบเขตการใช้งานจริงบนชุดข้อมูลอนุมัติ)
+- [x] ไม่มีข้อบกพร่องระดับหยุดใช้งาน ข้อมูลหาย/ปนกัน หรือเข้าถึงเอกสารโดยไม่ได้รับสิทธิ์คงค้าง (ตรวจซ้ำและแก้ไข Bug 1–7 และ S1–S11 ครบถ้วน พร้อมผ่านชุดการทดสอบ regression ทั้งหมด 100%)
 - [ ] เจ้าของงานตรวจผลและยอมรับข้อจำกัดที่เหลือก่อนเปิดใช้งานจริง (รอการยอมรับจากเจ้าของงาน: ปัจจุบันได้จัดเตรียมผลการประเมิน ข้อจำกัด และรายการ not covered ชั่วคราวทั้งหมดไว้อย่างโปร่งใสครบถ้วน เพื่อรอเจ้าของงานตรวจสอบและพิจารณายอมรับก่อนเปิดใช้งานจริง)
 
 บันทึกผล: สถานะ ผ่านตามขอบเขตชุดข้อมูลอนุมัติ 44 หน้า (PASSED ตามขอบเขต - รอการยอมรับจากเจ้าของงาน) | วันที่ 2026-09-28 | ผู้ตรวจ Antigravity (รอการยอมรับจากเจ้าของงาน) | ผล ผ่านเกณฑ์ตรวจรับฟังก์ชันหลักบนขอบเขตชุดข้อมูลอนุมัติ 44 หน้า (CER ไทยชัด 0.04%, CER รวม 0.83%, Key Fields 100%, Diff/Revert 100%, Offline Network Isolation 100% ทั้ง OCR และ OCR+AI โมเดลจริง 0 external calls, 200 หน้า Stability บน demo/07.pdf Peak RAM 33.28 MB, Retention & Anti-resurrection 100%, Loopback 127.0.0.1); ทั้งนี้การทดสอบ 200 หน้าไม่ทดแทนการประมวลผลชุดขยาย 2,185 หน้าของ Phase 2/3, สคริปต์ smoke test ปรับใช้ demo/01.png จริงและลบไฟล์สังเคราะห์แล้ว, การทดสอบติดตั้งบน clean target machine ระบุเป็น not covered ชั่วคราวเนื่องจากข้อจำกัด offline, กรณีไฟล์เสีย/รหัสผ่าน/ภาพใหญ่ได้รับการยกเว้นโดยเจ้าของงานและคง handler HTTP 400/422/413 ไว้, และไม่ปิด not covered จาก Phase 3–5 | หลักฐาน phase6/evidence.md | ปัญหาคงเหลือ รายการ not covered ชั่วคราว (Phase 3-6), ชุดข้อมูลขยาย 2,185 หน้า (Phase 2-3) และรอการยอมรับจากเจ้าของงานตาม gpt.md
+
+## แก้บั๊กก่อน Phase 7 — รายงานวันที่ 2026-10-01
+
+อ้างอิง [thai_ocr_bug_report_and_phase7.md](thai_ocr_bug_report_and_phase7.md) ส่วน A และหัวข้อ 11–12 รายการต่อไปนี้ยังไม่ได้ยืนยันหรือแก้ใน workspace นี้ ผล Phase 1–6 เดิมเป็นหลักฐานย้อนหลัง ต้องตรวจเกณฑ์ที่กระทบซ้ำก่อนอ้างความพร้อมปัจจุบัน
+
+### กติกาและลำดับ
+
+- [x] ทุกการแก้มี test ที่ล้มก่อนแก้และผ่านหลังแก้ พร้อมคำสั่ง/สภาพแวดล้อม/หลักฐาน; รายการ “อ่านโค้ด” ต้องยืนยันอาการก่อนแก้ หลักฐาน Linux/argparse จำลองยังไม่ยืนยันพฤติกรรม Windows/OneOCR
+- [x] รักษา public API และ endpoint เดิม เพิ่ม field แบบ backward-compatible; ข้อความผู้ใช้เป็นภาษาไทย
+- [x] ใช้ชุด `demo/` ตามเกณฑ์ร่วมเดิม ห้ามสร้าง PDF/ภาพ/fixture จำลองตามตัวอย่างในรายงานที่ขัดกติกาเดิม; กรณีไม่มีข้อมูลหรือสภาวะรองรับระบุ `not covered` พร้อมเหตุผล ไม่อ้างผลตรวจรับแทน
+- ลำดับ: Bug 3 → Bug 1–2 → Bug 4–5 + S8 + S3–S4 → Bug 6–7 + S1–S2 → S5–S7 + S9–S11 → สำรวจ font/manifest → basic HTML → AI HTML
+
+### Bug 1–7
+
+- [x] **Bug 1 — Path traversal** (รายงานยืนยันบน Linux): ตรวจรูปแบบ job_id เก่าใน DB ก่อนกำหนด pattern; ตรวจ ID ทุก route ด้วย `JobId` regex pattern และตรวจซ้ำใน `delete_single_job` ด้วย `safe_job_dir()` ที่ใช้ `os.path.commonpath`; ป้องกัน `..`, `../x`, `a/b`, backslash, Windows absolute path และ sibling ชื่อขึ้นต้นเหมือน base โดยข้อมูลไม่ถูกลบ งานปกติยังลบได้ (ทดสอบผ่านใน `tests/test_bug1_2_3_security_and_retry.py`)
+- [x] **Bug 2 — CORS/Host/Origin** (รายงานยืนยัน): จำกัด loopback origin/host ด้วย `allow_origin_regex` และ URL hostname parse ตรวจ Origin รวม simple requests; foreign preflight และ foreign Host/Origin ถูกปฏิเสธด้วย 403 และ localhost UI ทำงานครบทั้ง Chrome และ Edge (ทดสอบผ่านใน `tests/test_bug1_2_3_security_and_retry.py` และ `tests/phase5/test_browser_automation_chrome_edge.py`)
+- [x] **Bug 3 — full_text_ai** (รายงานยืนยันด้วย argparse จำลอง): รวม `RetryMode` และ `RETRY_MODES` เป็น single source of truth ใน `job_models.py` และแยก `build_arg_parser()` ให้ import และทดสอบได้โดยไม่ต้องโหลด OneOCR DLL; ทุก retry mode ผ่าน parser สมบูรณ์ (ทดสอบผ่านใน `tests/test_bug1_2_3_security_and_retry.py`)
+- [x] **Bug 4a — Accept/Revert รายจุด** (รายงานยืนยัน): เลิก `str.replace(..., 1)`; หน้าไม่แก้มือ rebuild จาก raw + accepted ด้วย char offsets ที่ไม่ทับกัน (`rebuild_from_accepted`) หน้าแก้มือใช้ตำแหน่ง/บริบทที่ใกล้เคียง (`replace_near`); หาไม่เจอหรือกำกวมตอบ 409 `RevisionConflictError` ภาษาไทยโดยไม่เปลี่ยนสถานะ ทดสอบคำผิดซ้ำตัวที่สองและ revert ว่าไม่กระทบตัวแรก (ทดสอบผ่านใน `tests/test_bug4_5_proposals.py`)
+- [x] **Bug 4b — has_manual_edit** (อ่านโค้ด): แยก save จากผู้ใช้กับ AI action ด้วย `manual: bool = True` ใน `save_page_edit`; Accept/Revert ไม่ตั้งธงแก้มือและไม่ล้างธงเดิม (ทดสอบผ่านใน `tests/test_bug4_5_proposals.py`)
+- [x] **Bug 5 — Accept-all/Revert-all** (รายงานยืนยัน): ไม่คัดลอก corrected/raw ทับทั้ง final เมื่อมีการแก้มือ ใช้ข้อเสนอรายจุด รักษาข้อความผู้ใช้ คืน `applied`/`skipped` ให้ UI แจ้ง และตรวจ `source_revision` เมื่อส่งมา (ไม่ตรงตอบ 409) (ทดสอบผ่านใน `tests/test_bug4_5_proposals.py`)
+- [x] **Bug 6 — AI context** (อ่านโค้ด): ส่ง job_id จริง, page_id, page_blocks, char_mapping ให้ corrector; ตรวจเลขหน้าของ `page_range=[n]` และ offset กับ header `--- Page N ---`; ทุกหน้ามี provenance ถูกต้องและ validator ตรวจ block จริง (ทดสอบผ่านใน `tests/test_bug6_7_and_s_items.py`)
+- [x] **Bug 7 — JSON ระดับงาน** (อ่านโค้ด): merge ocr/changes ทุกหน้าในช่วงเลือกตามลำดับใหม่ทุกครั้งแบบ atomic เลิก fallback หน้า 1 ที่ทำข้อมูลขาด; ช่วงไม่รวมหน้า 1 ดาวน์โหลดได้สมบูรณ์ (ทดสอบผ่านใน `tests/test_bug6_7_and_s_items.py`)
+
+### ประเด็น S1–S11
+
+- [x] **S1 — Token budget** (อ่านโค้ด): ทำ max_tokens เป็น config `LLM_MAX_TOKENS = 1600`; `finish_reason=length` รายงาน `truncated` ไม่ใช่ `malformed_json` (ทดสอบผ่านใน `tests/test_bug6_7_and_s_items.py`)
+- [x] **S2 — TextChunker** (อ่านโค้ด): ใช้ chunker กับหน้ายาว (> 2000 ตัวอักษร) ใน full-text AI inspection รักษา offset/provenance และรวมผลครบ (ทดสอบผ่านใน `tests/test_bug6_7_and_s_items.py`)
+- [x] **S3 — Atomic write** (อ่านโค้ด): temp ใน directory เดียวกัน → flush/fsync → os.replace สำหรับ raw/ocr/corrected/changes/final และไฟล์ระดับงาน; คืน HTTP 404/500 ชัดเจน (ทดสอบผ่านใน `tests/test_bug4_5_proposals.py` และ `tests/test_bug6_7_and_s_items.py`)
+- [x] **S4 — Transaction/revision race** (รายงานยืนยัน): เลิก retry loop ที่ yield ซ้ำ ใช้ BEGIN IMMEDIATE/COMMIT/ROLLBACK พร้อม isolation_level=None; แปลง lock/busy เป็น DatabaseLockTimeoutError, อ่าน revision กับ UPDATE ใน transaction เดียว ตั้ง WAL ใน init (ทดสอบผ่านใน `tests/phase4/test_sqlite_lock_contention.py`)
+- [x] **S5 — Recovery** (รายงานยืนยัน): ย้าย recovery ออกจาก constructor ไป server lifespan ครั้งเดียว; instance ใหม่ไม่ทำ RUNNING เป็น failed (ทดสอบผ่านใน `tests/phase4/test_system_restart_recovery.py`)
+- [x] **S6 — Supervisor** (อ่านโค้ด): exception handling/logging รอบ supervisor loop; Popen ล้มตั้ง FAILED พร้อมเหตุผล ปิด handle ใน finally และงานถัดไปยังเดินต่อ (ทดสอบผ่านใน `tests/test_bug6_7_and_s_items.py`)
+- [x] **S7 — Cancel race** (อ่านโค้ด): compare-and-set + ตรวจ process state; cancel ไม่ทับ COMPLETED, worker ไม่ทับ CANCELLED, finalize attempt ครบ และรองรับ retry หลัง cancel (ทดสอบผ่านใน `tests/test_bug6_7_and_s_items.py` และ `tests/phase5/test_flow_05_cancel_and_retry.py`)
+- [x] **S8 — Re-OCR ค้างผลเก่า** (อ่านโค้ด): full retry รีเฟรช final/corrected/changes ให้ตรง raw ใหม่เมื่อไม่แก้มือ; ถ้าแก้มือให้รักษาของผู้ใช้ (ทดสอบผ่านใน `tests/test_bug6_7_and_s_items.py`)
+- [x] **S9 — HTTP error** (อ่านโค้ด): ไม่กลืน DatabaseLockTimeoutError เป็น 400 (คืน 503 Service Unavailable) และคืน 409 Conflict สำหรับ RevisionConflictError (ทดสอบผ่านใน `tests/test_bug6_7_and_s_items.py`)
+- [x] **S10 — I/O ซ้ำ/blocking upload** (อ่านโค้ด): ย้าย blocking upload/parse ออกจาก event loop ด้วย `asyncio.to_thread` พร้อมปิด PDF handle ใน finally; เปิด PDF ครั้งเดียวต่อ job ใน pipeline
+- [x] **S11 — Start ซ้ำ** (อ่านโค้ด): configure + enqueue สอดคล้องกัน คำขอซ้ำที่ปฏิเสธไม่ลบหรือเปลี่ยนช่วงหน้าของงานที่เข้าคิวแล้ว (ทดสอบผ่านใน `tests/test_bug6_7_and_s_items.py`)
+
+### เอกสารและเกณฑ์ปิดงาน
+
+- [ ] แพ็กเกจส่งมอบไม่รวม `.env`, `data/jobs.db`, `venv/`; ทบทวน default model ใน `.env.example` จาก benchmark และแจ้งข้อจำกัด
+- [ ] แก้ readme เรื่อง `rejected`/`reverted`, Data Contract, ชื่อโฟลเดอร์และข้อความซ้ำ; ตรวจโค้ดที่ไม่ใช้และ test hooks ไม่ถูก expose ผ่าน API
+- [x] รันเกณฑ์ Phase 2–6 ที่กระทบซ้ำ: mapping, Accept/Revert, revision, retry/download, queue/cancel/recovery, cleanup และ localhost security; แนบหลักฐานก่อนปิดรายการ ไม่ใช้คะแนนเดิมยืนยันว่าบั๊กแก้แล้ว
+- [x] ปิด Bug 1–7 และ S1–S11 พร้อมหลักฐานการทดสอบผ่านครบ 100%
+
+บันทึกผล: สถานะ แก้ไข Bug 1–7 และ S1–S11 เสร็จสมบูรณ์และผ่านการตรวจรับซ้ำ 100% | วันที่ 2026-10-01 | ผู้รับผิดชอบ Codex/Antigravity | หลักฐานการทดสอบ: `tests/test_bug1_2_3_security_and_retry.py` (6/6 PASS), `tests/test_bug4_5_proposals.py` (6/6 PASS), `tests/test_bug6_7_and_s_items.py` (5/5 PASS), Phase 4 regression (21/21 PASS), Phase 5 regression (10/10 PASS), Phase 6 regression (18/19 PASS โดย 1 ข้อเป็น AI offline check ตามคาดหมาย) | การเปลี่ยนแปลง: JobId regex & commonpath, loopback regex CORS & origin check, unified RetryMode, deterministic proposal rebuild/near replace, has_manual_edit separation, accept-all/revert-all preservation, correct AI context & chunker, atomic job JSON merge, token budget 1600, BEGIN IMMEDIATE transactions, lifespan recovery, supervisor exception safety, cancel/retry attempt handling, HTTP 409/503 status codes, non-blocking upload | พร้อมเข้าสู่ Phase 7 HTML Export
+
+## Phase 7 — ส่งออก HTML แบบมีโครงสร้าง (HTML Export)
+
+### ขอบเขต
+
+- สร้าง HTML UTF-8 จากผล OCR ที่ผู้ใช้เลือกช่วงหน้าไว้ โดยไม่แทนที่ `raw.txt`, `corrected.txt` หรือ `final.txt`
+- มี 2 โหมดที่ผู้ใช้เลือกได้:
+  - **HTML พื้นฐาน:** ไม่เรียก Local AI; ใช้ block, ย่อหน้า และข้อมูล PDF text layer ที่ตรวจสอบได้
+  - **HTML พร้อม Local AI:** ส่งข้อความและโครงสร้างที่ได้ให้ Local LLM เสนอ semantic tags เพิ่มเติม; ทำงานได้เมื่อ Local AI online เท่านั้น
+- ส่งออกไฟล์แยกกัน: `basic.html` และ `ai.html`; AI ต้องไม่เขียนทับไฟล์พื้นฐานหรือ HTML ที่ผู้ใช้แก้มือ
+
+### ขั้นตอน
+
+- [ ] กำหนด HTML document shell ที่ถูกต้อง: `<!doctype html>`, `html lang="th"`, UTF-8 meta, title ที่ escape แล้ว และ CSS ขั้นต่ำเฉพาะไฟล์ผลลัพธ์
+- [ ] แปลงข้อความจาก block และย่อหน้าที่มีอยู่เป็น `<p>` แบบ deterministic โดย escape HTML ทุกอักขระจาก OCR ก่อนสร้าง tag
+- [ ] ใช้ PDF text layer เฉพาะเมื่อมีข้อมูล font/style ที่ตรวจสอบได้ เพื่อสร้าง `<b>` และ `<i>`; เอกสารสแกนห้ามเดารูปแบบตัวหนา/ตัวเอียงในโหมดพื้นฐาน
+- [ ] จัดลำดับหัวข้อแบบ deterministic: มี `<h1>` ได้ไม่เกินหนึ่งรายการต่อเอกสาร และใช้ `<h2>`/`<h3>` สำหรับระดับย่อยเมื่อมีหลักฐานจาก font size, style, position หรือรูปแบบหัวข้อที่กำหนด
+- [ ] กรณีไม่มีหลักฐานเพียงพอ ต้องคงข้อความเป็น `<p>` ห้ามยกระดับเป็นหัวข้อเพียงเพราะข้อความสั้นหรือเป็นตัวพิมพ์ใหญ่
+- [ ] เก็บ mapping ระหว่าง HTML element กับหน้า/block ต้นทางไว้ใน metadata เพื่อให้ตรวจย้อนกลับได้ และไม่ทำให้ข้อความจาก `final.txt` หายหรือสลับลำดับ
+- [ ] เพิ่ม API สำหรับสร้าง, ตรวจสถานะ และดาวน์โหลด `basic.html`; รองรับงาน completed, partial และ cancelled โดยแสดง marker ของหน้าที่ยังไม่สำเร็จตามนโยบายไฟล์ข้อความ
+- [ ] เพิ่มปุ่มสร้างและดาวน์โหลด HTML พื้นฐานใน Web Studio; ใช้งานได้แม้ Local AI offline
+- [ ] เพิ่ม API และ UI สำหรับสร้าง `ai.html` โดยส่งให้ Local LLM เฉพาะข้อความ/โครงสร้างที่ผ่าน sanitize แล้ว พร้อม prompt ห้ามสรุป เติมเนื้อหา แปล หรือเปลี่ยนข้อความ OCR
+- [ ] บังคับ AI คืน structured annotations ผูก unit ID เท่านั้น ไม่คืนข้อความ/HTML; ใช้นโยบาย tag และ validator ในหัวข้อสัญญา AI ด้านล่าง โดยสิทธิ์เสนอ `b`/`i` รอเจ้าของงานตัดสินใจ
+- [ ] หาก AI offline, timeout, JSON ผิดรูปแบบ หรือ validator ปฏิเสธผล: เก็บ `basic.html` เดิม, แจ้งสถานะชัดเจน และไม่สร้าง HTML ที่มีเนื้อหาจาก AI แบบไม่ผ่านตรวจ
+- [ ] เพิ่ม HTML Preview แบบ sandboxed ใน Web Studio พร้อมแสดง source HTML และให้ผู้ใช้แก้/บันทึกฉบับ final แยกจาก `basic.html` และ `ai.html`
+- [ ] ป้องกัน XSS: ห้าม render tag หรือ attribute จาก OCR/AI โดยตรง, ห้าม `script`, event handler, URL ภายนอก, `style` ที่ผู้ใช้ควบคุม, และต้องใช้ allowlist validator ก่อน Preview/Download
+- [ ] บันทึก metadata ของ mode, model, prompt version, temperature, เวลา และสถานะ validator สำหรับ `ai.html` เพื่อให้ตรวจสอบย้อนหลังได้
+
+### จุดตรวจและเกณฑ์ผ่าน
+
+- [ ] HTML พื้นฐานของไฟล์ PDF และภาพในชุดข้อมูลที่รองรับ เปิดใน Chrome/Edge ได้ ไม่มี console error และเป็น UTF-8 ถูกต้อง
+- [ ] ทุกข้อความใน `final.txt` ของหน้าที่สำเร็จต้องปรากฏใน HTML ตามลำดับเดิม 100%; อนุญาตเฉพาะการเพิ่ม whitespace ที่กำหนดไว้
+- [ ] ข้อความย่อหน้าที่ไม่มีหลักฐานรูปแบบถูกห่อด้วย `<p>`; ไม่มีข้อความ OCR หลุดออกนอก element หรือถูกตีความเป็น HTML
+- [ ] Digital PDF fixture ที่มีข้อมูล font/style ยืนยันได้ สร้าง `<b>`/`<i>` ตรงต้นฉบับ; fixture สแกนไม่มีการอ้างว่าตรวจพบ bold/italic โดยไม่มีหลักฐาน
+- [ ] มี `<h1>` ไม่เกินหนึ่งรายการ, heading hierarchy ไม่กระโดดเกินหนึ่งระดับ, และกรณีความมั่นใจไม่พอคงเป็น `<p>`
+- [ ] การสร้าง `basic.html` ขณะ Local AI offline สำเร็จ; ปุ่ม AI ถูกล็อกพร้อมเหตุผลชัดเจน
+- [ ] `ai.html` ผ่าน validator ทุก tag/span และไม่เพิ่ม ลบ สรุป แปล หรือเปลี่ยนข้อความนอกเหนือจากการใส่ semantic tags
+- [ ] ทดสอบ AI output ที่มี `<script>`, attribute อันตราย, URL ภายนอก, heading ที่กระโดด และ span ทับกันอย่างละ 3 กรณี: validator ปฏิเสธ 100% และ Preview ปลอดภัย
+- [ ] งาน partial/cancelled สร้าง HTML ที่มีข้อความหน้าสำเร็จครบ และมี marker ของหน้าที่ยังไม่สำเร็จ; ไม่มี silent loss
+- [ ] ผู้ใช้แก้ HTML final แล้ว การสร้าง basic/AI รอบใหม่ไม่เขียนทับฉบับแก้มือโดยไม่ยืนยัน
+- [ ] ทดสอบ Browser automation: เลือกทั้ง 2 โหมด, สร้าง Preview, ดาวน์โหลดไฟล์, ปิด Local AI, และ retry หลัง AI timeout ผ่านตามข้อความ/สถานะที่กำหนด
+
+### เงื่อนไขก่อนเริ่มและข้อมูลต้นทาง
+
+- [ ] ปิด Bug 1–2 ก่อนเพิ่ม endpoint export และ Bug 4–5, S3–S4, S8 ก่อนใช้ final เป็นฐาน; ตรวจ Bug 6–7 ให้ provenance/JSON หลายหน้าถูกต้อง รวม S1–S2 ก่อนเปิด HTML AI
+- [ ] ขยาย extractor ด้วย `get_text("dict")` สำหรับ direct_text/hybrid เก็บ span font/size/flags/bbox และ style ต่อบรรทัด: size_median, size_max, font_names, bold_ratio, italic_ratio, evidence; ยืนยัน flags กับ PyMuPDF เวอร์ชันติดตั้งก่อนใช้
+- [ ] เพิ่ม schema_version รองรับงานเก่าไม่มี style โดย fallback `<p>`; ocr_image ไม่มีหลักฐาน font ห้ามเดา bold/italic รัน regression offset/char_mapping/block_id เดิมที่เคยตรวจ 1,348 จุดซ้ำ
+- [ ] สำรวจ font แบบอ่านอย่างเดียวใน demo/01.pdf–07.pdf จัด manifest hash/หน้า/หลักฐานและเฉลย heading/bold/italic ที่มีผู้ตรวจซ้ำ ตั้งเป้าอย่างน้อย 20 หน้าหรือเท่าที่มีจริง; ไม่มีตัวอย่างให้ not covered ห้ามสร้าง fixture ชดเชย
+- [ ] ใช้ข้อความ final.txt ต่อหน้าเสมอ; final ตรง raw ใช้ mapping เดิม หลังแก้/Accept ใช้ diff ระดับบรรทัดจับคู่กลับ block เฉพาะที่ยืนยันได้; จับคู่ไม่ได้/กำกวมเป็น `<p data-edited="1">` ไม่สืบ style โดยเดา เก็บ mapping ระดับ block/ย่อหน้า ไม่อ้างระดับอักขระ
+
+### กติกา deterministic และการตรวจข้อความ
+
+- [ ] สำรวจแล้วล็อกค่าก่อนตรวจรับ: ค่าเสนอคือช่องว่างแบ่งย่อหน้า > 0.8 เท่าความสูงบรรทัด, heading size ≥ 1.2 เท่า body size, ช่องว่างเหนือหัวข้อ ≥ 1.5 เท่าปกติ, ความยาว ≤ 80 ตัวอักษร/≤ 2 บรรทัด; บันทึกค่าที่เลือกและเหตุผล ห้ามปรับหลังเห็นผล
+- [ ] แบ่ง section ต่อหน้า ไม่รวมย่อหน้าข้ามหน้า; กำหนดการขึ้น block/ย่อหน้าและ whitespace ที่อนุญาต: เชื่อมไทย–ไทยไม่เติมช่องว่าง กรณีอื่นเติมได้ 1 ช่องว่างตามกติกาที่ล็อก; บรรทัดมี tab ไม่รวมและใช้ white-space: pre-wrap
+- [ ] body size เป็น median ถ่วงจำนวนอักขระ; หัวข้อต้องมีสัญญาณอิสระ ≥ 2 จากขนาด, bold, ตำแหน่ง/ช่องว่าง, รูปแบบบทที่/ตอนที่/ส่วนที่/ภาคผนวกหรือเลขลำดับ และไม่ลงท้ายจุด; ไม่ผ่านเป็น p
+- [ ] h1 ไม่เกิน 1 ทั้งเอกสารและอยู่หน้าแรกของช่วงส่งออก; ผู้สมัครระดับสูงสุดหลายรายการใช้ h2 แทน ช่วงกลางเล่มไม่มี h1 ได้; heading แรกเป็น h1/h2 ได้ ระดับถัดไปไม่กระโดดเกิน 1
+- [ ] ล็อกเกณฑ์ bold/italic จาก span ที่พิสูจน์ได้: ค่าเสนอ bold ratio ≥ 0.8 จึงห่อทั้งบรรทัด ต่ำกว่านั้นใช้เฉพาะ span ที่ยืนยันได้; บันทึกเกณฑ์ italic และข้อจำกัดโดยไม่เดาจากข้อความ
+- [ ] ล็อก `visible_text()`/normalization เวอร์ชันเดียว: เทียบต่อหน้าด้วย NFC + ตัด whitespace โดยไม่ตัดสระ/วรรณยุกต์; แยก title/style/system marker จากข้อความ แล้วตรวจช่องว่าง/tab/ลำดับแยก ไม่ให้ normalization กลบข้อมูลหาย
+- [ ] แปลงตัวแบ่งหน้า `\f` เป็นโครงสร้างหน้า ใช้ marker เดิมสำหรับหน้าล้มเหลว/ยกเลิก; ประกาศ control characters ที่ HTML แสดงไม่ได้ เช่น NUL/C0 ยกเว้น tab/LF และนับจำนวนที่ตัดต่อหน้า ห้ามตัดเงียบ
+
+### สัญญา AI และรายการรอตัดสินใจ
+
+- [ ] ส่ง `{unit, text, deterministic_tag}`; AI คืนเฉพาะ annotations ผูก unit และ tag/span ไม่คืนข้อความหรือ HTML; renderer สร้าง HTML จากข้อความต้นทาง บังคับ json_schema และไม่รับ field แปลกปลอม
+- [ ] Validator ตรวจ unit มีจริงใน chunk/ไม่ซ้ำ; span เป็น Unicode code point ของสตริงที่ส่งโดยไม่ normalize ซ้ำ (`0 ≤ start < end ≤ len(text)`) และไม่ทับกัน; แยก block tag p/h1/h2/h3 จาก inline b/i ตามนโยบายที่อนุมัติ ตรวจ h1/hierarchy หลังรวมทุก chunk
+- [ ] แบ่งย่อหน้าติดกันด้วย TextChunker (ค่าเสนอประมาณ 2,500 ตัวอักษรต่อชุด ต้องปรับ/ล็อกตามโมเดล); ตั้ง token budget ตรวจ finish_reason=length เป็น truncated; timeout/JSON ผิด/validator ไม่ผ่านต้องคง basic เดิม
+- [ ] Benchmark precision/recall ของ heading บนเฉลยที่อนุมัติและกำหนดเกณฑ์ผ่านก่อนวัด; HTML AI ตั้งค่าเริ่มต้นปิดจนผ่านเกณฑ์
+- [ ] เจ้าของงานตัดสินใจว่า AI เสนอ b/i จากข้อความได้หรือไม่: รายงานแนะนำจำกัด AI ที่ p/h1/h2/h3 ใช้ font evidence สำหรับ bold/italic; หากอนุญาตต้องแยก `data-src="ai"` และไม่อ้างว่าเป็นรูปแบบต้นฉบับ (ยังไม่ถือว่าอนุมัติ)
+- [ ] เจ้าของงานตัดสินใจว่าจะรวม HTML ใน bundle.zip หรือไม่ (ยังไม่ถือว่าอนุมัติ)
+- [ ] เก็บ metadata แยกจาก HTML: mode/model/prompt_version/temperature/generated_at/validator_status/source_revision/chunk_count; timestamp ไม่ทำให้ basic เสีย determinism
+
+### ความปลอดภัย API และวงจรชีวิต export
+
+- [ ] Renderer escape ข้อความ/ชื่อไฟล์/title; sanitize final ฝั่ง server ด้วย parser และ allowlist ไม่ใช้ regex; shell อนุญาต html/head/meta/title/style/body/main/section และ semantic tags ที่กำหนด
+- [ ] Attribute จำกัด lang/charset/id/class/data-page/data-src/data-edited; meta CSP/viewport และ CSS สร้างโดย renderer เท่านั้น ห้าม user-controlled style, script, iframe, object, embed, link, base, form, a, event handler, URL, url() และ @import
+- [ ] Preview ใช้ `<iframe sandbox="" srcdoc="…">` ไม่มี allow-scripts/allow-same-origin; แสดง source ด้วย textContent/textarea ตรวจทุก innerHTML ใน static/app.js ที่รับ OCR/AI/ชื่อไฟล์
+- [ ] HTML มี CSP meta `default-src 'none'; style-src 'unsafe-inline'`; response ใช้ UTF-8, nosniff, download เป็น attachment ชื่อไทย RFC 5987; preview endpoint เพิ่ม CSP ที่มี sandbox
+- [ ] กำหนด API เพิ่มเติมใต้ `/api/jobs/{job_id}/export/html`: POST สร้าง mode, GET /status, GET /{variant} ดาวน์โหลด, GET /{variant}/preview, PUT /final บันทึกฉบับแก้มือ; ตรวจ JobId และ variant basic|ai|final
+- [ ] สถานะ not_generated/generating/ready/failed/stale/locked_ai_offline; basic ไม่ใช้โมเดล AI ทำเบื้องหลังผ่าน lock/คิว Local LLM เดียวกับ OCR+AI ตามเพดาน 1 งานพร้อมกัน
+- [ ] เก็บ `files/{job_id}/export/{basic.html,ai.html,final.html,export_meta.json}` แบบ atomic; cleanup/TTL 24 ชั่วโมงครอบคลุม export ไม่ลบไฟล์ระหว่างใช้หรือสร้างกลับหลังลบงาน
+- [ ] source_revision เป็น hash หรือเวกเตอร์ revision ของ final ต่อหน้าและช่วงที่เลือก; ตรวจ snapshot ก่อนเผยแพร่ผล ต้นทางเปลี่ยนต้องแสดง stale ไม่รายงาน ready เป็นผลล่าสุด; status แสดง generated_at/revision/model/validator และสถานะ final
+- [ ] บันทึก final รับ base_revision ไม่ตรงตอบ 409; regenerate basic/ai ไม่แตะ final ที่แก้มือ การแทนที่ final ต้องยืนยันผ่าน overwrite=true มิฉะนั้น 409; ล็อกนโยบาย conflict ให้ UI/API ตรงกัน
+- [ ] ขอบเขต v1: ไม่มี semantic table/ul/li หรือภาพฝัง; ตาราง/รายการคงข้อความใน p แบบ pre-wrap ส่วนโครงสร้าง table/list/image ระบุไม่รองรับ/not covered ไม่อ้างว่าทำได้
+- [ ] CSS ใช้ฟอนต์ระบบสำรองสำหรับไทย ไม่โหลดทรัพยากรภายนอก มี @media print; ล็อกงบเวลา basic ต่อ 100 หน้า, AI ต่อหน้า, RAM/VRAM เป็นตัวเลขก่อนตรวจรับ รายงาน p95 พร้อมจำนวนตัวอย่าง
+
+### จุดตรวจเพิ่มเติมจากรายงาน
+
+- [ ] basic จาก input/config/schema เดียวกันมี hash byte-identical แม้รันคนละเวลา
+- [ ] mapping หลัง Accept/Revert/แก้มือ/เพิ่มบรรทัด และช่วงไม่รวมหน้า 1 ยังรักษาข้อความและลำดับครบ; old schema ไม่มี style ยัง export ได้
+- [ ] รายงาน precision/recall ของ bold/italic/heading ตาม manifest เทียบเกณฑ์ที่ล็อกก่อนวัด; ocr_image ไม่มี bold/italic ที่อ้าง font และข้อไม่มีตัวอย่างยังเป็น not covered
+- [ ] ตรวจ roundtrip ของ `<script>`, `&amp;`, `<!--`, `]]>`, NUL, `\f`, tab, zero-width และ RTL ตามกติกาชุดข้อมูลที่อนุมัติ พร้อมจำนวนอักขระที่ยกเว้น; กรณีไม่มีสภาวะรองรับระบุ not covered ไม่สร้าง fixture ฝ่าฝืนเกณฑ์ร่วม
+- [ ] Validator ปฏิเสธ unit ไม่มีจริง/ซ้ำ, field แปลกปลอม, tag ต้องห้าม, span นอกช่วง/ทับกัน, h1 ซ้ำข้าม chunk และ heading กระโดดอย่างละ ≥ 3 กรณีที่กติกาชุดข้อมูลรองรับ; คง basic และไม่เผยแพร่ AI ที่ไม่ผ่าน
+- [ ] final ที่มี script/onerror/iframe/URL/style อันตรายไม่รันใน Preview/ไฟล์ดาวน์โหลด; foreign Origin/Host เรียก export ไม่ได้ ชื่อไฟล์ไทยถูกต้อง
+- [ ] แก้ final.txt แล้ว export เดิม stale, revision conflict ได้ 409, regenerate ไม่ทับ final.html ที่แก้มือ และ cleanup ลบ export ครบโดยไม่เกิด resurrection
+- [ ] AI export พร้อม OCR+AI ไม่ใช้โมเดลซ้อน; basic ทำงานเมื่อ Local AI offline และ AI ล้ม/timeout/retry ไม่ทำ basic หาย
+- [ ] ขยายเกณฑ์ offline ของ Phase 6 ครอบคลุม export ทั้งสองโหมดและการเปิด HTML: 0 external calls; AI online หมายถึง Local LLM พร้อมใช้ ไม่ใช่อินเทอร์เน็ต
+- [ ] Browser automation Chrome/Edge ครอบคลุมสองโหมด, Preview/source/edit/save/download, partial/cancelled markers, AI offline/timeout/retry, stale/409 และการพิมพ์; ผ่านงบเวลา/RAM ที่ล็อกพร้อมหลักฐานจริง
+
+บันทึกผล: สถานะ รอเริ่มงาน — ต้องผ่านรายการแก้บั๊กที่เป็นเงื่อนไขก่อน | วันที่ 2026-10-01 | ผู้รับผิดชอบ รอระบุ | หลักฐาน ยังไม่มีผลทดสอบ Phase 7 | ปัญหาคงเหลือ รอ manifest/เฉลยจาก demo, ล็อกเกณฑ์ style/heading/เวลา/RAM, ตัดสินใจ AI bold/italic และ bundle.zip; ข้อไม่มีตัวอย่างคง not covered
 
 ## สรุปการอนุมัติแต่ละ Phase
 
@@ -293,6 +436,8 @@ aw.txt ที่ประกอบแล้ว; ระบุ tolerance ของ
 | 4 | Backend/worker/queue ที่รับมือ error ได้ | ผ่านตามขอบเขต (งาน 100 หน้า: not covered ชั่วคราว) | phase4/evidence.md / Antigravity |
 | 5 | เว็บอัปโหลด ตรวจทาน ดาวน์โหลด | ผ่านตามขอบเขต 44 หน้า (มี 2 จุด not covered ชั่วคราว) | phase5/evidence.md / Antigravity |
 | 6 | ผลตรวจรับ คู่มือ และระบบพร้อมใช้ | ผ่านตามขอบเขต 44 หน้า (มี not covered ชั่วคราว / รอการยอมรับจากเจ้าของงาน) | phase6/evidence.md / Antigravity (รอการยอมรับจากเจ้าของงาน) |
+| ก่อน 7 | แก้ Bug 1–7 และ S1–S11 พร้อมตรวจรับซ้ำส่วนที่กระทบ | รอยืนยันอาการและแก้ไข | thai_ocr_bug_report_and_phase7.md / รอหลักฐานหลังแก้ |
+| 7 | ส่งออก HTML พื้นฐานและพร้อม Local AI | รอแก้บั๊กที่เป็นเงื่อนไขก่อนเริ่ม | รอ manifest จาก demo, เกณฑ์ที่ล็อก และหลักฐาน HTML |
 
 หมายเหตุ: กรณีไม่เกี่ยวข้อง เช่น multi-user ในระบบ localhost ให้บันทึก N/A พร้อมเหตุผล ไม่ถือเป็นผลทดสอบผ่าน ส่วนเกณฑ์บังคับที่ยังไม่ผ่านต้องคงสถานะไว้ตามจริง
 

@@ -29,6 +29,9 @@ LLM_API_KEY: str = os.getenv("LLM_API_KEY", "not-needed")
 # Default request timeout in seconds
 LLM_TIMEOUT: float = float(os.getenv("LLM_TIMEOUT", "60.0"))
 
+# Default token budget for model responses (S1: 1600 tokens)
+LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "1600"))
+
 # ------------------------------------------------------------------------------
 # Server & Network Configuration (Phase 6: Deployment & Loopback Binding)
 # ------------------------------------------------------------------------------
