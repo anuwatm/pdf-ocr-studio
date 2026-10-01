@@ -24,7 +24,8 @@ from typing import Optional, List, Dict, Any, Annotated
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query, Path, status, Request
-from fastapi.responses import FileResponse, PlainTextResponse, JSONResponse
+from fastapi.responses import FileResponse, PlainTextResponse, JSONResponse, Response
+from pydantic import BaseModel
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
@@ -905,6 +906,152 @@ def delete_job_endpoint(job_id: JobId, force: bool = Query(False)):
         return res
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+# ------------------------------------------------------------------------------
+# Phase 7: Structured HTML Export Endpoints
+# ------------------------------------------------------------------------------
+
+class HtmlExportRequest(BaseModel):
+    mode: str = "basic"
+
+
+class SaveFinalHtmlRequest(BaseModel):
+    html_content: str
+    base_revision: Optional[str] = None
+    overwrite: bool = False
+
+
+@app.post("/api/jobs/{job_id}/export/html")
+def export_html_endpoint(job_id: JobId, req: HtmlExportRequest = HtmlExportRequest()):
+    """
+    Generates structured HTML (basic.html or ai.html).
+    basic: 100% deterministic, offline without AI.
+    ai: Uses Local LLM to suggest semantic tags if online; otherwise preserves basic.html.
+    """
+    job = db.get_job_status(job_id)
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+
+    mode = req.mode.lower().strip()
+    if mode not in ("basic", "ai"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Allowed export modes: 'basic', 'ai'")
+
+    if mode == "ai":
+        from src.llm_client import LocalLLMClient
+        from src.html_exporter import generate_ai_html, generate_basic_html, _update_export_meta
+        client = LocalLLMClient()
+        health = client.check_health()
+        if health.get("status") != "healthy":
+            # AI is offline: generate basic.html as fallback and record locked_ai_offline status
+            basic_html, meta = generate_basic_html(job_id, files_dir=DEFAULT_OUTPUT_DIR)
+            job_dir = os.path.abspath(os.path.join(DEFAULT_OUTPUT_DIR, job_id))
+            _update_export_meta(job_dir, "ai", {
+                "mode": "ai",
+                "validator_status": "locked_ai_offline",
+                "message": "Local AI is offline. Basic HTML preserved.",
+            })
+            return {
+                "status": "locked_ai_offline",
+                "mode": "ai",
+                "detail": "Local AI is offline; basic.html preserved",
+                "meta": meta,
+            }
+        content, meta = generate_ai_html(job_id, files_dir=DEFAULT_OUTPUT_DIR, llm_client=client)
+        return {"status": meta.get("validator_status", "ready"), "mode": "ai", "meta": meta}
+
+    else:
+        from src.html_exporter import generate_basic_html
+        content, meta = generate_basic_html(job_id, files_dir=DEFAULT_OUTPUT_DIR)
+        return {"status": "ready", "mode": "basic", "meta": meta}
+
+
+@app.get("/api/jobs/{job_id}/export/html/status")
+def export_html_status_endpoint(job_id: JobId):
+    """
+    Returns HTML export status, source revision, and stale indicator.
+    """
+    job = db.get_job_status(job_id)
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    from src.html_exporter import get_export_status
+    return get_export_status(job_id, files_dir=DEFAULT_OUTPUT_DIR)
+
+
+@app.get("/api/jobs/{job_id}/export/html/{variant}")
+def download_html_endpoint(
+    job_id: JobId,
+    variant: str = Path(pattern=r"^(basic|ai|final)$"),
+):
+    """
+    Downloads exported HTML file with RFC 5987 UTF-8 encoded filename and nosniff protection.
+    """
+    job = db.get_job_status(job_id)
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+
+    file_path = os.path.abspath(os.path.join(DEFAULT_OUTPUT_DIR, job_id, "export", f"{variant}.html"))
+    if is_path_traversal(file_path, DEFAULT_OUTPUT_DIR) or not os.path.exists(file_path):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Export {variant}.html not found")
+
+    from urllib.parse import quote
+    filename = f"{job.filename}_{variant}.html"
+    encoded_filename = quote(filename)
+    headers = {
+        "Content-Disposition": f"attachment; filename=\"{variant}.html\"; filename*=UTF-8''{encoded_filename}",
+        "X-Content-Type-Options": "nosniff",
+    }
+    return FileResponse(file_path, media_type="text/html; charset=utf-8", headers=headers)
+
+
+@app.get("/api/jobs/{job_id}/export/html/{variant}/preview")
+def preview_html_endpoint(
+    job_id: JobId,
+    variant: str = Path(pattern=r"^(basic|ai|final)$"),
+):
+    """
+    Returns HTML for sandboxed preview with Content-Security-Policy sandbox enforcement.
+    """
+    job = db.get_job_status(job_id)
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+
+    file_path = os.path.abspath(os.path.join(DEFAULT_OUTPUT_DIR, job_id, "export", f"{variant}.html"))
+    if is_path_traversal(file_path, DEFAULT_OUTPUT_DIR) or not os.path.exists(file_path):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Export {variant}.html not found")
+
+    with open(file_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    headers = {
+        "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+        "X-Content-Type-Options": "nosniff",
+    }
+    return Response(content=content, media_type="text/html; charset=utf-8", headers=headers)
+
+
+@app.put("/api/jobs/{job_id}/export/html/final")
+def save_final_html_endpoint(job_id: JobId, req: SaveFinalHtmlRequest):
+    """
+    Saves user-edited final.html with sanitization and revision conflict checking.
+    Returns HTTP 409 if source_revision changed, unless overwrite=True.
+    """
+    job = db.get_job_status(job_id)
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+
+    from src.html_exporter import save_final_html
+    try:
+        meta = save_final_html(
+            job_id=job_id,
+            final_html_content=req.html_content,
+            base_revision=req.base_revision,
+            overwrite=req.overwrite,
+            files_dir=DEFAULT_OUTPUT_DIR,
+        )
+        return {"status": "saved", "meta": meta}
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
 
 
 if __name__ == "__main__":

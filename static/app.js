@@ -26,6 +26,9 @@
     pollTimer: null,
     activeBoxIndex: null,
     activeMainTab: "upload",
+    htmlBaseRevision: 1,
+    currentHtmlVariant: "basic",
+    activeHtmlSubtab: "preview",
   };
 
   // DOM Elements
@@ -103,10 +106,28 @@
     tabFinal: document.getElementById("tab-final"),
     tabDiff: document.getElementById("tab-diff"),
     tabRaw: document.getElementById("tab-raw"),
+    tabHtml: document.getElementById("tab-html"),
     panelFinal: document.getElementById("panel-final"),
     panelDiff: document.getElementById("panel-diff"),
     panelRaw: document.getElementById("panel-raw"),
+    panelHtml: document.getElementById("panel-html"),
     badgeProposalsCount: document.getElementById("badge-proposals-count"),
+
+    // Phase 7: Structured HTML Export & Sandboxed Preview
+    btnGenerateHtmlBasic: document.getElementById("btn-generate-html-basic"),
+    btnGenerateHtmlAi: document.getElementById("btn-generate-html-ai"),
+    htmlExportStatusBadge: document.getElementById("html-export-status-badge"),
+    btnSubtabPreview: document.getElementById("btn-subtab-preview"),
+    btnSubtabSource: document.getElementById("btn-subtab-source"),
+    htmlPreviewView: document.getElementById("html-preview-view"),
+    htmlPreviewFrame: document.getElementById("html-preview-frame"),
+    htmlSourceView: document.getElementById("html-source-view"),
+    htmlSourceEditor: document.getElementById("html-source-editor"),
+    htmlSourceStatusText: document.getElementById("html-source-status-text"),
+    btnSaveFinalHtml: document.getElementById("btn-save-final-html"),
+    btnDlHtmlBasic: document.getElementById("btn-dl-html-basic"),
+    btnDlHtmlAi: document.getElementById("btn-dl-html-ai"),
+    btnDlHtmlFinal: document.getElementById("btn-dl-html-final"),
 
     // Editor & Diff
     editorFinalText: document.getElementById("editor-final-text"),
@@ -130,6 +151,7 @@
     btnDownloadCorrected: document.getElementById("btn-download-corrected"),
     btnDownloadFinal: document.getElementById("btn-download-final"),
     btnDownloadBundle: document.getElementById("btn-download-bundle"),
+    btnDownloadHtml: document.getElementById("btn-download-html"),
     btnDownloadPageImages: document.getElementById("btn-download-page-images"),
 
     // Conflict Modal
@@ -389,6 +411,14 @@
     el.tabFinal.addEventListener("click", () => activateTab("final"));
     el.tabDiff.addEventListener("click", () => activateTab("diff"));
     el.tabRaw.addEventListener("click", () => activateTab("raw"));
+    el.tabHtml?.addEventListener("click", () => activateTab("html"));
+
+    // Phase 7 HTML Export Actions
+    el.btnGenerateHtmlBasic?.addEventListener("click", () => generateHtmlExport("basic"));
+    el.btnGenerateHtmlAi?.addEventListener("click", () => generateHtmlExport("ai"));
+    el.btnSubtabPreview?.addEventListener("click", () => switchHtmlSubtab("preview"));
+    el.btnSubtabSource?.addEventListener("click", () => switchHtmlSubtab("source"));
+    el.btnSaveFinalHtml?.addEventListener("click", saveFinalHtml);
 
     // Save & Edit
     el.btnSaveEdit.addEventListener("click", saveManualEdit);
@@ -927,8 +957,8 @@
      ========================================================================== */
 
   function activateTab(tabName) {
-    [el.tabFinal, el.tabDiff, el.tabRaw].forEach(t => t.classList.remove("active"));
-    [el.panelFinal, el.panelDiff, el.panelRaw].forEach(p => p.classList.add("hidden"));
+    [el.tabFinal, el.tabDiff, el.tabRaw, el.tabHtml].forEach(t => t?.classList.remove("active"));
+    [el.panelFinal, el.panelDiff, el.panelRaw, el.panelHtml].forEach(p => p?.classList.add("hidden"));
 
     if (tabName === "final") {
       el.tabFinal.classList.add("active");
@@ -939,6 +969,12 @@
     } else if (tabName === "raw") {
       el.tabRaw.classList.add("active");
       el.panelRaw.classList.remove("hidden");
+    } else if (tabName === "html") {
+      el.tabHtml?.classList.add("active");
+      el.panelHtml?.classList.remove("hidden");
+      if (state.currentJobId) {
+        loadHtmlExportStatus();
+      }
     }
   }
 
@@ -1160,6 +1196,200 @@
   }
 
   /* ==========================================================================
+     Phase 7: Structured HTML Export, Sandboxed Preview & Editing
+     ========================================================================== */
+
+  function switchHtmlSubtab(subtab) {
+    state.activeHtmlSubtab = subtab;
+    const isPreview = subtab === "preview";
+    el.btnSubtabPreview?.classList.toggle("active", isPreview);
+    el.btnSubtabSource?.classList.toggle("active", !isPreview);
+    el.htmlPreviewView?.classList.toggle("hidden", !isPreview);
+    el.htmlSourceView?.classList.toggle("hidden", isPreview);
+  }
+
+  async function loadHtmlExportStatus() {
+    if (!state.currentJobId) return;
+    try {
+      const res = await fetch(`/api/jobs/${state.currentJobId}/export/html/status`);
+      if (!res.ok) return;
+      const status = await res.json();
+      state.htmlBaseRevision = status.source_revision || 1;
+
+      // Update badge
+      if (el.htmlExportStatusBadge) {
+        if (status.is_stale) {
+          el.htmlExportStatusBadge.textContent = "ต้องสร้างใหม่ (ข้อความเปลี่ยน)";
+          el.htmlExportStatusBadge.className = "badge badge-warning";
+        } else if (status.variants && status.variants.length > 0) {
+          el.htmlExportStatusBadge.textContent = `ส่งออกแล้ว (${status.variants.join(", ")})`;
+          el.htmlExportStatusBadge.className = "badge badge-success";
+        } else {
+          el.htmlExportStatusBadge.textContent = "ยังไม่ได้ส่งออก";
+          el.htmlExportStatusBadge.className = "badge badge-neutral";
+        }
+      }
+
+      // Update variant download links in toolbar
+      const variants = status.variants || [];
+      const hasBasic = variants.includes("basic");
+      const hasAi = variants.includes("ai");
+      const hasFinal = variants.includes("final");
+
+      if (el.btnDlHtmlBasic) {
+        el.btnDlHtmlBasic.href = `/api/jobs/${state.currentJobId}/export/html/basic`;
+        el.btnDlHtmlBasic.classList.toggle("hidden", !hasBasic);
+      }
+      if (el.btnDlHtmlAi) {
+        el.btnDlHtmlAi.href = `/api/jobs/${state.currentJobId}/export/html/ai`;
+        el.btnDlHtmlAi.classList.toggle("hidden", !hasAi);
+      }
+      if (el.btnDlHtmlFinal) {
+        el.btnDlHtmlFinal.href = `/api/jobs/${state.currentJobId}/export/html/final`;
+        el.btnDlHtmlFinal.classList.toggle("hidden", !hasFinal);
+      }
+
+      // Bottom bar download link (prefer final, then ai, then basic)
+      if (el.btnDownloadHtml) {
+        const preferred = hasFinal ? "final" : (hasAi ? "ai" : (hasBasic ? "basic" : null));
+        if (preferred) {
+          el.btnDownloadHtml.href = `/api/jobs/${state.currentJobId}/export/html/${preferred}`;
+          el.btnDownloadHtml.classList.remove("hidden");
+        } else {
+          el.btnDownloadHtml.classList.add("hidden");
+        }
+      }
+
+      // Determine preferred variant to display in preview and source editor
+      const displayVariant = hasFinal ? "final" : (hasAi ? "ai" : (hasBasic ? "basic" : null));
+      if (displayVariant) {
+        state.currentHtmlVariant = displayVariant;
+        await loadHtmlVariantContent(displayVariant);
+      } else {
+        if (el.htmlPreviewFrame) {
+          el.htmlPreviewFrame.srcdoc = "<div style='font-family:sans-serif;padding:2rem;color:#888;text-align:center;'>ยังไม่ได้ส่งออก HTML กรุณากดปุ่ม 'สร้าง HTML พื้นฐาน' หรือ 'สร้าง HTML พร้อม AI' ด้านบน</div>";
+        }
+        if (el.htmlSourceEditor) el.htmlSourceEditor.value = "";
+      }
+    } catch (err) {
+      console.error("Load HTML export status error:", err);
+    }
+  }
+
+  async function loadHtmlVariantContent(variant) {
+    if (!state.currentJobId) return;
+    try {
+      const res = await fetch(`/api/jobs/${state.currentJobId}/export/html/${variant}`);
+      if (!res.ok) return;
+      const htmlText = await res.text();
+
+      // Sandboxed preview via srcdoc
+      if (el.htmlPreviewFrame) {
+        el.htmlPreviewFrame.srcdoc = htmlText;
+      }
+      if (el.htmlSourceEditor) {
+        el.htmlSourceEditor.value = htmlText;
+      }
+    } catch (err) {
+      console.error(`Failed to load HTML variant ${variant}:`, err);
+    }
+  }
+
+  async function generateHtmlExport(mode = "basic") {
+    if (!state.currentJobId) return;
+    const btn = mode === "ai" ? el.btnGenerateHtmlAi : el.btnGenerateHtmlBasic;
+    const originalText = btn ? btn.textContent : "";
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = mode === "ai" ? "กำลังประมวลผล AI..." : "กำลังสร้าง HTML...";
+    }
+
+    try {
+      const res = await fetch(`/api/jobs/${state.currentJobId}/export/html`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: mode }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || "Export HTML failed");
+      }
+      const data = await res.json();
+
+      // Refresh status and load preview
+      await loadHtmlExportStatus();
+      switchHtmlSubtab("preview");
+
+      if (mode === "ai" && !data.ai_applied) {
+        alert("Local AI ออฟไลน์หรือตอบสนองไม่ถูกต้อง ระบบจึงถอยกลับไปใช้ basic.html อย่างปลอดภัย");
+      }
+    } catch (err) {
+      alert(`สร้าง HTML ไม่สำเร็จ: ${err.message}`);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = originalText;
+      }
+    }
+  }
+
+  async function saveFinalHtml() {
+    if (!state.currentJobId) return;
+    const htmlContent = el.htmlSourceEditor?.value;
+    if (!htmlContent || !htmlContent.trim()) {
+      alert("เนื้อหา HTML ว่างเปล่า");
+      return;
+    }
+
+    el.btnSaveFinalHtml.disabled = true;
+    el.btnSaveFinalHtml.textContent = "กำลังบันทึก...";
+
+    try {
+      const res = await fetch(`/api/jobs/${state.currentJobId}/export/html/final`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          html_content: htmlContent,
+          base_revision: state.htmlBaseRevision,
+        }),
+      });
+
+      if (res.status === 409) {
+        const conflict = await res.json();
+        if (confirm(`ตรวจพบข้อขัดแย้ง: ${conflict.detail || "ไฟล์ต้นทางเปลี่ยนไปแล้ว"}\nคุณต้องการบันทึกทับ (Overwrite) หรือไม่?`)) {
+          // Force overwrite
+          const forceRes = await fetch(`/api/jobs/${state.currentJobId}/export/html/final`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              html_content: htmlContent,
+              base_revision: state.htmlBaseRevision,
+              overwrite: true,
+            }),
+          });
+          if (!forceRes.ok) throw new Error("Overwrite failed");
+          alert("บันทึกทับสำเร็จเรียบร้อย");
+          await loadHtmlExportStatus();
+        }
+        return;
+      }
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || "Save final HTML failed");
+      }
+
+      alert("บันทึก final.html สำเร็จเรียบร้อย");
+      await loadHtmlExportStatus();
+    } catch (err) {
+      alert(`บันทึก final.html ไม่สำเร็จ: ${err.message}`);
+    } finally {
+      el.btnSaveFinalHtml.disabled = false;
+      el.btnSaveFinalHtml.textContent = "บันทึก Final HTML";
+    }
+  }
+
+  /* ==========================================================================
      Downloads & Export Warnings
      ========================================================================== */
 
@@ -1172,6 +1402,9 @@
     el.btnDownloadPageImages.href = `/api/jobs/${jId}/download/page-images.zip`;
     el.btnDownloadCorrected.classList.toggle("hidden", !job.enable_ai);
     el.btnDownloadPageImages.classList.toggle("hidden", !job.filename.toLowerCase().endsWith(".pdf"));
+
+    // Also refresh HTML export links/badge
+    loadHtmlExportStatus();
 
     // Warning banner if failed or partial
     const hasFailures = job.failed_pages > 0 || job.status === "partial" || job.status === "failed" || job.status === "cancelled";

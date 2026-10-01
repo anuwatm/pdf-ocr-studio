@@ -347,6 +347,9 @@
                 <button id="tab-raw" class="tab-btn" role="tab" aria-selected="false">
                   ข้อความดิบ (Raw)
                 </button>
+                <button id="tab-html" class="tab-btn" role="tab" aria-selected="false">
+                  ส่งออก HTML (Phase 7)
+                </button>
               </div>
 
               <!-- Revision Badge & Save Status -->
@@ -426,6 +429,50 @@
                 <span class="text-muted text-xs">ข้อความต้นทางที่อ่านได้จาก OneOCR Baseline ก่อนผ่าน AI</span>
               </div>
             </div>
+
+            <!-- Tab 4: HTML Export & Sandboxed Preview (Phase 7) -->
+            <div id="panel-html" class="tab-panel hidden" role="tabpanel">
+              <div class="html-export-toolbar">
+                <div class="html-action-buttons">
+                  <button id="btn-generate-html-basic" class="btn btn-outline btn-xs" type="button">
+                    สร้าง HTML พื้นฐาน
+                  </button>
+                  <button id="btn-generate-html-ai" class="btn btn-primary btn-xs" type="button" title="ส่ง Local LLM เสนอ semantic tags">
+                    สร้าง HTML พร้อม AI
+                  </button>
+                  <span id="html-export-status-badge" class="badge badge-neutral">ยังไม่ได้ส่งออก</span>
+                </div>
+                <div class="html-subtabs">
+                  <button id="btn-subtab-preview" class="html-subtab-btn active" type="button">ดูตัวอย่าง (Preview)</button>
+                  <button id="btn-subtab-source" class="html-subtab-btn" type="button">แก้ไข HTML Final</button>
+                </div>
+              </div>
+
+              <!-- Preview View (Sandboxed iframe) -->
+              <div id="html-preview-view" class="html-view-container">
+                <iframe id="html-preview-frame" sandbox="" class="html-preview-iframe" title="ตัวอย่าง HTML ที่ส่งออก"></iframe>
+              </div>
+
+              <!-- Source / Edit Final View -->
+              <div id="html-source-view" class="html-view-container hidden">
+                <div class="editor-wrapper">
+                  <textarea id="html-source-editor" class="text-editor font-mono text-xs" placeholder="ยังไม่มีไฟล์ HTML กรุณาสร้าง HTML พื้นฐานก่อน..." spellcheck="false"></textarea>
+                </div>
+                <div class="editor-actions">
+                  <span id="html-source-status-text" class="text-muted text-xs">คุณสามารถปรับแต่ง HTML แล้วกดบันทึกเป็นฉบับ final.html ได้</span>
+                  <button id="btn-save-final-html" class="btn btn-success btn-xs" type="button">
+                    บันทึก Final HTML
+                  </button>
+                </div>
+              </div>
+
+              <!-- Downloads bar for HTML variants -->
+              <div class="html-download-links">
+                <a id="btn-dl-html-basic" class="btn btn-outline btn-xs hidden" href="#" download>ดาวน์โหลด basic.html</a>
+                <a id="btn-dl-html-ai" class="btn btn-outline btn-xs hidden" href="#" download>ดาวน์โหลด ai.html</a>
+                <a id="btn-dl-html-final" class="btn btn-outline btn-xs hidden" href="#" download>ดาวน์โหลด final.html</a>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -477,6 +524,14 @@
                 <line x1="10" y1="12" x2="14" y2="12"/>
               </svg>
               <span>ดาวน์โหลดชุดผลลัพธ์ (ZIP)</span>
+            </a>
+
+            <a id="btn-download-html" class="btn btn-outline btn-sm hidden" href="#" download>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="16 18 22 12 16 6"/>
+                <polyline points="8 6 2 12 8 18"/>
+              </svg>
+              <span>ดาวน์โหลด HTML (Phase 7)</span>
             </a>
 
             <a id="btn-download-page-images" class="btn btn-outline btn-sm hidden" href="#" download>

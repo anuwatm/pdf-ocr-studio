@@ -6,6 +6,7 @@ and hybrid page handling module for Local Thai OCR Web.
 import os
 import re
 import math
+import statistics
 import fitz  # PyMuPDF
 from PIL import Image, ImageStat
 from typing import Dict, List, Tuple, Optional, Any
@@ -167,17 +168,102 @@ def render_pdf_page_to_image(page: fitz.Page, dpi: int = 300) -> Image.Image:
     return img
 
 
+def _extract_line_style(spans: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Computes font metrics and style ratios from PyMuPDF spans for a line."""
+    if not spans:
+        return {
+            "size_median": 0.0,
+            "size_max": 0.0,
+            "font_names": [],
+            "bold_ratio": 0.0,
+            "italic_ratio": 0.0,
+            "evidence": "none",
+            "spans": [],
+        }
+
+    total_chars = max(1, sum(len(s.get("text", "")) for s in spans))
+    bold_chars = 0
+    italic_chars = 0
+    sizes: List[float] = []
+    font_names_set: List[str] = []
+    cleaned_spans: List[Dict[str, Any]] = []
+
+    for s in spans:
+        s_text = s.get("text", "")
+        font = s.get("font", "")
+        size = round(float(s.get("size", 0.0)), 2)
+        flags = int(s.get("flags", 0))
+        # PyMuPDF: bit 4 (16) is bold, bit 1 (2) is italic
+        is_bold = bool((flags & 16) or "bold" in font.lower())
+        is_italic = bool((flags & 2) or "italic" in font.lower() or "oblique" in font.lower())
+
+        if font and font not in font_names_set:
+            font_names_set.append(font)
+
+        char_len = len(s_text)
+        if is_bold:
+            bold_chars += char_len
+        if is_italic:
+            italic_chars += char_len
+
+        sizes.extend([size] * max(1, char_len))
+
+        cleaned_spans.append({
+            "text": s_text,
+            "size": size,
+            "font": font,
+            "flags": flags,
+            "is_bold": is_bold,
+            "is_italic": is_italic,
+        })
+
+    bold_ratio = round(bold_chars / total_chars, 2)
+    italic_ratio = round(italic_chars / total_chars, 2)
+    size_median = round(statistics.median(sizes), 2) if sizes else 0.0
+    size_max = round(max([float(s.get("size", 0.0)) for s in spans]), 2) if spans else 0.0
+
+    has_flags = any((s.get("flags", 0) & 18) for s in spans)
+    if has_flags:
+        evidence = "pdf_span_flags"
+    elif bold_ratio > 0 or italic_ratio > 0:
+        evidence = "font_name"
+    else:
+        evidence = "none"
+
+    return {
+        "size_median": size_median,
+        "size_max": size_max,
+        "font_names": font_names_set,
+        "bold_ratio": bold_ratio,
+        "italic_ratio": italic_ratio,
+        "evidence": evidence,
+        "spans": cleaned_spans,
+    }
+
+
 def extract_native_text_blocks(page: fitz.Page, dpi: int = 300) -> List[Dict[str, Any]]:
     """
     Extract native vector text blocks from PDF page, converting coordinates
     from points (1/72 inch) to reference image pixels at given DPI.
+    Preserves exact block/line mapping and attaches typography style data.
     """
     scale = dpi / 72.0
     raw_blocks = page.get_text("blocks")
     # block tuple: (x0, y0, x1, y1, text, block_no, block_type)
     # block_type 0 = text, 1 = image
 
+    # Extract detailed dict blocks for font/style analysis
+    try:
+        dict_data = page.get_text("dict")
+        dict_blocks = [
+            b for b in dict_data.get("blocks", [])
+            if b.get("type") == 0 and "".join(s.get("text", "") for l in b.get("lines", []) for s in l.get("spans", [])).strip()
+        ]
+    except Exception:
+        dict_blocks = []
+
     blocks = []
+    text_block_idx = 0
     for b in raw_blocks:
         x0, y0, x1, y1, text, block_no, b_type = b
         if b_type != 0 or not text.strip():
@@ -203,6 +289,10 @@ def extract_native_text_blocks(page: fitz.Page, dpi: int = 300) -> List[Dict[str
         total_lines = max(1, len([l for l in raw_lines if l.strip()]))
         line_h = (py1 - py0) / total_lines
 
+        # Correlate with dict block lines if available
+        dict_block = dict_blocks[text_block_idx] if text_block_idx < len(dict_blocks) else None
+        dict_lines = [l for l in dict_block.get("lines", []) if "".join(s.get("text", "") for s in l.get("spans", [])).strip()] if dict_block else []
+
         curr_y = py0
         line_idx = 0
         for l_text in raw_lines:
@@ -214,6 +304,11 @@ def extract_native_text_blocks(page: fitz.Page, dpi: int = 300) -> List[Dict[str
                 round(px1, 2), round(curr_y + line_h, 2),
                 round(px0, 2), round(curr_y + line_h, 2),
             ]
+
+            # Style extraction
+            d_spans = dict_lines[line_idx].get("spans", []) if line_idx < len(dict_lines) else []
+            line_style = _extract_line_style(d_spans)
+
             lines.append({
                 "line_index": line_idx,
                 "text": l_text,
@@ -223,10 +318,38 @@ def extract_native_text_blocks(page: fitz.Page, dpi: int = 300) -> List[Dict[str
                     "x3": line_quad[4], "y3": line_quad[5],
                     "x4": line_quad[6], "y4": line_quad[7],
                 },
+                "style": line_style,
                 "words": []
             })
             curr_y += line_h
             line_idx += 1
+
+        text_block_idx += 1
+
+        # Compute aggregate block style
+        block_lines_styles = [l.get("style", {}) for l in lines if l.get("style")]
+        if block_lines_styles:
+            b_sizes = [ls["size_median"] for ls in block_lines_styles if ls.get("size_median", 0) > 0]
+            b_bold = [ls["bold_ratio"] for ls in block_lines_styles]
+            b_italic = [ls["italic_ratio"] for ls in block_lines_styles]
+            b_fonts = list(dict.fromkeys(f for ls in block_lines_styles for f in ls.get("font_names", [])))
+            block_style = {
+                "size_median": round(statistics.median(b_sizes), 2) if b_sizes else 0.0,
+                "size_max": round(max([ls["size_max"] for ls in block_lines_styles]), 2) if block_lines_styles else 0.0,
+                "font_names": b_fonts,
+                "bold_ratio": round(statistics.mean(b_bold), 2) if b_bold else 0.0,
+                "italic_ratio": round(statistics.mean(b_italic), 2) if b_italic else 0.0,
+                "evidence": "pdf_span_flags" if any(ls.get("evidence") == "pdf_span_flags" for ls in block_lines_styles) else ("font_name" if any(ls.get("evidence") == "font_name" for ls in block_lines_styles) else "none"),
+            }
+        else:
+            block_style = {
+                "size_median": 0.0,
+                "size_max": 0.0,
+                "font_names": [],
+                "bold_ratio": 0.0,
+                "italic_ratio": 0.0,
+                "evidence": "none",
+            }
 
         blocks.append({
             "block_id": f"p{page.number + 1}_b{block_no}",
@@ -240,6 +363,7 @@ def extract_native_text_blocks(page: fitz.Page, dpi: int = 300) -> List[Dict[str
             },
             "rect": Rect(px0, py0, px1, py1),
             "text": text.strip(),
+            "style": block_style,
             "lines": lines,
         })
 
