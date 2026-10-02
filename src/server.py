@@ -940,25 +940,49 @@ def export_html_endpoint(job_id: JobId, req: HtmlExportRequest = HtmlExportReque
     if mode == "ai":
         from src.llm_client import LocalLLMClient
         from src.html_exporter import generate_ai_html, generate_basic_html, _update_export_meta
-        client = LocalLLMClient()
-        health = client.check_health()
-        if health.get("status") != "healthy":
-            # AI is offline: generate basic.html as fallback and record locked_ai_offline status
-            basic_html, meta = generate_basic_html(job_id, files_dir=DEFAULT_OUTPUT_DIR)
-            job_dir = os.path.abspath(os.path.join(DEFAULT_OUTPUT_DIR, job_id))
-            _update_export_meta(job_dir, "ai", {
-                "mode": "ai",
-                "validator_status": "locked_ai_offline",
-                "message": "Local AI is offline. Basic HTML preserved.",
-            })
-            return {
-                "status": "locked_ai_offline",
-                "mode": "ai",
-                "detail": "Local AI is offline; basic.html preserved",
-                "meta": meta,
-            }
-        content, meta = generate_ai_html(job_id, files_dir=DEFAULT_OUTPUT_DIR, llm_client=client)
-        return {"status": meta.get("validator_status", "ready"), "mode": "ai", "meta": meta}
+
+        # Checklist 407: Enforce at most 1 concurrent Local LLM job across OCR+AI and AI export
+        if job_manager.is_ai_in_use() and not job_manager.ai_lock.locked():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Local AI กำลังประมวลผลงาน OCR+AI อื่นอยู่ ไม่สามารถส่งออก AI ซ้อนกันได้ กรุณารอให้งานปัจจุบันเสร็จสิ้น",
+            )
+
+        acquired = job_manager.ai_lock.acquire(timeout=5.0)
+        if not acquired:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Local AI กำลังถูกใช้งานโดยงานอื่นอยู่ (จำกัด 1 งานพร้อมกัน)",
+            )
+        try:
+            client = LocalLLMClient()
+            health = client.check_health()
+            if health.get("status") not in ("connected", "healthy"):
+                # AI is offline: generate basic.html as fallback and record locked_ai_offline status
+                basic_html, meta = generate_basic_html(job_id, files_dir=DEFAULT_OUTPUT_DIR)
+                job_dir = os.path.abspath(os.path.join(DEFAULT_OUTPUT_DIR, job_id))
+                from datetime import datetime, timezone
+                _update_export_meta(job_dir, "ai", {
+                    "mode": "ai",
+                    "model": getattr(client, "model", "google/gemma-3-1b"),
+                    "prompt_version": "v1.0",
+                    "temperature": 0.0,
+                    "generated_at": datetime.now(timezone.utc).isoformat(),
+                    "chunk_count": 0,
+                    "source_revision": meta.get("source_revision", ""),
+                    "validator_status": "locked_ai_offline",
+                    "message": "Local AI is offline. Basic HTML preserved.",
+                })
+                return {
+                    "status": "locked_ai_offline",
+                    "mode": "ai",
+                    "detail": "Local AI is offline; basic.html preserved",
+                    "meta": meta,
+                }
+            content, meta = generate_ai_html(job_id, files_dir=DEFAULT_OUTPUT_DIR, llm_client=client)
+            return {"status": meta.get("validator_status", "ready"), "mode": "ai", "meta": meta}
+        finally:
+            job_manager.ai_lock.release()
 
     else:
         from src.html_exporter import generate_basic_html

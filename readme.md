@@ -56,6 +56,7 @@
   - [ติดตั้งและเริ่มต้นใช้งาน](#การติดตั้งและเริ่มต้นใช้งาน-getting-started)
 - [การตั้งค่า Local AI ตรวจแก้](#การตั้งค่า-local-ai-ตรวจแก้)
 - [สัญญาข้อมูลและไฟล์ผลลัพธ์ (Data Contract)](#สัญญาข้อมูลและไฟล์ผลลัพธ์-data-contract)
+- [รายละเอียด REST API (API Reference)](#รายละเอียด-rest-api-api-reference)
 - [โครงสร้างโฟลเดอร์ (Repository Structure)](#โครงสร้างโฟลเดอร์-repository-structure)
 - [ผลการทดสอบและเกณฑ์ตรวจรับ (Verification & Benchmarks)](#ผลการทดสอบและเกณฑ์ตรวจรับ-verification--benchmarks)
 - [ข้อควรรู้ก่อนเผยแพร่บน GitHub](#ข้อควรรู้ก่อนเผยแพร่บน-github)
@@ -106,13 +107,17 @@ flowchart TB
     subgraph Browser ["Browser: 127.0.0.1"]
         Upload["Upload PDF/ภาพ และเลือกช่วงหน้า"]
         Progress["Progress และ Preview รายหน้า"]
-        Studio["Web Studio / Download text, ZIP, ภาพ ZIP / History"]
+        Studio["Web Studio / ตรวจและแก้ข้อความ"]
+        HtmlStudio["HTML Export / Preview / Download / History"]
         Config["Config และ Test Local LLM"]
     end
 
     subgraph Server ["FastAPI process"]
         API["REST API"]
         Queue["Job Manager / Supervisor"]
+        HtmlExport["Structured HTML Export"]
+        Sanitizer["Parser + Strict Allowlist Sanitizer"]
+        AILock["Local AI coordination<br/>ครั้งละ 1 งาน"]
         Cleanup["History และ Cleanup API"]
     end
 
@@ -125,6 +130,7 @@ flowchart TB
     subgraph LocalData ["ข้อมูลภายในเครื่อง"]
         DB[("SQLite WAL")]
         Files[("files/job_id<br/>input, raw, corrected, final,<br/>ocr.json, changes.json, page-images.zip")]
+        ExportFiles[("export/<br/>basic.html, ai.html, final.html,<br/>export_meta.json")]
     end
 
     LLM["Local LLM<br/>127.0.0.1 only"]
@@ -132,16 +138,23 @@ flowchart TB
     Upload --> API
     Progress <--> API
     Studio <--> API
+    HtmlStudio <--> API
     Config <--> API
     API <--> DB
     API <--> Files
+    API --> HtmlExport
+    HtmlExport --> Sanitizer
+    HtmlExport <--> ExportFiles
+    HtmlExport --> AILock
+    Runner -. "OCR+AI active" .-> AILock
+    AILock <--> LLM
     API --> Queue --> Runner
     Runner <--> DB
     Runner --> Pipeline --> OneOCR
     Runner --> Files
-    Runner <--> LLM
     Cleanup --> DB
     Cleanup --> Files
+    Cleanup --> ExportFiles
 ```
 
 OneOCR DLL ถูกโหลดใน Worker เท่านั้น ดังนั้นความขัดข้องของ native OCR ไม่ทำให้ FastAPI process หยุดตามไปด้วย. API สร้าง ZIP ภาพ PDF เมื่อผู้ใช้ขอดาวน์โหลด โดยมี PNG หนึ่งไฟล์ต่อหนึ่งหน้าในช่วงงาน. API และ Local LLM จำกัดการเชื่อมต่อไว้ที่ loopback.
@@ -175,6 +188,7 @@ flowchart TD
     More -->|มี| Page
     More -->|ไม่มี| Assemble["รวม raw.txt, corrected.txt และ final.txt"]
     Assemble --> Finish(["OCR เสร็จ"])
+    Finish --> ExportReady["พร้อมส่งออก basic.html<br/>หรือ AI semantic HTML จาก final.txt"]
 ```
 
 PDF จะตรวจจำนวนหน้าทันทีหลังเลือกไฟล์เพื่อให้เลือกช่วงได้เลย. ช่วงหน้าที่เลือกอาจยาวกว่า 200 หน้าได้; Worker จะทำต่อเนื่องเป็น batch ละ 200 หน้าเพื่อคืนทรัพยากร OCR ระหว่าง batch. เมื่อหน้าใดเสร็จ ระบบจะเขียนไฟล์และอัปเดตสถานะก่อนเริ่มหน้าถัดไป ทำให้ Preview แสดงผลหน้านั้นได้ทันที.
@@ -202,6 +216,22 @@ flowchart TD
     Review --> Revert["Revert หรือไม่แก้: คง final.txt เดิม"]
     Review -.-> FullAI["AI ตรวจคำผิดทั้งหมด: อ่าน raw.txt ทุกหน้าที่ OCR สำเร็จ<br/>ทีละหน้า โดยไม่ทำ OCR ซ้ำ"]
     FullAI --> Prompt
+    Accept --> SavedFinal["final.txt ที่ผู้ใช้ควบคุม"]
+    Revert --> SavedFinal
+    SavedFinal --> HtmlMode{"ส่งออก HTML แบบใด?"}
+    HtmlMode -->|basic| BasicHTML["สร้าง basic.html แบบ deterministic"]
+    HtmlMode -->|ai| HtmlAILock{"Local AI ว่างหรือไม่?"}
+    HtmlAILock -->|ไม่ว่าง| Conflict["HTTP 409 ให้ลองใหม่ภายหลัง"]
+    HtmlAILock -->|offline| BasicFallback["คง basic.html และบันทึก locked_ai_offline"]
+    HtmlAILock -->|ว่างและพร้อม| Semantic["Local LLM เสนอ semantic tags"]
+    Semantic --> HtmlValidate{"annotation ผ่าน validator หรือไม่?"}
+    HtmlValidate -->|ผ่าน| AIHTML["สร้าง ai.html"]
+    HtmlValidate -->|ไม่ผ่าน| BasicFallback
+    BasicHTML --> HtmlReview["Sandboxed Preview / ตรวจ source revision"]
+    AIHTML --> HtmlReview
+    BasicFallback --> HtmlReview
+    HtmlReview --> Sanitize["แก้ HTML แล้วผ่าน Parser + Strict Allowlist"]
+    Sanitize --> FinalHTML["บันทึก final.html<br/>409 เมื่อ revision ชน เว้นแต่ overwrite"]
 ```
 
 ค่าเริ่มต้นคือ **OneOCR อย่างเดียว (Baseline)**. ตัวเลือก AI จะเปิดหลังการทดสอบการเชื่อมต่อพบ Local LLM เท่านั้น. `corrected.txt` เป็นผลข้อเสนอของ AI ส่วน `final.txt` เป็นฉบับที่ผู้ใช้ควบคุม.
@@ -231,6 +261,23 @@ stateDiagram-v2
     Partial --> Deleted: cleanup ตามอายุที่ผู้ใช้ระบุ
     Failed --> Deleted: cleanup ตามอายุที่ผู้ใช้ระบุ
     Cancelled --> Deleted: cleanup ตามอายุที่ผู้ใช้ระบุ
+
+    state "วงจร HTML export" as HtmlExport {
+        [*] --> NotGenerated
+        NotGenerated --> BasicReady: export basic หรือ AI fallback
+        BasicReady --> AIReady: AI พร้อมและ validator ผ่าน
+        BasicReady --> FinalReady: แก้และบันทึก
+        AIReady --> FinalReady: แก้และบันทึก
+        FinalReady --> Stale: source_revision เปลี่ยน
+        Stale --> BasicReady: สร้างใหม่จาก final.txt ล่าสุด
+    }
+
+    Completed --> HtmlExport: ส่งออกจาก final.txt
+    Partial --> HtmlExport: ส่งออกจากหน้าที่สำเร็จ
+    note right of HtmlExport
+        สถานะ HTML แยกจากสถานะงาน OCR
+        AI offline/validator ไม่ผ่านจะคง basic.html
+    end note
 ```
 
 เมื่อยกเลิก ระบบจะรวมข้อความของหน้าที่ OCR สำเร็จแล้วทันที และใส่ `[PAGE N: CANCELLED]` ให้หน้าที่ยังไม่ทำ เพื่อให้ไฟล์ดาวน์โหลดไม่ขาดผลที่มีอยู่. ผู้ใช้กด **เริ่มงานต่อจากหน้าที่เหลือ** ได้โดยไม่ต้อง refresh. หน้า **งาน OCR ก่อนหน้า** แสดงงานล่าสุด เปิดดูหรือดาวน์โหลดงานเดิมได้. การลบรายงานและ cleanup จะไม่ลบงานที่อยู่ในสถานะ `queued` หรือ `running`; Worker ตรวจสถานะก่อนเขียนผลต่อเพื่อไม่ให้ไฟล์ที่ลบแล้วถูกสร้างกลับ.
@@ -260,8 +307,21 @@ flowchart TD
     N -->|ใช่| O["กด AI ตรวจคำผิดทั้งหมด"]
     O --> M
     N -->|ไม่| P["แก้มือ / Accept / Revert แล้วบันทึก"]
-    P --> Q["ดาวน์โหลด text, ผล AI, ZIP หรือภาพ PDF รายหน้า ZIP"]
+    P --> X{"ต้องการส่งออก HTML หรือไม่?"}
+    X -->|ไม่| Q["ดาวน์โหลด text, ผล AI, ZIP หรือภาพ PDF รายหน้า ZIP"]
+    X -->|basic| Y["สร้าง basic.html แบบ deterministic"]
+    X -->|ai| Z{"Local AI ว่างและเชื่อมต่อได้หรือไม่?"}
+    Z -->|ไม่ว่าง| Z1["รับ HTTP 409 แล้วลองใหม่ภายหลัง"]
+    Z -->|offline| Y
+    Z -->|พร้อม| W["AI เสนอ semantic tags และผ่าน validator"]
+    Y --> V["เปิด Sandboxed Preview"]
+    W --> V
+    V --> U{"แก้ HTML หรือไม่?"}
+    U -->|ไม่| Q2["ดาวน์โหลด basic.html หรือ ai.html"]
+    U -->|ใช่| T["Sanitize และบันทึก final.html<br/>ตรวจ revision conflict"]
+    T --> Q2
     Q --> R["เปิดดูหรือลบงานเดิมจากงาน OCR ก่อนหน้า"]
+    Q2 --> R
 ```
 
 ---
@@ -429,6 +489,99 @@ Correct only OCR spelling mistakes in this text. original_text must be copied ex
 
 ---
 
+## รายละเอียด REST API (API Reference)
+
+ระบบขับเคลื่อนด้วย **FastAPI** รันบน `http://127.0.0.1:8000` (จำกัดเฉพาะ Loopback เพื่อความเป็นส่วนตัว) มีระบบเอกสาร API แบบ Interactive ให้อัตโนมัติ:
+
+- **Swagger UI**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- **ReDoc**: [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
+- **OpenAPI Schema**: [http://127.0.0.1:8000/openapi.json](http://127.0.0.1:8000/openapi.json)
+
+### 1. หมวดตรวจสุขภาพและสถานะระบบ (Health & Diagnostics)
+
+| Method | Endpoint | คำอธิบาย |
+|---|---|---|
+| `GET` | `/api/health` | ตรวจสอบสถานะเซิร์ฟเวอร์ ข้อมูลคิวงาน (`queue_info`) และการเชื่อมต่อฐานข้อมูล |
+
+### 2. หมวดตั้งค่า Local AI (Local LLM Configuration)
+
+| Method | Endpoint | พารามิเตอร์ / Body | คำอธิบาย |
+|---|---|---|---|
+| `GET` | `/api/ai/status` | - | ตรวจสอบว่า Local LLM พร้อมใช้งานหรือไม่ (`healthy` / `offline`) |
+| `GET` | `/api/ai/config` | - | ดึงค่าคอนฟิกปัจจุบัน (`base_url`, `model`, `timeout`) โดยซ่อน API Key |
+| `POST` | `/api/ai/config/test` | JSON: `{ base_url, model, timeout, api_key? }` | ทดสอบเชื่อมต่อไปยัง endpoint โดยยังไม่บันทึก |
+| `PUT` | `/api/ai/config` | JSON: `{ base_url, model, timeout, api_key? }` | บันทึกการตั้งค่าลง `.env` และมีผลกับงานถัดไปทันที |
+
+### 3. หมวดจัดการวงจรงาน OCR (Job Lifecycle)
+
+| Method | Endpoint | พารามิเตอร์ / Body | คำอธิบาย |
+|---|---|---|---|
+| `POST` | `/api/upload` | Multipart/form-data:<br>• `file`: ไฟล์ PDF / รูปภาพ<br>• `max_pages_limit`: (optional)<br>• `max_size_limit`: (optional) | อัปโหลดและตรวจสอบไฟล์ ตรวจสอบความปลอดภัย สร้าง `job_id` |
+| `POST` | `/api/jobs/{job_id}/start` | JSON: `{ enable_ai: true, page_start?: 1, page_end?: N, include_page_numbers?: true }` | นำงานเข้าคิวประมวลผล OneOCR / Local AI |
+| `GET` | `/api/jobs/{job_id}/status` | Path: `job_id` | เช็คสถานะงานโดยละเอียดระดับหน้าและ latency |
+| `POST` | `/api/jobs/{job_id}/cancel` | Path: `job_id` | ยกเลิกงานที่กำลังรันหรือรอคิว พร้อมหยุด Worker ทันที |
+| `POST` | `/api/jobs/{job_id}/retry` | JSON: `{ retry_mode: "failed_only" \| "ai_only" \| "full" \| "full_text_ai" }` | ประมวลผลซ้ำเฉพาะหน้าที่ล้มเหลว หรือรันซ้ำเฉพาะ AI |
+| `GET` | `/api/jobs` | Query: `limit=50` | ดึงรายการประวัติงานทั้งหมดในฐานข้อมูล SQLite |
+| `POST` | `/api/jobs/{job_id}/review` | Query: `new_status=unreviewed \| in_review \| reviewed` | อัปเดตสถานะการตรวจทานของงาน |
+
+### 4. หมวดดูเนื้อหาและตรวจแก้รายหน้า (Page Data & Human-in-the-Loop)
+
+| Method | Endpoint | พารามิเตอร์ / Body | คำอธิบาย |
+|---|---|---|---|
+| `GET` | `/api/jobs/{job_id}/pages/{page_id}/image` | Path: `job_id`, `page_id` | ดึงรูปภาพเรนเดอร์ของหน้านั้นสำหรับแสดงใน Dual-pane Viewer |
+| `GET` | `/api/jobs/{job_id}/pages/{page_id}/data` | Path: `job_id`, `page_id` | ข้อมูลเต็มของหน้า: `raw_text`, `corrected_text`, `final_text`, Bounding boxes, AI proposals |
+| `PUT` | `/api/jobs/{job_id}/pages/{page_id}/edit` | JSON: `{ source_revision: int, edited_text: string, check_conflict: bool }` | บันทึกข้อความที่ผู้ใช้แก้ไขเอง ป้องกันการเขียนทับชนกัน (HTTP 409) |
+| `POST` | `/api/jobs/{job_id}/pages/{page_id}/corrections/{change_id}/accept` | Path: `change_id` | ยอมรับข้อเสนอแก้คำผิดจุดนั้นของ AI |
+| `POST` | `/api/jobs/{job_id}/pages/{page_id}/corrections/{change_id}/revert` | Path: `change_id` | ปฏิเสธข้อเสนอ AI และย้อนกลับไปใช้ข้อความเดิมจาก OCR |
+| `POST` | `/api/jobs/{job_id}/pages/{page_id}/corrections/accept-all` | Query: `source_revision?` | ยอมรับข้อเสนอของ AI ทุกจุดในหน้านั้นพร้อมกัน |
+| `POST` | `/api/jobs/{job_id}/pages/{page_id}/corrections/revert-all` | Query: `source_revision?` | ปฏิเสธและย้อนคืนข้อความเดิมจาก OCR ทุกจุดในหน้านั้น |
+
+### 5. หมวดดาวน์โหลดผลลัพธ์ (Download & Artifacts)
+
+| Method | Endpoint | ไฟล์ที่รองรับ | คำอธิบาย |
+|---|---|---|---|
+| `GET` | `/api/jobs/{job_id}/download/{file_type}` | `raw.txt`<br>`corrected.txt`<br>`final.txt`<br>`ocr.json`<br>`changes.json`<br>`bundle.zip`<br>`page-images.zip` | ดาวน์โหลดไฟล์ผลลัพธ์ตามประเภทที่ต้องการ (กรณีงานสถานะ `partial` หรือ `failed` จะมี `X-Job-Warning` แจ้งเตือนใน Header) |
+
+### 6. หมวดส่งออกโครงสร้าง HTML (Structured HTML Export)
+
+| Method | Endpoint | พารามิเตอร์ / Body | คำอธิบาย |
+|---|---|---|---|
+| `POST` | `/api/jobs/{job_id}/export/html` | JSON: `{ mode: "basic" \| "ai" }` | สร้างเอกสาร HTML โครงสร้าง (`basic` = deterministic, `ai` = ใช้ AI จัดโครงสร้างหัวข้อ/ย่อหน้า) |
+| `GET` | `/api/jobs/{job_id}/export/html/status` | Path: `job_id` | ตรวจสอบสถานะการแปลง HTML และ revision ว่าล้าสมัย (stale) หรือไม่ |
+| `GET` | `/api/jobs/{job_id}/export/html/{variant}` | Path: `variant` = `basic` \| `ai` \| `final` | ดาวน์โหลดไฟล์ HTML โครงสร้าง (RFC 5987 UTF-8 attachment) |
+| `GET` | `/api/jobs/{job_id}/export/html/{variant}/preview` | Path: `variant` = `basic` \| `ai` \| `final` | ดูตัวอย่าง HTML แบบ Sandboxed CSP ปลอดภัย |
+| `PUT` | `/api/jobs/{job_id}/export/html/final` | JSON: `{ html_content, base_revision?, overwrite: bool }` | บันทึกการแก้ไขโค้ด HTML ฉบับสุดท้ายด้วยตนเอง (HTTP 409 หากชน) |
+
+HTML export ใช้ฟอนต์ระบบในเครื่องและไม่โหลด Google Fonts หรือทรัพยากรภายนอก. โหมด `basic` เป็น deterministic; โหมด `ai` ใช้ได้เมื่อ Local LLM พร้อมและถูกจำกัดให้ทำงานพร้อมกับ OCR+AI ได้ครั้งละหนึ่งงาน. การวัดเวลา/VRAM ของ AI และ precision/recall ของ semantic tags จะรายงานต่อเมื่อมีผลวัด Local LLM จริงและเฉลยระดับ element ที่ผู้ตรวจรับรองแล้วเท่านั้น.
+
+### 7. หมวดบริหารจัดการและล้างข้อมูล (Admin & Retention Cleanup)
+
+| Method | Endpoint | พารามิเตอร์ / Body | คำอธิบาย |
+|---|---|---|---|
+| `POST` | `/api/admin/cleanup` | Query: `max_age_seconds?` | สั่งลบงานที่หมดอายุตามนโยบาย Retention โดยไม่แตะต้องงานที่กำลังรัน |
+| `DELETE` | `/api/jobs/{job_id}` | Path: `job_id`, Query: `force: bool` | ลบงานและโฟลเดอร์ผลลัพธ์ของ `job_id` นั้นทิ้งอย่างถาวร |
+
+### ตัวอย่างการเรียกใช้งานด้วย cURL (Quick Example)
+
+```bash
+# 1. อัปโหลดเอกสาร
+curl -F "file=@document.pdf" http://127.0.0.1:8000/api/upload
+# ตอบกลับ: {"job_id":"abc123xyz","status":"queued","total_pages":5,...}
+
+# 2. สั่งเริ่มประมวลผล (หน้า 1-5, เปิด AI)
+curl -X POST http://127.0.0.1:8000/api/jobs/abc123xyz/start \
+  -H "Content-Type: application/json" \
+  -d '{"enable_ai": true, "page_start": 1, "page_end": 5}'
+
+# 3. ตรวจสอบสถานะความคืบหน้า
+curl http://127.0.0.1:8000/api/jobs/abc123xyz/status
+
+# 4. ดาวน์โหลดผลลัพธ์ฉบับสมบูรณ์
+curl -O http://127.0.0.1:8000/api/jobs/abc123xyz/download/final.txt
+```
+
+---
+
 ## โครงสร้างโฟลเดอร์ (Repository Structure)
 
 ```text
@@ -498,6 +651,9 @@ publish/
 | ภาพหมุน 90° / 180° / 270° | **NOT TESTED** | ไม่มีตัวอย่างเอกสารจริงสำหรับตรวจรับ |
 | PDF เสีย, PDF ติดรหัสผ่าน และภาพใหญ่ | **EXEMPTED** | ยกเว้นโดยเจ้าของงาน; ระบบยังคงตอบ error HTTP 400/422/413 |
 | ติดตั้งบน clean target machine จากศูนย์ | **NOT TESTED** | รอทดสอบบนเครื่องปลายทางจริงหรือจัดเตรียม wheelhouse แบบ offline |
+| HTML Export AI latency / VRAM | **NOT TESTED** | ยังไม่มีผลวัดซ้ำได้จาก Local LLM และตัววัด VRAM; ไม่ใช้ค่าประมาณแทนผลจริง |
+| HTML Export precision / recall | **NOT TESTED** | manifest ปัจจุบันมีเพียงยอดรวม ต้องมีเฉลยระดับ element ที่ผู้ตรวจรับรองก่อนคำนวณ |
+| Browser automation Phase 7 หลังปรับ offline/XSS/download/409 | **PENDING** | โค้ดและ syntax ตรวจแล้ว; รอรัน integration suite ใน workspace แยกเพื่อเก็บหลักฐานใหม่ |
 | การยอมรับข้อจำกัดก่อนใช้งานจริง | **PENDING** | รอเจ้าของงานตรวจผลและยอมรับข้อจำกัดที่ระบุไว้ |
 
 ## ข้อควรรู้ก่อนเผยแพร่บน GitHub

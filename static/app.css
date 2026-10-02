@@ -35,8 +35,8 @@
   --bbox-active: #f59e0b;
   --bbox-active-fill: rgba(245, 158, 11, 0.35);
 
-  --font-sans: 'Plus Jakarta Sans', 'Sarabun', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-sans: 'Leelawadee UI', Tahoma, Arial, sans-serif;
+  --font-mono: Consolas, 'Courier New', monospace;
 
   --radius-sm: 6px;
   --radius-md: 10px;

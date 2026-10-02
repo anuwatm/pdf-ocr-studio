@@ -36,12 +36,30 @@ class JobManager:
         self.db = JobDatabase(db_path=db_path)
 
         self._lock = threading.RLock()
+        self._ai_lock = threading.Lock()
         self._active_processes: Dict[str, subprocess.Popen] = {}  # job_id -> Popen
         self._active_attempts: Dict[str, int] = {}
         self._queue: deque = deque()  # list of job_ids queued
         self._stop_event = threading.Event()
         self._supervisor_thread = threading.Thread(target=self._supervisor_loop, daemon=True)
         self._supervisor_thread.start()
+
+    @property
+    def ai_lock(self) -> threading.Lock:
+        return self._ai_lock
+
+    def is_ai_in_use(self) -> bool:
+        """
+        Returns True if Local LLM is currently being used either by an active
+        OCR+AI worker process or by an AI export task.
+        """
+        with self._lock:
+            for job_id, proc in self._active_processes.items():
+                if proc.poll() is None:
+                    job = self.db.get_job_status(job_id)
+                    if job and job.enable_ai:
+                        return True
+            return self._ai_lock.locked()
 
     def ensure_started(self):
         """
@@ -288,6 +306,10 @@ class JobManager:
                 # 2. Schedule from queue if slots available
                 with self._lock:
                     while len(self._active_processes) < self.max_concurrent_workers and len(self._queue) > 0:
+                        peek_task = self._queue[0]
+                        # Checklist 407: Enforce at most 1 concurrent Local LLM job across OCR+AI workers and AI export
+                        if peek_task.get("enable_ai") and self.is_ai_in_use():
+                            break
                         task = self._queue.popleft()
                         self._spawn_worker_subprocess(task)
             except Exception as e:

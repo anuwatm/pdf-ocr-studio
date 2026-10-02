@@ -138,3 +138,30 @@ class LocalLLMClient:
                 "content": "",
                 "error": str(e),
             }
+
+    def generate(
+        self,
+        prompt: str,
+        temperature: float = 0.0,
+        max_tokens: Optional[int] = None,
+        system_prompt: Optional[str] = None,
+    ) -> str:
+        """
+        Convenience wrapper around chat_completion for single-prompt text generation.
+        Returns the generated response content, or raises RuntimeError on failure.
+        """
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        res = self.chat_completion(
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        if not res.get("success"):
+            err_msg = res.get("error") or f"LLM generation failed ({res.get('status')})"
+            raise RuntimeError(err_msg)
+        return res.get("content", "")
+

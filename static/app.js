@@ -1231,7 +1231,13 @@
       }
 
       // Update variant download links in toolbar
-      const variants = status.variants || [];
+      const variants = (status.variants && status.variants.length > 0)
+        ? status.variants
+        : [
+            status.has_final ? "final" : null,
+            status.has_ai ? "ai" : null,
+            status.has_basic ? "basic" : null,
+          ].filter(Boolean);
       const hasBasic = variants.includes("basic");
       const hasAi = variants.includes("ai");
       const hasFinal = variants.includes("final");

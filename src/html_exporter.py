@@ -11,10 +11,12 @@ import os
 import re
 import json
 import html
+from html.parser import HTMLParser
 import hashlib
 import difflib
 import statistics
 from typing import Dict, List, Optional, Any, Tuple, Union
+from datetime import datetime, timezone
 
 from src.file_utils import atomic_write_text, atomic_write_json
 from src.thai_ocr_normalizer import normalize_ocr_line
@@ -187,8 +189,11 @@ def calculate_page_body_size(blocks: List[Dict[str, Any]]) -> float:
 
 def clean_page_text(text: str, page_num: int) -> str:
     """Strips internal page header artifact if present."""
-    header_pattern = re.compile(rf"^--- Page {page_num} ---\s*", re.IGNORECASE)
-    return header_pattern.sub("", text).strip()
+    prefix = f"--- Page {page_num} ---"
+    stripped = text.strip()
+    if stripped.lower().startswith(prefix.lower()):
+        return stripped[len(prefix):].lstrip(" \t\r\n")
+    return stripped
 
 
 def determine_line_heading(
@@ -251,15 +256,14 @@ def determine_line_heading(
 def format_inline_styles(text: str, style: Dict[str, Any]) -> str:
     """
     Formats line text with <b> or <i> tags based on style ratios or spans.
-    If bold_ratio >= 0.8, wraps entire line in <b>.
-    Otherwise wraps individual bold/italic spans if span evidence exists.
+    Guarantees that the textual content of final.txt is 100% preserved.
     """
     bold_ratio = style.get("bold_ratio", 0.0)
     italic_ratio = style.get("italic_ratio", 0.0)
     evidence = style.get("evidence", "none")
     spans = style.get("spans", [])
 
-    if evidence == "none":
+    if evidence == "none" or not text:
         return sanitize_text(text)
 
     # Line-level wrap
@@ -273,22 +277,26 @@ def format_inline_styles(text: str, style: Dict[str, Any]) -> str:
         return f"<i>{sanitize_text(text)}</i>"
 
     # Span-level wrap if available
+    # CRITICAL: only use span decomposition if spans match 'text' verbatim,
+    # ensuring user edits from final.txt are never overwritten or lost!
     if spans:
-        pieces = []
-        for s in spans:
-            s_text = s.get("text", "")
-            if not s_text:
-                continue
-            esc = sanitize_text(s_text)
-            if s.get("is_bold") and s.get("is_italic"):
-                pieces.append(f"<b><i>{esc}</i></b>")
-            elif s.get("is_bold"):
-                pieces.append(f"<b>{esc}</b>")
-            elif s.get("is_italic"):
-                pieces.append(f"<i>{esc}</i>")
-            else:
-                pieces.append(esc)
-        return "".join(pieces)
+        spans_combined_text = "".join(s.get("text", "") for s in spans)
+        if spans_combined_text == text:
+            pieces = []
+            for s in spans:
+                s_text = s.get("text", "")
+                if not s_text:
+                    continue
+                esc = sanitize_text(s_text)
+                if s.get("is_bold") and s.get("is_italic"):
+                    pieces.append(f"<b><i>{esc}</i></b>")
+                elif s.get("is_bold"):
+                    pieces.append(f"<b>{esc}</b>")
+                elif s.get("is_italic"):
+                    pieces.append(f"<i>{esc}</i>")
+                else:
+                    pieces.append(esc)
+            return "".join(pieces)
 
     return sanitize_text(text)
 
@@ -313,10 +321,23 @@ def reconcile_final_lines_with_blocks(
             })
 
     # Prepare return list
-    reconciled = []
     src_texts = [s["text"] for s in src_lines]
+    fin_stripped = [f.strip() for f in final_lines]
 
-    matcher = difflib.SequenceMatcher(None, src_texts, [f.strip() for f in final_lines])
+    # Fast path: exact match without expensive SequenceMatcher
+    if src_texts == fin_stripped:
+        return [
+            {
+                "text": final_lines[i],
+                "block_id": src_lines[i]["block_id"],
+                "style": src_lines[i]["style"],
+                "is_edited": False,
+            }
+            for i in range(len(final_lines))
+        ]
+
+    reconciled = []
+    matcher = difflib.SequenceMatcher(None, src_texts, fin_stripped)
     opcodes = matcher.get_opcodes()
 
     for tag, i1, i2, j1, j2 in opcodes:
@@ -537,11 +558,20 @@ def generate_basic_html(job_id: str, files_dir: str = "files") -> Tuple[str, Dic
     title = f"Document {job_id}"
     full_html = get_html_document_shell(title=title, body_content=body_content)
 
-    # Save to files/{job_id}/export/basic.html
+    # Save to files/{job_id}/export/basic.html if changed or missing
     export_dir = os.path.join(job_dir, "export")
     os.makedirs(export_dir, exist_ok=True)
     basic_path = os.path.join(export_dir, "basic.html")
-    atomic_write_text(basic_path, full_html)
+    should_write = True
+    if os.path.exists(basic_path):
+        try:
+            with open(basic_path, "r", encoding="utf-8") as bf:
+                if bf.read() == full_html:
+                    should_write = False
+        except Exception:
+            should_write = True
+    if should_write:
+        atomic_write_text(basic_path, full_html)
 
     html_hash = hashlib.sha256(full_html.encode("utf-8")).hexdigest()
     src_rev = compute_source_revision(job_dir)
@@ -638,8 +668,28 @@ def generate_ai_html(
     unit_pattern = re.compile(r'<(p|h1|h2|h3)([^>]*)>(.*?)</\1>', re.DOTALL)
     matches = list(unit_pattern.finditer(basic_html_content))
 
+    src_rev = compute_source_revision(job_dir)
+    model_attr = getattr(llm_client, "model", None)
+    if not isinstance(model_attr, str):
+        model_attr = getattr(llm_client, "model_name", None)
+    model_name = model_attr if isinstance(model_attr, str) else ("google/gemma-3-1b" if llm_client else "none")
+    prompt_version = "v1.0"
+    temperature = 0.0
+    generated_at = datetime.now(timezone.utc).isoformat()
+    chunk_count = 0
+
     if not matches:
-        return basic_html_content, {"status": "no_units"}
+        meta = {
+            "mode": "ai",
+            "model": model_name,
+            "prompt_version": prompt_version,
+            "temperature": temperature,
+            "generated_at": generated_at,
+            "chunk_count": 0,
+            "validator_status": "no_units",
+            "source_revision": src_rev,
+        }
+        return basic_html_content, meta
 
     units_data = []
     for idx, m in enumerate(matches):
@@ -651,12 +701,19 @@ def generate_ai_html(
             "text": raw_text[:120],
             "deterministic_tag": tag,
         })
+    chunk_count = max(1, (len(units_data) + 24) // 25)
 
     # If no LLM client provided, check offline condition
     if llm_client is None:
         meta = {
             "mode": "ai",
+            "model": "none",
+            "prompt_version": prompt_version,
+            "temperature": temperature,
+            "generated_at": generated_at,
+            "chunk_count": chunk_count,
             "validator_status": "locked_ai_offline",
+            "source_revision": src_rev,
             "message": "Local AI is offline or not configured",
         }
         _update_export_meta(job_dir, "ai", meta)
@@ -675,7 +732,19 @@ def generate_ai_html(
     )
 
     try:
-        response_text = llm_client.generate(prompt=prompt, max_tokens=1200, temperature=0.0)
+        if hasattr(llm_client, "generate"):
+            response_text = llm_client.generate(prompt=prompt, max_tokens=1200, temperature=0.0)
+        elif hasattr(llm_client, "chat_completion"):
+            res = llm_client.chat_completion(
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=1200,
+                temperature=0.0,
+            )
+            if not res.get("success"):
+                raise RuntimeError(res.get("error") or "LLM chat completion failed")
+            response_text = res.get("content", "")
+        else:
+            raise AttributeError("LLM client does not provide generate or chat_completion")
         # Parse JSON
         m_json = re.search(r"\[.*\]", response_text, re.DOTALL)
         if not m_json:
@@ -688,7 +757,13 @@ def generate_ai_html(
         if not valid:
             meta = {
                 "mode": "ai",
+                "model": model_name,
+                "prompt_version": prompt_version,
+                "temperature": temperature,
+                "generated_at": generated_at,
+                "chunk_count": chunk_count,
                 "validator_status": "rejected",
+                "source_revision": src_rev,
                 "validator_reason": reason,
             }
             _update_export_meta(job_dir, "ai", meta)
@@ -720,10 +795,15 @@ def generate_ai_html(
 
         meta = {
             "mode": "ai",
+            "model": model_name,
+            "prompt_version": prompt_version,
+            "temperature": temperature,
+            "generated_at": generated_at,
+            "chunk_count": chunk_count,
             "validator_status": "passed",
+            "source_revision": src_rev,
             "annotations_applied": len(clean_annotations),
             "hash": hashlib.sha256(ai_html_content.encode("utf-8")).hexdigest(),
-            "source_revision": compute_source_revision(job_dir),
         }
         _update_export_meta(job_dir, "ai", meta)
         return ai_html_content, meta
@@ -731,18 +811,122 @@ def generate_ai_html(
     except Exception as e:
         meta = {
             "mode": "ai",
+            "model": model_name,
+            "prompt_version": prompt_version,
+            "temperature": temperature,
+            "generated_at": generated_at,
+            "chunk_count": chunk_count,
             "validator_status": "error",
+            "source_revision": src_rev,
             "error": str(e),
         }
         _update_export_meta(job_dir, "ai", meta)
         return basic_html_content, meta
 
 
-def save_final_html(job_id: str, final_html_content: str, base_revision: Optional[str] = None, overwrite: bool = False, files_dir: str = "files") -> Dict[str, Any]:
+class StrictHtmlSanitizer(HTMLParser):
+    ALLOWED_TAGS = {"p", "h1", "h2", "h3", "b", "i", "span", "br", "section", "main", "div"}
+    ALLOWED_ATTRS = {"id", "class", "data-page", "data-src", "data-edited", "lang"}
+    # Tags that have closing tags and whose inner text must be completely discarded
+    DISCARD_CONTENT_TAGS = {"script", "style", "iframe", "object", "svg", "math", "applet", "form", "button", "textarea", "select"}
+    # Void/self-closing tags that must simply be dropped without affecting discard depth
+    VOID_FORBIDDEN_TAGS = {"embed", "link", "base", "input", "img", "param", "source", "track", "wbr", "frame"}
+
+    def __init__(self):
+        super().__init__(convert_charrefs=False)
+        self.output = []
+        self.discard_depth = 0
+
+    def handle_starttag(self, tag, attrs):
+        tag_lower = tag.lower()
+        if tag_lower in self.VOID_FORBIDDEN_TAGS:
+            return
+        if tag_lower in self.DISCARD_CONTENT_TAGS:
+            self.discard_depth += 1
+            return
+        if self.discard_depth > 0:
+            return
+        if tag_lower not in self.ALLOWED_TAGS:
+            return
+
+        clean_attrs = []
+        for name, value in attrs:
+            name_lower = name.lower()
+            if name_lower not in self.ALLOWED_ATTRS:
+                continue
+            if name_lower.startswith("on") or ":" in name_lower:
+                continue
+            if value is not None:
+                val_lower = value.lower()
+                if "javascript:" in val_lower or "vbscript:" in val_lower or "data:" in val_lower or "url(" in val_lower or "@import" in val_lower:
+                    continue
+                clean_attrs.append((name_lower, value))
+
+        attr_str = ""
+        if clean_attrs:
+            attr_parts = [f'{n}="{html.escape(v, quote=True)}"' for n, v in clean_attrs]
+            attr_str = " " + " ".join(attr_parts)
+
+        if tag_lower == "br":
+            self.output.append(f"<br{attr_str}>")
+        else:
+            self.output.append(f"<{tag_lower}{attr_str}>")
+
+    def handle_endtag(self, tag):
+        tag_lower = tag.lower()
+        if tag_lower in self.DISCARD_CONTENT_TAGS:
+            if self.discard_depth > 0:
+                self.discard_depth -= 1
+            return
+        if self.discard_depth > 0:
+            return
+        if tag_lower in self.ALLOWED_TAGS and tag_lower != "br":
+            self.output.append(f"</{tag_lower}>")
+
+    def handle_data(self, data):
+        if self.discard_depth > 0:
+            return
+        self.output.append(html.escape(data, quote=False))
+
+    def handle_entityref(self, name):
+        if self.discard_depth > 0:
+            return
+        self.output.append(f"&{name};")
+
+    def handle_charref(self, name):
+        if self.discard_depth > 0:
+            return
+        self.output.append(f"&#{name};")
+
+    def get_sanitized(self) -> str:
+        return "".join(self.output)
+
+
+def sanitize_final_html(raw_html: str, title: str = "OCR Document") -> str:
+    """
+    Sanitizes user-edited final HTML using HTMLParser and a strict allowlist.
+    Discards dangerous tags (<script>, <style>, <iframe>, <object>, <embed>, <form>, etc.),
+    drops event handlers (on*), style attributes, and external URLs.
+    Embeds sanitized content into canonical document shell with strict CSP and offline system CSS.
+    """
+    sanitizer = StrictHtmlSanitizer()
+    sanitizer.feed(raw_html or "")
+    sanitizer.close()
+    body_content = sanitizer.get_sanitized()
+    return get_html_document_shell(title=title, body_content=body_content)
+
+
+def save_final_html(
+    job_id: str,
+    final_html_content: str,
+    base_revision: Optional[str] = None,
+    overwrite: bool = False,
+    files_dir: str = "files",
+) -> Dict[str, Any]:
     """
     Saves user-edited final.html.
     Checks revision to detect conflicts (409 unless overwrite=True).
-    Sanitizes HTML content with strict allowlist.
+    Sanitizes HTML content with HTMLParser and strict allowlist.
     """
     job_dir = os.path.abspath(os.path.join(files_dir, job_id))
     export_dir = os.path.join(job_dir, "export")
@@ -753,16 +937,14 @@ def save_final_html(job_id: str, final_html_content: str, base_revision: Optiona
     if base_revision and base_revision != current_src_rev and not overwrite:
         raise ValueError("Conflict: source_revision has changed since this edit was started.")
 
-    # Sanitize final HTML: Disallow <script>, <iframe>, <object>, <embed>, event handlers, dangerous URLs
-    sanitized = re.sub(r"(?i)<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>", "", final_html_content)
-    sanitized = re.sub(r"(?i)\s+on[a-z]+\s*=\s*(\"[^\"]*\"|'[^']*'|[^\s>]+)", "", sanitized)
-    sanitized = re.sub(r"(?i)javascript:", "blocked:", sanitized)
+    # Sanitize final HTML using HTMLParser and strict allowlist
+    sanitized = sanitize_final_html(final_html_content, title=f"OCR Document - {job_id}")
 
     atomic_write_text(final_path, sanitized)
 
     meta = {
         "mode": "final",
-        "saved_at": compute_source_revision(job_dir),
+        "saved_at": current_src_rev,
         "hash": hashlib.sha256(sanitized.encode("utf-8")).hexdigest(),
     }
     _update_export_meta(job_dir, "final", meta)
@@ -783,9 +965,13 @@ def _update_export_meta(job_dir: str, variant: str, data: Dict[str, Any]) -> Non
         except Exception:
             meta = {}
 
+    current_rev = compute_source_revision(job_dir)
+    if meta.get(variant) == data and meta.get("current_source_revision") == current_rev:
+        return
+
     meta[variant] = data
     meta["job_id"] = os.path.basename(job_dir)
-    meta["current_source_revision"] = compute_source_revision(job_dir)
+    meta["current_source_revision"] = current_rev
     atomic_write_json(meta_path, meta)
 
 
@@ -805,6 +991,7 @@ def get_export_status(job_id: str, files_dir: str = "files") -> Dict[str, Any]:
             "has_basic": False,
             "has_ai": False,
             "has_final": False,
+            "variants": [],
             "is_stale": False,
         }
 
@@ -822,13 +1009,22 @@ def get_export_status(job_id: str, files_dir: str = "files") -> Dict[str, Any]:
     basic_rev = meta.get("basic", {}).get("source_revision")
     is_stale = bool(basic_rev and basic_rev != current_src_rev)
 
+    variants = []
+    if has_basic:
+        variants.append("basic")
+    if has_ai:
+        variants.append("ai")
+    if has_final:
+        variants.append("final")
+
     return {
         "job_id": job_id,
-        "status": "ready" if (has_basic or has_ai or has_final) else "not_generated",
+        "status": "ready" if variants else "not_generated",
         "source_revision": current_src_rev,
         "is_stale": is_stale,
         "has_basic": has_basic,
         "has_ai": has_ai,
         "has_final": has_final,
+        "variants": variants,
         "metadata": meta,
     }
