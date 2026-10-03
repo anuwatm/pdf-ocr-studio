@@ -426,6 +426,75 @@ aw.txt ที่ประกอบแล้ว; ระบุ tolerance ของ
 
 บันทึกผล: สถานะ ผ่านสมบูรณ์ 100% | วันที่ 2026-10-02 | ผู้รับผิดชอบ Antigravity | หลักฐาน tests/phase7/ (25/25 PASS), phase7/font_style_manifest.json, phase7/benchmark_results.json, phase7/browser_automation.log, tests/phase2 (27/27 PASS), Offline 0-call CSP Strict Sandboxing | ปัญหาคงเหลือ ไม่มี
 
+## Phase 8 — ส่งออก EPUB และ XHTML Quick Preview (EPUB Export & XHTML Quick Preview)
+
+### สถานะและขอบเขต
+
+- สถานะ: **กำลังพัฒนา / ยังไม่ผ่านการตรวจรับ** (เริ่ม 2026-10-03)
+- สร้าง EPUB แบบ reflowable จากผล HTML ของ Phase 7 โดยไม่แก้หรือเขียนทับ `raw.txt`, `corrected.txt`, `final.txt`, `basic.html`, `ai.html` หรือ `final.html`
+- ผู้ใช้เลือกต้นทาง `basic`, `ai` หรือ `final`; ค่าเริ่มต้นใช้ `final.html` เมื่อมีและไม่ stale มิฉะนั้นใช้ `basic.html`
+- EPUB รุ่นแรกเน้นข้อความภาษาไทย, semantic headings, สารบัญ, CSS ภายใน และปกแบบเลือกได้; การฝังภาพทุกหน้าของต้นฉบับ, fixed-layout EPUB, ตารางซับซ้อน, เชิงอรรถ และ DRM อยู่นอกขอบเขต v1
+- Preview เป็น **Quick Preview ของ XHTML ก่อน package เป็น `.epub`** ผ่าน sandboxed iframe บน localhost; ไม่รวมการฝัง EPUB reader ใน Browser และห้ามใช้ CDN, external font หรือส่งเอกสารออกนอกเครื่อง
+- Phase 8 ไม่เรียก Local LLM เพิ่มเอง; ถ้าต้องการโครงสร้างจาก AI ให้ใช้ `ai.html` ที่ผ่าน validator ของ Phase 7 แล้ว เพื่อลดความซ้ำซ้อนและไม่แย่ง AI lock
+
+### โครงสร้างข้อมูลและการสร้าง EPUB
+
+- [ ] กำหนด `BookModel` กลางจาก DOM ที่ sanitize แล้ว: metadata, sections, headings, paragraphs, page provenance และ assets; ห้าม package HTML string ที่ยังไม่ผ่าน parser โดยตรง
+- [ ] กำหนด metadata บังคับอย่างน้อย `title`, `language=th`, `identifier`; รองรับ `creator`, `publisher`, `description`, `date` และรูปปกแบบเลือกได้
+- [x] แปลง HTML5 ของ Phase 7 เป็น XHTML ที่ XML well-formed พร้อม `lang="th"` และ `xml:lang="th"`; escape ข้อความและ attributes ทุกจุด
+- [ ] รักษา visible text จาก source variant ครบ 100% ตามลำดับเดิม โดยใช้ normalization/ข้อยกเว้น control characters ชุดเดียวกับ Phase 7
+- [x] แบ่งบทแบบ deterministic: เริ่มบทใหม่ที่ `h1`; ถ้าไม่มี `h1` ให้แบ่งตาม section/page provenance และบันทึกกติกาไว้ใน metadata
+- [x] สร้าง heading ID แบบ deterministic และไม่ซ้ำ เพื่อเชื่อมสารบัญกับตำแหน่งในบท
+- [ ] สร้าง `nav.xhtml` จาก `h1`–`h3`; hierarchy ต้องไม่กระโดดและทุกลิงก์ต้องชี้ไปยังไฟล์/ID ที่มีจริง
+- [x] สร้าง CSS ภายใน EPUB สำหรับภาษาไทยและ reflow; ใช้ system fallback, ไม่ฝัง external font, ไม่มี `url()` หรือ `@import`
+- [ ] รองรับรูปปกภายใน EPUB พร้อม MIME type, dimensions และ alt text; ถ้าไม่มีปกต้องสร้าง EPUB ได้โดยไม่ใช้ภาพ placeholder จากอินเทอร์เน็ต
+- [x] สร้าง package ขั้นต่ำครบ: `mimetype`, `META-INF/container.xml`, `EPUB/package.opf`, `EPUB/nav.xhtml`, `EPUB/text/*.xhtml`, `EPUB/styles/book.css` และ assets ที่ใช้งานจริง
+- [x] ZIP ต้องวาง `mimetype` เป็นรายการแรก, ค่าเป็น `application/epub+zip` ตรงตัว และเก็บแบบไม่บีบอัด; รายการอื่นบีบอัดได้
+- [x] `package.opf` ต้องมี metadata, manifest และ spine ตรงกับไฟล์จริง 100%; ไม่มี orphan asset หรือ reference ที่หาย
+- [x] output เป็น `files/{job_id}/export/epub/book.epub` และ `epub_meta.json`; เขียนแบบ atomic และไม่ทับไฟล์พร้อมใช้เมื่อ generation ล้มเหลว
+
+### API, สถานะ และวงจรชีวิต
+
+- [x] เพิ่ม `POST /api/jobs/{job_id}/export/epub/preview` รับ source variant, metadata, chapter split และสร้าง XHTML Quick Preview โดยยังไม่ package EPUB (ตัวเลือกปกรอดำเนินการ)
+- [x] เพิ่ม `GET /api/jobs/{job_id}/export/epub/preview` แสดง XHTML Quick Preview ใน sandboxed iframe พร้อมสารบัญจำลองจาก `nav.xhtml`
+- [x] เพิ่ม `POST /api/jobs/{job_id}/export/epub` รับ `base_preview_revision` แล้ว package XHTML ชุดที่ผู้ใช้ Preview แล้ว; source หรือ config เปลี่ยนตอบ 409 และให้สร้าง Preview ใหม่
+- [x] เพิ่ม `GET /api/jobs/{job_id}/export/epub/status` คืนสถานะ, preview/source revision, source variant, validation result, generated time, file size และ stale indicator
+- [x] เพิ่ม `GET /api/jobs/{job_id}/export/epub/download` ส่งไฟล์เป็น attachment พร้อม UTF-8/RFC 5987 filename และ `X-Content-Type-Options: nosniff`
+- [ ] กำหนดสถานะ `not_generated`, `preview_ready`, `generating`, `ready`, `failed`, `invalid`, `stale`; ห้ามรายงาน `ready` ก่อน package และ validator ผ่าน
+- [x] คำนวณ `source_revision` จาก HTML ต้นทางและ `preview_revision` จาก config/metadata; เมื่อ HTML เปลี่ยน EPUB เดิมเป็น `stale`
+- [ ] ป้องกัน generation ซ้อนของ job เดียวกันและ revision conflict; การสร้างใหม่ต้องไม่ทำให้ EPUB รุ่นพร้อมใช้เดิมหายหากรอบใหม่ล้มเหลว
+- [ ] cleanup/delete/TTL ต้องลบ EPUB, metadata และ preview cache พร้อม job โดยไม่เกิด resurrection และไม่ลบระหว่างดาวน์โหลด
+- [ ] งาน completed, partial และ cancelled ส่งออกได้ตามข้อความที่มี โดย marker ของหน้าที่ไม่สำเร็จต้องคงอยู่และไม่มี silent loss
+
+### XHTML Quick Preview ก่อนสร้าง EPUB
+
+- [x] Quick Preview และ chapter XHTML ใช้ canonical block model ชุดเดียวกัน; ห้ามสร้าง Preview จากข้อมูลคนละเส้นทางกับ EPUB
+- [ ] แสดงรายชื่อบท/สารบัญ, เนื้อหา XHTML, metadata, source variant และ preview revision ก่อนผู้ใช้กดสร้าง EPUB
+- [ ] รองรับเลือกบทจากสารบัญและแสดงเนื้อหาแบบ reflow ตาม CSS ภายใน; ไม่ต้องจำลอง pagination หรือพฤติกรรมของ EPUB reader จริง
+- [ ] แสดงคำเตือนทันทีเมื่อ source HTML, metadata, chapter split หรือปกเปลี่ยนจน Preview stale
+- [x] ใช้ `<iframe sandbox="">` และ CSP เข้มงวด; ปิด script, event handler, form, navigation, external URL, `url()` และ `@import` ภายใน XHTML
+- [ ] Preview, CSS, ปก และ assets ทุกตัวต้องมาจาก loopback เท่านั้น; network log ระหว่างเปิด/เปลี่ยนบทต้องมี external calls = 0
+- [x] Source view แสดง XHTML ด้วย readonly textarea และ escape error/metadata; ไม่ส่งข้อความ OCR เข้า `innerHTML` โดยตรง
+- [x] จำกัดขนาด XHTML/package และตรวจ JobId/path/chapter ID; ปฏิเสธ `../`, absolute path, drive letter และ duplicate path
+- [x] เมื่อ Quick Preview ผ่าน ผู้ใช้จึงกดสร้าง `.epub`; server ตรวจ `base_preview_revision` ซ้ำก่อน package เพื่อกัน source เปลี่ยนระหว่างทาง
+- [x] ระบุใน UI ชัดเจนว่า Quick Preview เป็นตัวอย่าง XHTML ก่อน package และอาจต่างจาก EPUB reader อื่น
+
+### การตรวจสอบและเกณฑ์ผ่าน
+
+- [ ] ใช้ EPUB validator ที่กำหนดเวอร์ชันแน่นอน ตรวจ `book.epub` แล้วต้องไม่มี error; warning ที่ยอมรับต้องมีเหตุผลและอนุมัติก่อนปิด Phase
+- [ ] แตก package ตรวจซ้ำว่า `mimetype` ถูกต้อง, container ชี้ OPF จริง, manifest/spine/nav ครบ และทุก reference อยู่ภายใน EPUB
+- [ ] ทดสอบ roundtrip ภาษาไทย, สระ/วรรณยุกต์, ไทยปนอังกฤษ, zero-width, RTL, `&`, `<`, `>`, quote และ page markers โดยข้อความไม่หายหรือสลับลำดับ
+- [ ] ทดสอบเอกสารมี/ไม่มี `h1`, หลายระดับ heading, ไม่มี style, partial/cancelled และงานเก่าที่ไม่มี Phase 7 style metadata
+- [ ] ทดสอบ payload อันตรายใน title/author/content/filename/cover metadata: script, event handler, external URL, CSS `url()`, SVG script และ path traversal ต้องไม่รันหรือหลุดออกนอก package
+- [ ] Browser automation บน Chrome และ Edge ครอบคลุมสร้าง Quick Preview, เปิดสารบัญ/บท, source view, stale/409, สร้าง EPUB หลัง Preview, invalid, regenerate และ download
+- [ ] network log ระหว่างสร้าง Quick Preview, package และดาวน์โหลด EPUB ต้องมี external calls = 0; Local AI offline ต้องไม่กระทบการสร้างจาก `basic.html` หรือ `final.html`
+- [ ] เปิด EPUB ที่ผ่าน validator ใน reader ภายนอกอย่างน้อย 2 ตัวและบันทึกผลเรื่องสารบัญ, ภาษาไทย, reflow, CSS และปก; ความต่างที่ยอมรับต้องระบุชัด
+- [ ] ล็อกงบเวลากับ RAM ก่อน benchmark; รายงาน p50/p90/p95, จำนวนหน้า, จำนวนบท, ขนาดไฟล์ และ peak memory จากการวัดจริง ห้ามใช้ค่าประมาณแทนหลักฐาน
+- [ ] ทดสอบ generation ซ้ำจาก source/config/metadata เดียวกันให้เนื้อหา package deterministic โดยแยก field เวลา/identifier ที่ประกาศว่าเปลี่ยนได้ออกจากการเทียบ
+- [ ] เพิ่ม `tests/phase8/`, `phase8/evidence.md`, fixture manifest, validator report, browser network log และ compatibility matrix ก่อนเสนอปิด Phase
+
+บันทึกผล: สถานะ กำลังพัฒนา / ยังไม่ผ่านการตรวจรับ | วันที่ 2026-10-03 | ผู้รับผิดชอบ Codex | หลักฐาน `tests/phase8/` 6/6 PASS และ `phase8/evidence.md` | ปัญหาคงเหลือ EPUBCheck, browser automation/network log, reader compatibility, cover, Unicode fixture และ benchmark
+
 ## สรุปการอนุมัติแต่ละ Phase
 
 | Phase | ผลส่งมอบ | สถานะเริ่มต้น | หลักฐาน/ผู้ตรวจ |
@@ -438,6 +507,7 @@ aw.txt ที่ประกอบแล้ว; ระบุ tolerance ของ
 | 6 | ผลตรวจรับ คู่มือ และระบบพร้อมใช้ | ผ่านตามขอบเขต 44 หน้า (มี not covered ชั่วคราว / รอการยอมรับจากเจ้าของงาน) | phase6/evidence.md / Antigravity (รอการยอมรับจากเจ้าของงาน) |
 | ก่อน 7 | แก้ Bug 1–7 และ S1–S11 พร้อมตรวจรับซ้ำส่วนที่กระทบ | ผ่านการตรวจรับซ้ำ 100% | tests/test_bug*.py (17/17 PASS), Phase 4-6 regression (49/50 PASS) / Codex/Antigravity |
 | 7 | ส่งออก HTML พื้นฐานและพร้อม Local AI | ผ่านสมบูรณ์ 100% | phase7/evidence.md, tests/phase7/ (25/25 PASS), phase7/font_style_manifest.json, phase7/benchmark_results.json, phase7/browser_automation.log, tests/phase2 (27/27 PASS) / Antigravity |
+| 8 | ส่งออก EPUB แบบ reflowable พร้อม XHTML Quick Preview ก่อน package | กำลังพัฒนา / ยังไม่ผ่านการตรวจรับ | tests/phase8/ (6/6 PASS), phase8/evidence.md; รอ EPUBCheck, browser automation และ compatibility matrix |
 
 หมายเหตุ: กรณีไม่เกี่ยวข้อง เช่น multi-user ในระบบ localhost ให้บันทึก N/A พร้อมเหตุผล ไม่ถือเป็นผลทดสอบผ่าน ส่วนเกณฑ์บังคับที่ยังไม่ผ่านต้องคงสถานะไว้ตามจริง
 

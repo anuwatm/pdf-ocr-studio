@@ -29,6 +29,8 @@
     htmlBaseRevision: 1,
     currentHtmlVariant: "basic",
     activeHtmlSubtab: "preview",
+    epubPreviewRevision: null,
+    activeEpubSubtab: "preview",
   };
 
   // DOM Elements
@@ -107,10 +109,12 @@
     tabDiff: document.getElementById("tab-diff"),
     tabRaw: document.getElementById("tab-raw"),
     tabHtml: document.getElementById("tab-html"),
+    tabEpub: document.getElementById("tab-epub"),
     panelFinal: document.getElementById("panel-final"),
     panelDiff: document.getElementById("panel-diff"),
     panelRaw: document.getElementById("panel-raw"),
     panelHtml: document.getElementById("panel-html"),
+    panelEpub: document.getElementById("panel-epub"),
     badgeProposalsCount: document.getElementById("badge-proposals-count"),
 
     // Phase 7: Structured HTML Export & Sandboxed Preview
@@ -128,6 +132,24 @@
     btnDlHtmlBasic: document.getElementById("btn-dl-html-basic"),
     btnDlHtmlAi: document.getElementById("btn-dl-html-ai"),
     btnDlHtmlFinal: document.getElementById("btn-dl-html-final"),
+
+    // Phase 8: EPUB Export & XHTML Quick Preview
+    epubSourceVariant: document.getElementById("epub-source-variant"),
+    epubChapterSplit: document.getElementById("epub-chapter-split"),
+    epubTitle: document.getElementById("epub-title"),
+    epubCreator: document.getElementById("epub-creator"),
+    epubPublisher: document.getElementById("epub-publisher"),
+    epubLanguage: document.getElementById("epub-language"),
+    btnGenerateEpubPreview: document.getElementById("btn-generate-epub-preview"),
+    btnBuildEpub: document.getElementById("btn-build-epub"),
+    epubExportStatusBadge: document.getElementById("epub-export-status-badge"),
+    btnEpubSubtabPreview: document.getElementById("btn-epub-subtab-preview"),
+    btnEpubSubtabSource: document.getElementById("btn-epub-subtab-source"),
+    epubPreviewView: document.getElementById("epub-preview-view"),
+    epubPreviewFrame: document.getElementById("epub-preview-frame"),
+    epubSourceView: document.getElementById("epub-source-view"),
+    epubSourceEditor: document.getElementById("epub-source-editor"),
+    btnDlEpub: document.getElementById("btn-dl-epub"),
 
     // Editor & Diff
     editorFinalText: document.getElementById("editor-final-text"),
@@ -152,6 +174,7 @@
     btnDownloadFinal: document.getElementById("btn-download-final"),
     btnDownloadBundle: document.getElementById("btn-download-bundle"),
     btnDownloadHtml: document.getElementById("btn-download-html"),
+    btnDownloadEpub: document.getElementById("btn-download-epub"),
     btnDownloadPageImages: document.getElementById("btn-download-page-images"),
 
     // Conflict Modal
@@ -166,8 +189,14 @@
      Initialization & Health Checks
      ========================================================================== */
 
+  const {activateTab, renderProposalsAndDiff, acceptAllCorrections, revertAllCorrections, saveManualEdit, updateSaveIndicator, updateReviewStatusBadge, markAsReviewed} = createTextWorkspace({state, el, loadPageData});
+  const {switchEpubSubtab, loadEpubExportStatus, generateEpubPreview, buildEpubPackage} = createEpubWorkspace({state, el});
+  const htmlWorkspace = createHtmlWorkspace({state, el, loadEpubExportStatus});
+  const {switchHtmlSubtab, loadHtmlExportStatus, generateHtmlExport, saveFinalHtml} = htmlWorkspace;
+
   function init() {
     setupTheme();
+    htmlWorkspace.init();
     setupDropzone();
     setupEventListeners();
     activateMainTab("upload");
@@ -287,6 +316,8 @@
 
     state.selectedFile = file;
     state.uploadedJob = null;
+    el.btnDownloadPageImages.disabled = true;
+    delete el.btnDownloadPageImages.dataset.downloadUrl;
     el.selectedFileName.textContent = file.name;
     el.selectedFileSize.textContent = formatBytes(file.size);
     el.selectedFileIcon.textContent = ext.replace(".", "").toUpperCase();
@@ -311,6 +342,8 @@
   function resetFileSelection() {
     state.selectedFile = null;
     state.uploadedJob = null;
+    el.btnDownloadPageImages.disabled = true;
+    delete el.btnDownloadPageImages.dataset.downloadUrl;
     state.previewedCompletedPageIds = [];
     state.currentPageData = null;
     el.fileInput.value = "";
@@ -373,6 +406,11 @@
       button.addEventListener("click", () => activateMainTab(button.dataset.mainTab));
     });
     el.btnStartJob.addEventListener("click", startJobFlow);
+    el.btnDownloadPageImages.addEventListener("click", () => {
+      if (!el.btnDownloadPageImages.disabled && el.btnDownloadPageImages.dataset.downloadUrl) {
+        window.location.assign(el.btnDownloadPageImages.dataset.downloadUrl);
+      }
+    });
     el.btnRefreshHistory.addEventListener("click", loadJobHistory);
     el.btnCleanupHistory.addEventListener("click", cleanupOldJobs);
     el.btnDeleteAllHistory.addEventListener("click", deleteAllFinishedJobs);
@@ -412,6 +450,7 @@
     el.tabDiff.addEventListener("click", () => activateTab("diff"));
     el.tabRaw.addEventListener("click", () => activateTab("raw"));
     el.tabHtml?.addEventListener("click", () => activateTab("html"));
+    el.tabEpub?.addEventListener("click", () => activateTab("epub"));
 
     // Phase 7 HTML Export Actions
     el.btnGenerateHtmlBasic?.addEventListener("click", () => generateHtmlExport("basic"));
@@ -419,6 +458,23 @@
     el.btnSubtabPreview?.addEventListener("click", () => switchHtmlSubtab("preview"));
     el.btnSubtabSource?.addEventListener("click", () => switchHtmlSubtab("source"));
     el.btnSaveFinalHtml?.addEventListener("click", saveFinalHtml);
+
+    // Phase 8 EPUB Export Actions
+    el.btnGenerateEpubPreview?.addEventListener("click", generateEpubPreview);
+    el.btnBuildEpub?.addEventListener("click", buildEpubPackage);
+    el.btnEpubSubtabPreview?.addEventListener("click", () => switchEpubSubtab("preview"));
+    el.btnEpubSubtabSource?.addEventListener("click", () => switchEpubSubtab("source"));
+    [el.epubSourceVariant, el.epubChapterSplit, el.epubTitle, el.epubCreator, el.epubPublisher, el.epubLanguage]
+      .filter(Boolean)
+      .forEach(input => input.addEventListener("input", () => {
+        state.epubConfigDirty = true;
+        state.epubPreviewRevision = null;
+        if (el.btnBuildEpub) el.btnBuildEpub.disabled = true;
+        if (el.epubExportStatusBadge) {
+          el.epubExportStatusBadge.textContent = "ตั้งค่าเปลี่ยน — สร้าง Preview ใหม่";
+          el.epubExportStatusBadge.className = "badge badge-warning";
+        }
+      }));
 
     // Save & Edit
     el.btnSaveEdit.addEventListener("click", saveManualEdit);
@@ -432,7 +488,8 @@
     document.addEventListener("keydown", (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
         e.preventDefault();
-        saveManualEdit();
+        if (state.activeMainTab === "html") saveFinalHtml();
+        else if (state.activeMainTab === "progress") saveManualEdit();
       }
     });
 
@@ -455,7 +512,7 @@
   }
 
   function activateMainTab(tabName) {
-    const validTabs = new Set(["upload", "progress", "history"]);
+    const validTabs = new Set(["upload", "progress", "html", "epub", "history"]);
     if (!validTabs.has(tabName)) return;
 
     state.activeMainTab = tabName;
@@ -468,6 +525,12 @@
       panel.classList.toggle("main-tab-hidden", panel.dataset.mainPanel !== tabName);
     });
 
+    refreshExportContext();
+    if (tabName === "html") {
+      htmlWorkspace.refresh();
+      loadHtmlExportStatus();
+    }
+    if (tabName === "epub") loadEpubExportStatus();
     const hasJob = Boolean(state.currentJobId);
     el.tabProgressEmpty.classList.toggle("hidden", tabName !== "progress" || hasJob);
     if (tabName === "history") loadJobHistory();
@@ -498,6 +561,10 @@
 
       el.btnStartJob.innerHTML = "<span>กำลังเริ่มงาน...</span>";
       const enableAi = el.modeOcrAi.checked;
+      if (!htmlWorkspace.confirmJobChange(state.uploadedJob.job_id)) {
+        updateRangeButton();
+        return;
+      }
       state.currentJobId = state.uploadedJob.job_id;
       state.previewedCompletedPageIds = [];
       state.currentPageData = null;
@@ -736,6 +803,7 @@
   }
 
   async function openPreviousJob(jobId) {
+    if (!htmlWorkspace.confirmJobChange(jobId)) return;
     try {
       const res = await fetch(`/api/jobs/${jobId}/status`);
       if (!res.ok) throw new Error("ไม่พบงานนี้");
@@ -856,6 +924,13 @@
     const count = end - start + 1;
     const valid = Number.isInteger(start) && Number.isInteger(end) && start >= 1 && end >= start && end <= state.uploadedJob.total_pages;
     el.btnStartJob.disabled = !valid;
+    const canExportImages = valid && state.selectedFile?.name.toLowerCase().endsWith(".pdf");
+    el.btnDownloadPageImages.disabled = !canExportImages;
+    if (canExportImages) {
+      el.btnDownloadPageImages.dataset.downloadUrl = `/api/jobs/${state.uploadedJob.job_id}/download/page-images.zip?page_start=${start}&page_end=${end}`;
+    } else {
+      delete el.btnDownloadPageImages.dataset.downloadUrl;
+    }
     const totalBatches = Math.ceil(count / 200);
     el.pageRangeLimit.textContent = valid
       ? `เลือก ${count} หน้า • ระบบแบ่ง ${totalBatches} batch ละ 200 หน้า`
@@ -956,461 +1031,26 @@
      Tabs & AI Proposals
      ========================================================================== */
 
-  function activateTab(tabName) {
-    [el.tabFinal, el.tabDiff, el.tabRaw, el.tabHtml].forEach(t => t?.classList.remove("active"));
-    [el.panelFinal, el.panelDiff, el.panelRaw, el.panelHtml].forEach(p => p?.classList.add("hidden"));
-
-    if (tabName === "final") {
-      el.tabFinal.classList.add("active");
-      el.panelFinal.classList.remove("hidden");
-    } else if (tabName === "diff") {
-      el.tabDiff.classList.add("active");
-      el.panelDiff.classList.remove("hidden");
-    } else if (tabName === "raw") {
-      el.tabRaw.classList.add("active");
-      el.panelRaw.classList.remove("hidden");
-    } else if (tabName === "html") {
-      el.tabHtml?.classList.add("active");
-      el.panelHtml?.classList.remove("hidden");
-      if (state.currentJobId) {
-        loadHtmlExportStatus();
-      }
-    }
+  function refreshExportContext() {
+    const hasJob = Boolean(state.currentJobId);
+    document.querySelectorAll("[data-export-controls]").forEach(node => { node.disabled = !hasJob; });
+    document.querySelectorAll("[data-export-empty]").forEach(node => node.classList.toggle("hidden", hasJob));
+    document.querySelectorAll("[data-export-job]").forEach(node => { node.textContent = hasJob ? `${state.jobStatus?.filename || ""} · ${state.currentJobId}` : "ยังไม่ได้เลือกงาน"; });
   }
-
-  function renderProposalsAndDiff(pageData) {
-    const diff = pageData.diff_summary || {};
-    el.metricLevenshtein.textContent = diff.levenshtein_distance || 0;
-    el.metricSubstitutions.textContent = diff.substitutions || 0;
-    el.metricInsertions.textContent = diff.insertions || 0;
-    el.metricDeletions.textContent = diff.deletions || 0;
-
-    const corrections = pageData.changes || [];
-    el.badgeProposalsCount.textContent = corrections.length;
-
-    el.proposalsList.innerHTML = "";
-
-    if (corrections.length === 0) {
-      el.proposalsList.innerHTML = '<div class="empty-placeholder">ไม่มีข้อเสนอการแก้ไขในหน้านี้ (AI ยืนยันข้อความตรงตามต้นฉบับ)</div>';
-      return;
-    }
-
-    corrections.forEach((c) => {
-      const card = document.createElement("div");
-      card.className = "proposal-card";
-      card.id = `proposal-card-${c.change_id}`;
-
-      const catName = formatCategory(c.category);
-      const isNamed = c.is_named_entity_or_number ? '<span class="badge badge-warning">ต้องตรวจทาน (ตัวเลข/ชื่อ)</span>' : '';
-      const statusBadge = `<span class="badge badge-${c.status === 'accepted' ? 'success' : c.status === 'rejected' ? 'danger' : 'neutral'}">${c.status}</span>`;
-
-      card.innerHTML = `
-        <div class="proposal-header">
-          <div class="proposal-badges">
-            <span class="badge badge-info">${catName}</span>
-            ${isNamed}
-            ${statusBadge}
-          </div>
-          <span class="text-xs text-muted font-mono">${c.change_id}</span>
-        </div>
-        <div class="proposal-diff-view">
-          <span class="diff-orig">${escapeHtml(c.original_text)}</span>
-          <span class="diff-arrow">→</span>
-          <span class="diff-corr">${escapeHtml(c.corrected_text)}</span>
-        </div>
-        <div class="proposal-actions">
-          <button class="btn btn-outline btn-success btn-xs btn-accept" data-id="${c.change_id}">
-            ยอมรับ
-          </button>
-          <button class="btn btn-outline btn-danger btn-xs btn-revert" data-id="${c.change_id}">
-            คืนค่า
-          </button>
-        </div>
-      `;
-
-      card.querySelector(".btn-accept").addEventListener("click", () => acceptCorrection(c.change_id));
-      card.querySelector(".btn-revert").addEventListener("click", () => revertCorrection(c.change_id));
-
-      el.proposalsList.appendChild(card);
-    });
-  }
-
-  function formatCategory(cat) {
-    switch (cat) {
-      case "spelling": return "การสะกดคำ";
-      case "vowel_tone": return "สระ/วรรณยุกต์";
-      case "number": return "ตัวเลข";
-      case "named_entity": return "ชื่อเฉพาะ";
-      default: return "ทั่วไป";
-    }
-  }
-
-  function escapeHtml(str) {
-    if (!str) return "";
-    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  }
-
-  /* ==========================================================================
-     Proposal Accept / Revert Actions
-     ========================================================================== */
-
-  async function acceptCorrection(changeId) {
-    try {
-      const res = await fetch(`/api/jobs/${state.currentJobId}/pages/${state.currentPageNum}/corrections/${changeId}/accept`, {
-        method: "POST",
-      });
-      if (!res.ok) throw new Error("Accept proposal failed");
-      await loadPageData(state.currentJobId, state.currentPageNum);
-    } catch (err) {
-      alert(`ยอมรับข้อเสนอไม่สำเร็จ: ${err.message}`);
-    }
-  }
-
-  async function revertCorrection(changeId) {
-    try {
-      const res = await fetch(`/api/jobs/${state.currentJobId}/pages/${state.currentPageNum}/corrections/${changeId}/revert`, {
-        method: "POST",
-      });
-      if (!res.ok) throw new Error("Revert proposal failed");
-      await loadPageData(state.currentJobId, state.currentPageNum);
-    } catch (err) {
-      alert(`คืนค่าไม่สำเร็จ: ${err.message}`);
-    }
-  }
-
-  async function acceptAllCorrections() {
-    try {
-      const res = await fetch(`/api/jobs/${state.currentJobId}/pages/${state.currentPageNum}/corrections/accept-all`, {
-        method: "POST",
-      });
-      if (!res.ok) throw new Error("Accept all failed");
-      await loadPageData(state.currentJobId, state.currentPageNum);
-    } catch (err) {
-      alert(`ยอมรับทั้งหมดไม่สำเร็จ: ${err.message}`);
-    }
-  }
-
-  async function revertAllCorrections() {
-    try {
-      const res = await fetch(`/api/jobs/${state.currentJobId}/pages/${state.currentPageNum}/corrections/revert-all`, {
-        method: "POST",
-      });
-      if (!res.ok) throw new Error("Revert all failed");
-      await loadPageData(state.currentJobId, state.currentPageNum);
-    } catch (err) {
-      alert(`คืนค่าทั้งหมดไม่สำเร็จ: ${err.message}`);
-    }
-  }
-
-  /* ==========================================================================
-     Manual Text Editing & Revision Conflict Detection
-     ========================================================================== */
-
-  async function saveManualEdit() {
-    if (!state.currentJobId || !state.currentPageNum) return;
-
-    updateSaveIndicator("saving");
-    const editedText = el.editorFinalText.value;
-
-    try {
-      const res = await fetch(`/api/jobs/${state.currentJobId}/pages/${state.currentPageNum}/edit`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          source_revision: state.currentRevision,
-          edited_text: editedText,
-          check_conflict: true,
-        }),
-      });
-
-      if (res.status === 409) {
-        // Revision Conflict detected! Never silently overwrite.
-        const conflictData = await res.json();
-        showConflictModal(conflictData.detail, editedText);
-        updateSaveIndicator("unsaved");
-        return;
-      }
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || "Save edit failed");
-      }
-
-      const saveRes = await res.json();
-      state.currentRevision = saveRes.new_revision;
-      state.hasUnsavedChanges = false;
-      el.revisionBadge.textContent = `Rev ${state.currentRevision}`;
-      updateSaveIndicator("saved");
-
-      // Transition review status in UI
-      updateReviewStatusBadge("in_review");
-
-    } catch (err) {
-      alert(`บันทึกไม่สำเร็จ: ${err.message}`);
-      updateSaveIndicator("unsaved");
-    }
-  }
-
-  function showConflictModal(detail, unsaved) {
-    el.modalConflictText.textContent = detail || "หน้านี้มีการแก้ไขใหม่จากแท็บอื่นแล้ว เพื่อป้องกันข้อมูลสูญหาย กรุณาคัดลอกข้อความไว้หรือโหลดฉบับล่าสุด";
-    el.conflictUnsavedText.value = unsaved;
-    el.modalConflict.classList.remove("hidden");
-  }
-
-  function updateSaveIndicator(status) {
-    el.saveIndicator.className = `save-indicator ${status}`;
-    if (status === "saved") el.saveStatusText.textContent = "บันทึกแล้ว";
-    else if (status === "unsaved") el.saveStatusText.textContent = "มีการแก้ไขที่ยังไม่บันทึก";
-    else if (status === "saving") el.saveStatusText.textContent = "กำลังบันทึก...";
-  }
-
-  /* ==========================================================================
-     Review Status & Finalization
-     ========================================================================== */
-
-  function updateReviewStatusBadge(st) {
-    el.badgePageReviewStatus.textContent = st === "reviewed" ? "ตรวจทานเสร็จสมบูรณ์" : st === "in_review" ? "กำลังตรวจทาน" : "ยังไม่ตรวจทาน";
-    el.badgePageReviewStatus.className = `badge badge-${st === "reviewed" ? "reviewed" : st === "in_review" ? "in-review" : "unreviewed"}`;
-
-    if (st === "reviewed") {
-      el.btnMarkReviewed.classList.add("btn-outline");
-      el.btnMarkReviewed.innerHTML = "<span>ตรวจทานแล้ว ✓</span>";
-    } else {
-      el.btnMarkReviewed.classList.remove("btn-outline");
-      el.btnMarkReviewed.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg><span>ยืนยันตรวจทานครบถ้วน</span>';
-    }
-  }
-
-  async function markAsReviewed() {
-    if (!state.currentJobId) return;
-
-    try {
-      const res = await fetch(`/api/jobs/${state.currentJobId}/review?new_status=reviewed`, {
-        method: "POST",
-      });
-      if (!res.ok) throw new Error("Failed to update review status");
-      updateReviewStatusBadge("reviewed");
-    } catch (err) {
-      alert(`ยืนยันสถานะไม่สำเร็จ: ${err.message}`);
-    }
-  }
-
-  /* ==========================================================================
-     Phase 7: Structured HTML Export, Sandboxed Preview & Editing
-     ========================================================================== */
-
-  function switchHtmlSubtab(subtab) {
-    state.activeHtmlSubtab = subtab;
-    const isPreview = subtab === "preview";
-    el.btnSubtabPreview?.classList.toggle("active", isPreview);
-    el.btnSubtabSource?.classList.toggle("active", !isPreview);
-    el.htmlPreviewView?.classList.toggle("hidden", !isPreview);
-    el.htmlSourceView?.classList.toggle("hidden", isPreview);
-  }
-
-  async function loadHtmlExportStatus() {
-    if (!state.currentJobId) return;
-    try {
-      const res = await fetch(`/api/jobs/${state.currentJobId}/export/html/status`);
-      if (!res.ok) return;
-      const status = await res.json();
-      state.htmlBaseRevision = status.source_revision || 1;
-
-      // Update badge
-      if (el.htmlExportStatusBadge) {
-        if (status.is_stale) {
-          el.htmlExportStatusBadge.textContent = "ต้องสร้างใหม่ (ข้อความเปลี่ยน)";
-          el.htmlExportStatusBadge.className = "badge badge-warning";
-        } else if (status.variants && status.variants.length > 0) {
-          el.htmlExportStatusBadge.textContent = `ส่งออกแล้ว (${status.variants.join(", ")})`;
-          el.htmlExportStatusBadge.className = "badge badge-success";
-        } else {
-          el.htmlExportStatusBadge.textContent = "ยังไม่ได้ส่งออก";
-          el.htmlExportStatusBadge.className = "badge badge-neutral";
-        }
-      }
-
-      // Update variant download links in toolbar
-      const variants = (status.variants && status.variants.length > 0)
-        ? status.variants
-        : [
-            status.has_final ? "final" : null,
-            status.has_ai ? "ai" : null,
-            status.has_basic ? "basic" : null,
-          ].filter(Boolean);
-      const hasBasic = variants.includes("basic");
-      const hasAi = variants.includes("ai");
-      const hasFinal = variants.includes("final");
-
-      if (el.btnDlHtmlBasic) {
-        el.btnDlHtmlBasic.href = `/api/jobs/${state.currentJobId}/export/html/basic`;
-        el.btnDlHtmlBasic.classList.toggle("hidden", !hasBasic);
-      }
-      if (el.btnDlHtmlAi) {
-        el.btnDlHtmlAi.href = `/api/jobs/${state.currentJobId}/export/html/ai`;
-        el.btnDlHtmlAi.classList.toggle("hidden", !hasAi);
-      }
-      if (el.btnDlHtmlFinal) {
-        el.btnDlHtmlFinal.href = `/api/jobs/${state.currentJobId}/export/html/final`;
-        el.btnDlHtmlFinal.classList.toggle("hidden", !hasFinal);
-      }
-
-      // Bottom bar download link (prefer final, then ai, then basic)
-      if (el.btnDownloadHtml) {
-        const preferred = hasFinal ? "final" : (hasAi ? "ai" : (hasBasic ? "basic" : null));
-        if (preferred) {
-          el.btnDownloadHtml.href = `/api/jobs/${state.currentJobId}/export/html/${preferred}`;
-          el.btnDownloadHtml.classList.remove("hidden");
-        } else {
-          el.btnDownloadHtml.classList.add("hidden");
-        }
-      }
-
-      // Determine preferred variant to display in preview and source editor
-      const displayVariant = hasFinal ? "final" : (hasAi ? "ai" : (hasBasic ? "basic" : null));
-      if (displayVariant) {
-        state.currentHtmlVariant = displayVariant;
-        await loadHtmlVariantContent(displayVariant);
-      } else {
-        if (el.htmlPreviewFrame) {
-          el.htmlPreviewFrame.srcdoc = "<div style='font-family:sans-serif;padding:2rem;color:#888;text-align:center;'>ยังไม่ได้ส่งออก HTML กรุณากดปุ่ม 'สร้าง HTML พื้นฐาน' หรือ 'สร้าง HTML พร้อม AI' ด้านบน</div>";
-        }
-        if (el.htmlSourceEditor) el.htmlSourceEditor.value = "";
-      }
-    } catch (err) {
-      console.error("Load HTML export status error:", err);
-    }
-  }
-
-  async function loadHtmlVariantContent(variant) {
-    if (!state.currentJobId) return;
-    try {
-      const res = await fetch(`/api/jobs/${state.currentJobId}/export/html/${variant}`);
-      if (!res.ok) return;
-      const htmlText = await res.text();
-
-      // Sandboxed preview via srcdoc
-      if (el.htmlPreviewFrame) {
-        el.htmlPreviewFrame.srcdoc = htmlText;
-      }
-      if (el.htmlSourceEditor) {
-        el.htmlSourceEditor.value = htmlText;
-      }
-    } catch (err) {
-      console.error(`Failed to load HTML variant ${variant}:`, err);
-    }
-  }
-
-  async function generateHtmlExport(mode = "basic") {
-    if (!state.currentJobId) return;
-    const btn = mode === "ai" ? el.btnGenerateHtmlAi : el.btnGenerateHtmlBasic;
-    const originalText = btn ? btn.textContent : "";
-    if (btn) {
-      btn.disabled = true;
-      btn.textContent = mode === "ai" ? "กำลังประมวลผล AI..." : "กำลังสร้าง HTML...";
-    }
-
-    try {
-      const res = await fetch(`/api/jobs/${state.currentJobId}/export/html`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: mode }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || "Export HTML failed");
-      }
-      const data = await res.json();
-
-      // Refresh status and load preview
-      await loadHtmlExportStatus();
-      switchHtmlSubtab("preview");
-
-      if (mode === "ai" && !data.ai_applied) {
-        alert("Local AI ออฟไลน์หรือตอบสนองไม่ถูกต้อง ระบบจึงถอยกลับไปใช้ basic.html อย่างปลอดภัย");
-      }
-    } catch (err) {
-      alert(`สร้าง HTML ไม่สำเร็จ: ${err.message}`);
-    } finally {
-      if (btn) {
-        btn.disabled = false;
-        btn.textContent = originalText;
-      }
-    }
-  }
-
-  async function saveFinalHtml() {
-    if (!state.currentJobId) return;
-    const htmlContent = el.htmlSourceEditor?.value;
-    if (!htmlContent || !htmlContent.trim()) {
-      alert("เนื้อหา HTML ว่างเปล่า");
-      return;
-    }
-
-    el.btnSaveFinalHtml.disabled = true;
-    el.btnSaveFinalHtml.textContent = "กำลังบันทึก...";
-
-    try {
-      const res = await fetch(`/api/jobs/${state.currentJobId}/export/html/final`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          html_content: htmlContent,
-          base_revision: state.htmlBaseRevision,
-        }),
-      });
-
-      if (res.status === 409) {
-        const conflict = await res.json();
-        if (confirm(`ตรวจพบข้อขัดแย้ง: ${conflict.detail || "ไฟล์ต้นทางเปลี่ยนไปแล้ว"}\nคุณต้องการบันทึกทับ (Overwrite) หรือไม่?`)) {
-          // Force overwrite
-          const forceRes = await fetch(`/api/jobs/${state.currentJobId}/export/html/final`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              html_content: htmlContent,
-              base_revision: state.htmlBaseRevision,
-              overwrite: true,
-            }),
-          });
-          if (!forceRes.ok) throw new Error("Overwrite failed");
-          alert("บันทึกทับสำเร็จเรียบร้อย");
-          await loadHtmlExportStatus();
-        }
-        return;
-      }
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || "Save final HTML failed");
-      }
-
-      alert("บันทึก final.html สำเร็จเรียบร้อย");
-      await loadHtmlExportStatus();
-    } catch (err) {
-      alert(`บันทึก final.html ไม่สำเร็จ: ${err.message}`);
-    } finally {
-      el.btnSaveFinalHtml.disabled = false;
-      el.btnSaveFinalHtml.textContent = "บันทึก Final HTML";
-    }
-  }
-
-  /* ==========================================================================
-     Downloads & Export Warnings
-     ========================================================================== */
 
   function updateDownloadLinks(job) {
+    htmlWorkspace.syncJob();
+    refreshExportContext();
     const jId = job.job_id;
     el.btnDownloadRaw.href = `/api/jobs/${jId}/download/raw.txt`;
     el.btnDownloadCorrected.href = `/api/jobs/${jId}/download/corrected.txt`;
     el.btnDownloadFinal.href = `/api/jobs/${jId}/download/final.txt`;
     el.btnDownloadBundle.href = `/api/jobs/${jId}/download/bundle.zip`;
-    el.btnDownloadPageImages.href = `/api/jobs/${jId}/download/page-images.zip`;
     el.btnDownloadCorrected.classList.toggle("hidden", !job.enable_ai);
-    el.btnDownloadPageImages.classList.toggle("hidden", !job.filename.toLowerCase().endsWith(".pdf"));
 
     // Also refresh HTML export links/badge
     loadHtmlExportStatus();
+    loadEpubExportStatus();
 
     // Warning banner if failed or partial
     const hasFailures = job.failed_pages > 0 || job.status === "partial" || job.status === "failed" || job.status === "cancelled";

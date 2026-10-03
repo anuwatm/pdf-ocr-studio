@@ -1,0 +1,70 @@
+<section id="section-html" class="card export-card main-tab-hidden" data-main-panel="html"><div class="card-header"><h2 class="card-title">HTML</h2><span data-export-job>ยังไม่ได้เลือกงาน</span></div><p data-export-empty>เปิดงานจากผลข้อความหรือประวัติงานก่อน</p><fieldset data-export-controls disabled><div id="panel-html" class="export-panel" role="tabpanel">
+              <div class="html-export-toolbar">
+                <div class="html-action-buttons">
+                  <button id="btn-generate-html-basic" class="btn btn-outline btn-xs" type="button">
+                    สร้าง HTML พื้นฐาน
+                  </button>
+                  <button id="btn-generate-html-ai" class="btn btn-primary btn-xs" type="button" title="ส่ง Local LLM เสนอ semantic tags">
+                    สร้าง HTML พร้อม AI
+                  </button>
+                  <span id="html-export-status-badge" class="badge badge-neutral">ยังไม่ได้ส่งออก</span>
+                </div>
+                <div class="html-subtabs">
+                  <button id="btn-subtab-preview" class="html-subtab-btn active" type="button">ดูตัวอย่าง (Preview)</button>
+                  <button id="btn-subtab-source" class="html-subtab-btn" type="button">แก้ไข HTML Final</button>
+                </div>
+              </div>
+
+              <div class="html-split" id="html-split"><div id="html-source-view" class="html-view-container"><div class="html-editor-modes" role="group" aria-label="รูปแบบการแก้ไข HTML">
+<button id="html-mode-code" class="html-subtab-btn active" type="button" aria-pressed="true">HTML Code</button>
+<button id="html-mode-visual" class="html-subtab-btn" type="button" aria-pressed="false">Visual — แก้ไขแบบ Word</button>
+</div>
+                <div id="html-code-view" class="editor-wrapper">
+                  <textarea id="html-source-editor" class="text-editor font-mono text-xs" placeholder="ยังไม่มีไฟล์ HTML กรุณาสร้าง HTML พื้นฐานก่อน..." spellcheck="false"></textarea>
+                </div>
+                <div id="html-visual-view" class="hidden">
+                  <div id="html-visual-toolbar" class="visual-toolbar" role="group" aria-label="จัดรูปแบบข้อความ">
+                    <select id="visual-block-format" aria-label="รูปแบบย่อหน้า">
+                      <option value="p">ข้อความปกติ</option><option value="h1">หัวข้อ 1</option><option value="h2">หัวข้อ 2</option><option value="h3">หัวข้อ 3</option>
+                    </select>
+                    <button type="button" data-visual-command="bold" aria-label="ตัวหนา" aria-pressed="false"><b>B</b></button>
+                    <button type="button" data-visual-command="italic" aria-label="ตัวเอียง" aria-pressed="false"><i>I</i></button>
+                    <button type="button" data-visual-command="underline" aria-label="ขีดเส้นใต้" aria-pressed="false"><u>U</u></button>
+                    <button type="button" data-visual-command="insertUnorderedList" aria-label="รายการหัวข้อ" aria-pressed="false">• รายการ</button>
+                    <button type="button" data-visual-command="insertOrderedList" aria-label="รายการตัวเลข" aria-pressed="false">1. รายการ</button>
+                    <button type="button" id="visual-link">ใส่ลิงก์</button>
+                    <button type="button" data-visual-command="unlink">เอาลิงก์ออก</button>
+                    <button type="button" data-visual-command="undo" aria-label="เลิกทำ">↶</button>
+                    <button type="button" data-visual-command="redo" aria-label="ทำซ้ำ">↷</button>
+                  </div>
+                  <p class="visual-hint">คลิกข้อความเพื่อแก้ไข • วางข้อความแบบไม่มีรูปแบบ • HTML อาจจัดโครงสร้างใหม่เมื่อแก้ใน Visual</p>
+                  <iframe id="html-visual-frame" sandbox="allow-same-origin" title="แก้ไข HTML แบบ Word"></iframe>
+                </div>
+                <div class="editor-actions">
+                  <span id="html-source-status-text" class="text-muted text-xs">ยังไม่มี HTML • บันทึกด้วยปุ่มหรือ Ctrl+S</span>
+                  <button id="btn-save-final-html" class="btn btn-success btn-xs" type="button">
+                    บันทึก Final HTML
+                  </button>
+                </div>
+              </div><input id="html-split-ratio" class="html-split-ratio" type="range" min="25" max="75" value="50" aria-label="ปรับความกว้างช่องโค้ด HTML"><div id="html-preview-view" class="html-view-container"><h3 class="export-pane-title">Preview</h3>
+                <iframe id="html-preview-frame" sandbox="" class="html-preview-iframe" title="ตัวอย่าง HTML ที่ส่งออก"></iframe>
+              </div></div>
+              
+
+              <!-- Source / Edit Final View -->
+              
+
+              <!-- Downloads bar for HTML variants -->
+              <div class="html-download-links">
+<a id="btn-download-html" class="btn btn-outline btn-sm hidden" href="#" download>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="16 18 22 12 16 6"/>
+                <polyline points="8 6 2 12 8 18"/>
+              </svg>
+              <span>ดาวน์โหลด HTML (Phase 7)</span>
+            </a>
+                <a id="btn-dl-html-basic" class="btn btn-outline btn-xs hidden" href="#" download>ดาวน์โหลด basic.html</a>
+                <a id="btn-dl-html-ai" class="btn btn-outline btn-xs hidden" href="#" download>ดาวน์โหลด ai.html</a>
+                <a id="btn-dl-html-final" class="btn btn-outline btn-xs hidden" href="#" download>ดาวน์โหลด final.html</a>
+              </div>
+            </div></fieldset></section>

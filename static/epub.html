@@ -1,0 +1,62 @@
+<section id="section-epub" class="card export-card main-tab-hidden" data-main-panel="epub"><div class="card-header"><h2 class="card-title">EPUB</h2><span data-export-job>ยังไม่ได้เลือกงาน</span></div><p data-export-empty>เปิดงานจากผลข้อความหรือประวัติงานก่อน</p><fieldset data-export-controls disabled><div id="panel-epub" class="export-panel" role="tabpanel">
+              <div class="epub-config-grid">
+                <label>HTML ต้นทาง
+                  <select id="epub-source-variant">
+                    <option value="auto">อัตโนมัติ (Final → Basic)</option>
+                    <option value="final">final.html</option>
+                    <option value="ai">ai.html</option>
+                    <option value="basic">basic.html</option>
+                  </select>
+                </label>
+                <label>แบ่งบท
+                  <select id="epub-chapter-split">
+                    <option value="heading">ตามหัวข้อ h1</option>
+                    <option value="page">ตามหน้า</option>
+                  </select>
+                </label>
+                <label>ชื่อหนังสือ
+                  <input id="epub-title" type="text" maxlength="300" placeholder="ชื่อหนังสือ">
+                </label>
+                <label>ผู้เขียน
+                  <input id="epub-creator" type="text" maxlength="300" placeholder="ไม่บังคับ">
+                </label>
+                <label>สำนักพิมพ์
+                  <input id="epub-publisher" type="text" maxlength="300" placeholder="ไม่บังคับ">
+                </label>
+                <label>ภาษา
+                  <input id="epub-language" type="text" value="th" maxlength="20">
+                </label>
+              </div>
+
+              <div class="html-export-toolbar">
+                <div class="html-action-buttons">
+                  <button id="btn-generate-epub-preview" class="btn btn-outline btn-xs" type="button">สร้าง XHTML Quick Preview</button>
+                  <button id="btn-build-epub" class="btn btn-primary btn-xs" type="button" disabled>สร้างไฟล์ EPUB</button>
+                  <span id="epub-export-status-badge" class="badge badge-neutral">ยังไม่ได้ Preview</span>
+                </div>
+                <div class="html-subtabs">
+                  <button id="btn-epub-subtab-preview" class="html-subtab-btn active" type="button">Quick Preview</button>
+                  <button id="btn-epub-subtab-source" class="html-subtab-btn" type="button">XHTML Source</button>
+                </div>
+              </div>
+
+              <div id="epub-preview-view" class="html-view-container">
+                <iframe id="epub-preview-frame" sandbox="" class="html-preview-iframe" title="XHTML Quick Preview ก่อนสร้าง EPUB"></iframe>
+              </div>
+              <div id="epub-source-view" class="html-view-container hidden">
+                <div class="editor-wrapper">
+                  <textarea id="epub-source-editor" class="text-editor font-mono text-xs" readonly spellcheck="false" placeholder="สร้าง XHTML Quick Preview ก่อน"></textarea>
+                </div>
+              </div>
+              <div class="html-download-links">
+<a id="btn-download-epub" class="btn btn-outline btn-sm hidden" href="#" download>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+              </svg>
+              <span>ดาวน์โหลด EPUB (Phase 8)</span>
+            </a>
+                <span class="text-muted text-xs">Quick Preview เป็น XHTML ก่อน package และอาจต่างจาก EPUB reader บางโปรแกรม</span>
+                <a id="btn-dl-epub" class="btn btn-success btn-xs hidden" href="#" download>ดาวน์โหลด EPUB</a>
+              </div>
+            </div></fieldset></section>

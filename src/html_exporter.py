@@ -825,10 +825,10 @@ def generate_ai_html(
 
 
 class StrictHtmlSanitizer(HTMLParser):
-    ALLOWED_TAGS = {"p", "h1", "h2", "h3", "b", "i", "span", "br", "section", "main", "div"}
+    ALLOWED_TAGS = {"p", "h1", "h2", "h3", "b", "i", "strong", "em", "u", "s", "span", "br", "section", "main", "div", "ul", "ol", "li", "a", "blockquote"}
     ALLOWED_ATTRS = {"id", "class", "data-page", "data-src", "data-edited", "lang"}
     # Tags that have closing tags and whose inner text must be completely discarded
-    DISCARD_CONTENT_TAGS = {"script", "style", "iframe", "object", "svg", "math", "applet", "form", "button", "textarea", "select"}
+    DISCARD_CONTENT_TAGS = {"head", "title", "script", "style", "iframe", "object", "svg", "math", "applet", "form", "button", "textarea", "select"}
     # Void/self-closing tags that must simply be dropped without affecting discard depth
     VOID_FORBIDDEN_TAGS = {"embed", "link", "base", "input", "img", "param", "source", "track", "wbr", "frame"}
 
@@ -852,6 +852,17 @@ class StrictHtmlSanitizer(HTMLParser):
         clean_attrs = []
         for name, value in attrs:
             name_lower = name.lower()
+            if tag_lower == "a" and name_lower == "href" and value:
+                from urllib.parse import urlsplit
+                href = value.strip()
+                if not re.search(r"[\x00-\x20\x7f]", href):
+                    try:
+                        parts = urlsplit(href)
+                        if href.startswith("#") or (parts.scheme in {"http", "https"} and parts.netloc) or (parts.scheme == "mailto" and parts.path):
+                            clean_attrs.append(("href", href))
+                    except ValueError:
+                        pass
+                continue
             if name_lower not in self.ALLOWED_ATTRS:
                 continue
             if name_lower.startswith("on") or ":" in name_lower:
@@ -906,7 +917,7 @@ def sanitize_final_html(raw_html: str, title: str = "OCR Document") -> str:
     """
     Sanitizes user-edited final HTML using HTMLParser and a strict allowlist.
     Discards dangerous tags (<script>, <style>, <iframe>, <object>, <embed>, <form>, etc.),
-    drops event handlers (on*), style attributes, and external URLs.
+    drops event handlers (on*), style attributes, and unsafe link protocols.
     Embeds sanitized content into canonical document shell with strict CSP and offline system CSS.
     """
     sanitizer = StrictHtmlSanitizer()

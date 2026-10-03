@@ -8,3 +8,4 @@ data/*.db-*
 files/*
 !files/.gitkeep
 !data/.gitkeep
+tests/artifacts/

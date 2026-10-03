@@ -24,7 +24,7 @@ from typing import Optional, List, Dict, Any, Annotated
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query, Path, status, Request
-from fastapi.responses import FileResponse, PlainTextResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, JSONResponse, Response
 from pydantic import BaseModel
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -462,7 +462,7 @@ def retry_job(job_id: JobId, req: JobRetryRequest = JobRetryRequest()):
 
 
 @app.get("/api/jobs/{job_id}/download/{file_type}")
-def download_output(job_id: JobId, file_type: str):
+def download_output(job_id: JobId, file_type: str, page_start: Optional[int] = Query(None, ge=1), page_end: Optional[int] = Query(None, ge=1)):
     """
     Downloads text results, JSON results, PDF page images, or bundle.zip.
     Includes page breaks and status warnings for partial/failed results.
@@ -497,13 +497,21 @@ def download_output(job_id: JobId, file_type: str):
         image_zip_path = os.path.join(job_dir, "page-images.zip")
         try:
             import fitz
-            with fitz.open(source_path) as pdf, zipfile.ZipFile(image_zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-                for page_info in job.pages:
-                    page_index = page_info.page_num - 1
-                    if page_index < 0 or page_index >= len(pdf):
-                        continue
-                    pix = pdf[page_index].get_pixmap(dpi=200, alpha=False)
-                    zf.writestr(f"page_{page_info.page_num:04d}.png", pix.tobytes("png"))
+            with fitz.open(source_path) as pdf:
+                if page_start is not None or page_end is not None:
+                    start = page_start if page_start is not None else 1
+                    end = page_end if page_end is not None else len(pdf)
+                    if start > end or end > len(pdf):
+                        raise HTTPException(status_code=400, detail="Invalid page range")
+                    page_numbers = range(start, end + 1)
+                else:
+                    page_numbers = [page.page_num for page in job.pages]
+                with zipfile.ZipFile(image_zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                    for page_num in page_numbers:
+                        pix = pdf[page_num - 1].get_pixmap(dpi=200, alpha=False)
+                        zf.writestr(f"page_{page_num:04d}.png", pix.tobytes("png"))
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to convert PDF pages to images: {e}")
         return FileResponse(image_zip_path, media_type="application/zip", filename=f"{job_id}_page-images.zip", headers=headers)
@@ -849,11 +857,16 @@ os.makedirs(STATIC_DIR, exist_ok=True)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
-@app.get("/", response_class=FileResponse)
+@app.get("/", response_class=HTMLResponse)
 def serve_index():
     index_file = os.path.join(STATIC_DIR, "index.html")
     if os.path.exists(index_file):
-        return FileResponse(index_file)
+        with open(index_file, encoding="utf-8") as source:
+            markup = source.read()
+        for name in ("text", "html", "epub"):
+            with open(os.path.join(STATIC_DIR, f"{name}.html"), encoding="utf-8") as partial:
+                markup = markup.replace(f"<!-- include:{name}.html -->", partial.read())
+        return HTMLResponse(markup)
     return PlainTextResponse("Local Thai OCR API is running. UI static file not created yet.")
 
 
@@ -920,6 +933,16 @@ class SaveFinalHtmlRequest(BaseModel):
     html_content: str
     base_revision: Optional[str] = None
     overwrite: bool = False
+
+
+class EpubPreviewRequest(BaseModel):
+    source_variant: str = "auto"
+    metadata: Optional[Dict[str, Any]] = None
+    chapter_split: str = "heading"
+
+
+class EpubPackageRequest(BaseModel):
+    base_preview_revision: str
 
 
 @app.post("/api/jobs/{job_id}/export/html")
@@ -1076,6 +1099,103 @@ def save_final_html_endpoint(job_id: JobId, req: SaveFinalHtmlRequest):
         return {"status": "saved", "meta": meta}
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+
+
+# ------------------------------------------------------------------------------
+# Phase 8: EPUB Export & XHTML Quick Preview Endpoints
+# ------------------------------------------------------------------------------
+
+@app.post("/api/jobs/{job_id}/export/epub/preview")
+def prepare_epub_preview_endpoint(job_id: JobId, req: EpubPreviewRequest):
+    job = db.get_job_status(job_id)
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    from src.epub_exporter import prepare_epub_preview
+    try:
+        meta = prepare_epub_preview(
+            job_id=job_id,
+            source_variant=req.source_variant,
+            metadata=req.metadata,
+            chapter_split=req.chapter_split,
+            files_dir=DEFAULT_OUTPUT_DIR,
+        )
+        return {"status": "preview_ready", "meta": meta}
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@app.get("/api/jobs/{job_id}/export/epub/preview")
+def get_epub_preview_endpoint(job_id: JobId):
+    job = db.get_job_status(job_id)
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    from src.epub_exporter import get_epub_preview
+    try:
+        content = get_epub_preview(job_id, files_dir=DEFAULT_OUTPUT_DIR)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    return Response(
+        content=content,
+        media_type="application/xhtml+xml; charset=utf-8",
+        headers={
+            "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+@app.post("/api/jobs/{job_id}/export/epub")
+def build_epub_endpoint(job_id: JobId, req: EpubPackageRequest):
+    job = db.get_job_status(job_id)
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    from src.epub_exporter import build_epub
+    try:
+        meta = build_epub(
+            job_id=job_id,
+            base_preview_revision=req.base_preview_revision,
+            files_dir=DEFAULT_OUTPUT_DIR,
+        )
+        return {"status": "ready", "meta": meta}
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    except ValueError as exc:
+        message = str(exc)
+        code = status.HTTP_409_CONFLICT if message.startswith("Conflict:") else status.HTTP_422_UNPROCESSABLE_ENTITY
+        raise HTTPException(status_code=code, detail=message)
+
+
+@app.get("/api/jobs/{job_id}/export/epub/status")
+def get_epub_status_endpoint(job_id: JobId):
+    job = db.get_job_status(job_id)
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    from src.epub_exporter import get_epub_status
+    return get_epub_status(job_id, files_dir=DEFAULT_OUTPUT_DIR)
+
+
+@app.get("/api/jobs/{job_id}/export/epub/download")
+def download_epub_endpoint(job_id: JobId):
+    job = db.get_job_status(job_id)
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    file_path = os.path.abspath(os.path.join(DEFAULT_OUTPUT_DIR, job_id, "export", "epub", "book.epub"))
+    if is_path_traversal(file_path, DEFAULT_OUTPUT_DIR) or not os.path.isfile(file_path):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="EPUB not generated")
+    from urllib.parse import quote
+    base_name = os.path.splitext(job.filename or "document")[0]
+    encoded_filename = quote(f"{base_name}.epub")
+    return FileResponse(
+        file_path,
+        media_type="application/epub+zip",
+        headers={
+            "Content-Disposition": f"attachment; filename=\"book.epub\"; filename*=UTF-8''{encoded_filename}",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 if __name__ == "__main__":

@@ -412,3 +412,47 @@
    - คำสั่ง: `publish\venv\Scripts\python.exe -m unittest tests.test_bug1_2_3_security_and_retry tests.test_bug4_5_proposals tests.test_bug6_7_and_s_items tests.test_upload_page_selection`
    - ผลลัพธ์: **ผ่านครบทั้ง 30 / 30 การทดสอบ (100% PASS)** ภายใน 3.05 วินาที
 3. **สรุปสถานะการตรวจรับ Phase 7:** **ผ่านการตรวจรับสมบูรณ์ (PASSED)** ตามขอบเขตชุดข้อมูลอนุมัติ Baseline 44 หน้า โดยรายการขยายและเกณฑ์ที่ต้องพึ่งพา Local LLM จริงระบุสถานะเป็น `not covered` ไว้อย่างชัดเจนและโปร่งใส
+
+---
+
+## 10. บันทึกผลการตรวจรับ UI Text / HTML / EPUB และ Visual Editor (Section 0.9 Acceptance — 2026-10-03)
+
+อ้างอิงตามรายงานการส่งมอบของ GPT ใน [gpt.md](gpt.md) (หัวข้อ 0.9) ได้ทำการตรวจสอบและรันการทดสอบตรวจรับแบบละเอียด (Formal Acceptance Verification) ทั้งในระดับ API, Unit Tests, Security Sanitization, Browser Automation (Google Chrome & Microsoft Edge), และ EPUB Generation บนสภาพแวดล้อมจริง โดยมีผลการประเมินตามรายการตรวจสอบ (Checklist) ดังนี้:
+
+### 10.1 ผลการตรวจสอบรายข้อตาม Checklist สำหรับตรวจรับ
+
+| รายการตรวจสอบ | ผลการตรวจรับ | รายละเอียดและหลักฐานการทดสอบ |
+|---|:---:|---|
+| **1. Server Lifecycle & Template Assembly** | **PASS** | `serve_index()` ประกอบ `index.html` ร่วมกับ partials `text.html`, `html.html`, `epub.html` ถูกต้องสมบูรณ์ 100% ไม่มี tag ตกค้าง (`<!-- include:` = 0) ทั้ง 5 Tab พร้อมใช้งาน |
+| **2. Export ภาพ PDF เป็น ZIP โดยไม่เริ่ม OCR** | **PASS** | ปุ่ม `#btn-download-page-images` ถูกปิด (disabled) ก่อนอัปโหลดและสำหรับไฟล์ภาพ (PNG/JPG) เมื่ออัปโหลด PDF สำเร็จปุ่มจะเปิด (enabled) พร้อมระบุช่วงหน้า สามารถดาวน์โหลด `page-images.zip` (PNG 200 DPI) ได้ทันทีโดยสถานะงานคงอยู่ที่ `queued` และ `completed_pages = 0` (ไม่เริ่ม OCR ก่อนรับคำสั่ง) |
+| **3. Job Context Switching & Isolation** | **PASS** | การเปิดงานจากประวัติงาน (History) แล้วสลับแท็บ Text / HTML / EPUB ผูกข้อมูลและ badge เข้ากับงานที่เลือกอย่างแม่นยำ ไม่ปนเปื้อนข้ามงาน และมีระบบเตือนป้องกันการสูญหายของงานร่างก่อนเปลี่ยนงาน |
+| **4. CodeMirror & Visual Editor 2-Way Sync** | **PASS** | สลับโหมด Code และ Visual ได้อย่างไร้รอยต่อ การจัดรูปแบบหัวข้อ (h1–h3, p), ตัวหนา, ตัวเอียง, ขีดเส้นใต้, รายการแบบจุด/ตัวเลข (ul/ol), ลิงก์ (a), และ undo/redo สะท้อนกลับมายัง CodeMirror และ Preview ครบถ้วน |
+| **5. Cross-Browser Chrome & Edge Verification** | **PASS** | รัน Playwright บน Windows ด้วยทั้ง Google Chrome (`channel="chrome"` v154) และ Microsoft Edge (`channel="msedge"` v154) ผ่าน 100% การป้อนข้อความภาษาไทย, การวางข้อความ (Paste ถูกบังคับเป็น plain text), คีย์ลัด Ctrl+S ทำงานถูกต้อง |
+| **6. Backend Final Save & No Autosave** | **PASS** | บันทึกผ่าน `PUT /api/jobs/{job_id}/export/html/final` สำเร็จ รูปแบบเอกสารคงอยู่ครบถ้วน ตรวจสอบแล้วไม่มีระบบ autosave แทรกแซงขณะพิมพ์ และดาวน์โหลดผ่าน `/api/jobs/{job_id}/export/html/final` ได้สมบูรณ์ |
+| **7. Title Leak Prevention (`OCR Document - ...`)** | **PASS** | แก้ไขปัญหาสำเร็จ: ทดสอบบันทึกซ้ำ 3 รอบ ข้อความใน `<title>` ไม่ถูกดึงมารั่วไหลใน `<body>` อีกต่อไป และข้อความที่ผู้ใช้เขียนจริงใน body ไม่สูญหาย |
+| **8. Concurrency & Revision Conflict 409** | **PASS** | การบันทึกที่มี `base_revision` ขัดแย้งกับเซิร์ฟเวอร์จะถูกปฏิเสธด้วย HTTP 409 Conflict เพื่อป้องกันการเขียนทับโดยไม่ตั้งใจ เว้นแต่ผู้ใช้จะยืนยัน overwrite |
+| **9. Strict Sandbox, CSP & Unsafe Link Purging** | **PASS** | Preview Iframe มี `sandbox=""` และ CSP เคร่งครัด; Visual Frame ใช้ `sandbox="allow-same-origin"` ปราศจาก `allow-scripts` สคริปต์อันตรายไม่สามารถทำงานได้; ลิงก์อันตราย (`javascript:`, `data:`, `file:`) และ event handlers ถูกตัดทิ้ง 100% |
+| **10. EPUB Export & Stale Detection** | **PASS** | สร้าง EPUB 3 จาก HTML ที่แก้ด้วย Visual Editor ได้สำเร็จ โครงสร้าง ZIP ถูกต้องตามมาตรฐาน (`mimetype` entry แรกแบบ `ZIP_STORED`), ไฟล์ chapter เป็น XML well-formed พร้อมรายการและรูปแบบตัวอักษร; เมื่อ HTML ถูกแก้ไข EPUB status จะแสดงสถานะ `stale` ทันที |
+| **11. Responsive Layout & Codebase Synchronization** | **PASS** | มุมมองเดสก์ท็อปและมือถือ (390×844) ใช้งานปุ่มสลับ subtab source/preview ได้ถูกต้อง; ไฟล์โค้ดทั้งหมดระหว่างโฟลเดอร์หลัก (`src/`, `static/`) และชุดติดตั้ง (`publish/src/`, `publish/static/`) ซิงก์ตรงกัน 100% |
+| **12. Architecture & Native execCommand Assessment** | **ACCEPTABLE** | การใช้ native `execCommand` ใน Visual Editor มี fallback plain text และ sanitizer คอย normalize โครงสร้างเอกสาร ถือว่าเหมาะสมสำหรับ editor เอกสารในระบบ local OCR นี้ |
+
+---
+
+### 10.2 ผลการรันชุดทดสอบยืนยันอย่างเป็นทางการ (Official Test Suite Results)
+
+1. **Acceptance Test Suite ([tests/test_gemini_acceptance_09.py](tests/test_gemini_acceptance_09.py)):**
+   - คำสั่ง: `publish\venv\Scripts\python.exe -m unittest tests.test_gemini_acceptance_09 -v`
+   - ผลลัพธ์: **ผ่านครบทั้ง 6 / 6 การทดสอบ (100% PASS)** ใน 4.46 วินาที
+     - `test_01_index_html_assembly_and_tabs`: ผ่าน
+     - `test_02_pdf_page_image_zip_download_without_ocr`: ผ่าน
+     - `test_03_title_leak_protection_and_sanitization`: ผ่าน
+     - `test_04_unsafe_links_and_xss_stripped`: ผ่าน
+     - `test_05_browser_chrome_full_visual_workspace_flow`: ผ่าน (Headless Chrome)
+     - `test_06_epub_export_with_visual_formatting_and_stale_detection`: ผ่าน
+2. **Studio Workspace Browser Automation ([tests/test_studio_workspace.py](tests/test_studio_workspace.py)):**
+   - รันบน Microsoft Edge และ Google Chrome: **PASS (100%)**
+3. **Core Regression & Integrated Suites:**
+   - คำสั่ง: `publish\venv\Scripts\python.exe -m unittest tests.test_visual_html tests.phase8.test_epub_exporter tests.test_upload_page_selection tests.test_bug1_2_3_security_and_retry tests.test_bug4_5_proposals tests.test_bug6_7_and_s_items tests.test_gemini_acceptance_09`
+   - ผลลัพธ์: **ผ่านครบทั้ง 46 / 46 การทดสอบ (100% PASS)** ใน 7.79 วินาที
+4. **สรุปผลการตรวจรับ:** **อนุมัติการตรวจรับงานส่วน UI Text / HTML / EPUB และ Visual Editor (Section 0.9) ผ่านสมบูรณ์ 100%**
+
