@@ -68,3 +68,22 @@
 - [ ] วัดผล Benchmark จริง: Latency (p50/p90/p95), RAM และขนาดไฟล์
 - [ ] จัดทำ Fixture Manifest และทดสอบ Roundtrip ให้ครบทุก Unicode edge case
 - [ ] รองรับรูปภาพหน้าปก (Cover Image) ภายใน EPUB แบบออฟไลน์
+
+### 3.7 ข้อเสนอแนะและข้อกำหนดทางเทคนิคเพิ่มเติมสำหรับ Phase 9 (Editable EPUB TOC)
+จากการทบทวนแผน Phase 9 ใน `checklist.md` เพื่อเตรียมพร้อมก่อนเริ่มพัฒนา ขอเสนอข้อกำหนดเพิ่มเติมเพื่อให้ครอบคลุมจุดบกพร่องและกรณีขอบ (Edge Cases) สำคัญดังนี้:
+1. **การรักษา Stable Target ID กับ `StrictHtmlSanitizer`**:
+   - ต้องเพิ่ม allowlist สำหรับ attribute `id` บนแท็ก heading (`<h1>`–`<h3>`) ใน `StrictHtmlSanitizer` โดยอนุญาตเฉพาะค่า alphanumeric/hyphen ที่ปลอดภัย เพื่อไม่ให้ sanitizer ตัด target ID ทิ้งตอนผู้ใช้บันทึก HTML
+   - การบันทึกผ่าน Visual Editor หรือ CodeMirror ต้องคง `id` เดิมของ heading ไว้เสมอ เพื่อป้องกันไม่ให้ target ใน `toc.json` กลายเป็น `unresolved` โดยไม่จำเป็น
+2. **การรองรับ Dual-Navigation EPUB 3 (`nav.xhtml`) และ EPUB 2 (`toc.ncx`)**:
+   - เพื่อความเข้ากันได้ 100% กับ E-Reader และฮาร์ดแวร์ภายนอก (เช่น Kindle รุ่นเก่า, Kobo, แอปภายนอก) ระบบต้อง compile `toc.json` ออกมาเป็นทั้ง `nav.xhtml` และ `toc.ncx` (พร้อมระบุ `<spine toc="ncx">` ใน OPF)
+3. **เกณฑ์ป้องกันสารบัญว่างเปล่า (Empty TOC Validation Gate)**:
+   - ตามสเปก EPUB 3 บังคับให้ `<nav epub:type="toc">` ต้องมีรายการอย่างน้อย 1 รายการ (`<ol><li><a href="...">...</a></li></ol>`)
+   - ระบบต้องปฏิเสธการ package และแจ้งเตือนใน UI หากผู้ใช้ลบรายการสารบัญออกทั้งหมดจนเหลือ 0 รายการ หรือไม่มี valid target เหลืออยู่
+4. **การจัดการ Header Grouping ที่ไม่มีลิงก์ (Non-linking Category Parent)**:
+   - รองรับกรณีผู้ใช้สร้างหัวข้อกลุ่ม/ภาค โดยใช้โครงสร้าง `<span>ชื่อกลุ่ม</span><ol>...</ol>` ตามมาตรฐาน EPUB 3 หรือมีตัวเลือกให้ชี้ไปยังบทแรกของกลุ่มนั้น ป้องกันปัญหา validation บน reader ที่เข้มงวด
+5. **เพดานความลึกและลำดับชั้น (Max Nesting Depth & Hierarchy Limits)**:
+   - กำหนดเพดานความลึกสูงสุดของสารบัญไม่เกิน 3–4 ระดับ เพื่อป้องกันไม่ให้ข้อความล้นขอบจอบน e-reader จอเล็ก
+   - มีระบบตรวจจับ Orphan Nesting (ไม่อนุญาตให้เยื้องเป็นระดับ 3 หากไม่มีรายการระดับ 2 รองรับ) และป้องกัน Parent Cycle
+6. **การจัดการฉบับร่างค้างข้ามแท็บ (Cross-Tab Stale Draft Handling)**:
+   - หากผู้ใช้แก้ไข TOC ในแท็บ EPUB ค้างไว้ (ยังไม่บันทึก) แล้วสลับไปแก้ไข HTML และบันทึก เมื่อกลับมาที่แท็บ EPUB ระบบต้องแสดงกล่องข้อความเตือนว่า `source_revision` เปลี่ยนแปลงไปแล้ว พร้อมทางเลือกให้ re-match กับเนื้อหาใหม่ หรือยกเลิกฉบับร่างเดิม ไม่ overwrite เงียบๆ
+

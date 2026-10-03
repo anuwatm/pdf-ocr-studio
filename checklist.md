@@ -495,6 +495,62 @@ aw.txt ที่ประกอบแล้ว; ระบุ tolerance ของ
 
 บันทึกผล: สถานะ กำลังพัฒนา / ยังไม่ผ่านการตรวจรับ | วันที่ 2026-10-03 | ผู้รับผิดชอบ Codex | หลักฐาน `tests/phase8/` 6/6 PASS และ `phase8/evidence.md` | ปัญหาคงเหลือ EPUBCheck, browser automation/network log, reader compatibility, cover, Unicode fixture และ benchmark
 
+## Phase 9 — แก้ไขสารบัญ EPUB และลิงก์ปลายทาง (Editable EPUB TOC)
+
+### สถานะและขอบเขต
+
+- วางแผน / ยังไม่เริ่มพัฒนา (2026-10-04); ต่อยอด Phase 8 โดยไม่ปิดหรือยกเว้นเกณฑ์คงค้างของ Phase 8
+- รุ่นแรก: แก้ชื่อ เพิ่ม/เอารายการออก เรียงลำดับ จัดระดับ และเลือกปลายทางจากหัวข้อหรือต้นบท
+- ชื่อสารบัญแยกจากหัวข้อจริง; การแก้สารบัญต้องไม่เปลี่ยนข้อความ ลำดับเนื้อหา หรือ spine และไม่ลบเนื้อหา
+- นอกขอบเขตรุ่นแรก: คลิกย่อหน้าใดก็ได้เพื่อสร้างจุดปลายทางใหม่ และย้ายเนื้อหา/แบ่งบทผ่าน editor
+
+### 9.1 โครงสร้างข้อมูลและ stable targets
+
+- [ ] กำหนด schema: entry ID, ชื่อที่แสดง, parent ID/ระดับ, ลำดับ, target ID และสถานะ auto-generated/user-edited
+- [ ] เก็บ `files/{job_id}/export/epub/toc.json` แยกจาก HTML พร้อม schema version, source revision และ TOC revision; เขียนแบบ atomic
+- [ ] ใช้ stable target ID ไม่อิงเลขลำดับ heading เพียงอย่างเดียว; เพิ่มหัวข้อก่อนหน้าแล้วปลายทางเดิมต้องไม่เลื่อนผิด
+- [ ] เก็บ mapping target ID → chapter filename/fragment ID และสร้าง href โดยระบบ ไม่ให้ผู้ใช้พิมพ์ path/URL เอง
+- [ ] สารบัญอัตโนมัติสะท้อนลำดับชั้น h1 → h2 → h3 จริง; รองรับชื่อซ้ำโดยแสดงบท/บริบท และเลือกต้นบทได้เมื่อไม่มีหัวข้อ
+- [ ] เมื่อ HTML เปลี่ยน รักษาการแก้มือเฉพาะปลายทางที่จับคู่ได้แน่นอน; เป้าหมายหายหรือกำกวมให้แสดง unresolved และรอเลือกใหม่ ห้ามเดาจับคู่เงียบ ๆ
+
+### 9.2 UI แก้ไขสารบัญใน tab EPUB
+
+- [ ] เพิ่มมุมมอง “แก้ไขสารบัญ” แสดงชื่อ ระดับ และปลายทาง
+- [ ] เพิ่มรายการ แก้ชื่อ และเอารายการออก โดยไม่ลบเนื้อหาหรือไฟล์
+- [ ] เลื่อนขึ้น/ลงและปรับระดับบทหลัก/หัวข้อย่อย พร้อมตรวจ parent cycle และระดับที่ไม่ถูกต้อง
+- [ ] เลือกปลายทางจากหัวข้อหรือต้นบท พร้อมปุ่ม “ไปดูตำแหน่ง” และบริบทแยกหัวข้อชื่อซ้ำ
+- [ ] เพิ่ม “สร้างสารบัญอัตโนมัติใหม่” โดยยืนยันก่อนทับสารบัญแก้มือ
+- [ ] ใช้ปุ่ม “บันทึกสารบัญและอัปเดต Preview”; แสดงสถานะยังไม่บันทึกและเตือนก่อนเปลี่ยนงาน/ปิดหน้า
+- [ ] รักษาฉบับร่างระหว่างสลับมุมมอง/โหลดสถานะ และไม่ปนสารบัญข้ามงาน
+- [ ] รองรับ keyboard และจอเล็ก ไม่พึ่ง drag-and-drop เพียงอย่างเดียว
+
+### 9.3 API, revision และการสร้างไฟล์
+
+- [ ] เพิ่ม API อ่านสารบัญ/ปลายทาง บันทึก และ regenerate แบบยืนยัน; ตรวจ JobId, schema และขนาดข้อมูล
+- [ ] รับ base TOC revision และ base source revision; ไม่ตรงตอบ 409 และรักษาฉบับร่าง ไม่ overwrite อัตโนมัติ
+- [ ] ใช้ TOC model เดียวสร้าง Quick Preview และ `nav.xhtml`; ต่างกันเฉพาะรูปแบบ href ตามไฟล์ปลายทาง
+- [ ] รวม TOC revision ใน preview/package revision; แก้สารบัญแล้ว EPUB เก่าต้อง stale และต้องสร้างใหม่
+- [ ] สร้าง EPUB เฉพาะสารบัญ/Preview ที่บันทึกแล้วและไม่มี unresolved targets; ตรวจ revision ซ้ำก่อนเผยแพร่ package
+- [ ] งานเก่าไม่มี `toc.json` ยังสร้างอัตโนมัติได้; regenerate HTML/Preview ไม่ทับสารบัญแก้มือโดยไม่มีคำยืนยัน
+- [ ] ตรวจทุก href ว่าชี้ chapter/fragment ที่มีจริง, IDs ไม่ซ้ำ และอยู่ภายใน package; ปฏิเสธ external URL/path traversal
+- [ ] Escape ชื่อสารบัญ/error ใน UI/XHTML, คง sandbox/CSP และไม่โหลด resource ภายนอก
+- [ ] ซิงก์ runtime ระหว่าง source กับ `publish/` และอัปเดตคู่มือ
+
+### 9.4 จุดตรวจและเกณฑ์ผ่าน
+
+- [ ] สารบัญหลายระดับถูกต้องทั้งการแบ่งบทตาม heading และตามหน้า รวมเอกสารไม่มีหัวข้อ
+- [ ] แก้ชื่อ เรียงลำดับ จัดระดับ เพิ่ม/เอารายการออกแล้ว reload ได้ผลเดิม; ข้อความและลำดับเนื้อหาไม่เปลี่ยน
+- [ ] คลิกทุก entry ใน Preview และ EPUB ถึงหัวข้อ/ต้นบทที่เลือก รวมชื่อซ้ำ ภาษาไทย และอักขระพิเศษ
+- [ ] เพิ่ม/เปลี่ยนชื่อหัวข้อและเปลี่ยนการแบ่งบทแล้วไม่ลิงก์ผิด; จับคู่ไม่ได้ต้อง unresolved และกันการสร้าง EPUB
+- [ ] ทดสอบสองแท็บ/409, response ช้า, source เปลี่ยนระหว่างบันทึกหรือสร้างไฟล์ และยกเลิก regenerate โดยไม่มี silent overwrite
+- [ ] ทดสอบ XSS, URL/path ต้องห้าม, duplicate IDs, missing targets และ parent cycle; ปฏิเสธก่อนบันทึก
+- [ ] Browser automation Chrome/Edge ครอบคลุมแก้ไข บันทึก เปิดงานซ้ำ คลิกลิงก์ stale/conflict และ mobile/keyboard พร้อม network log
+- [ ] ตรวจ EPUBCheck เวอร์ชันที่ล็อก และสารบัญ/ลิงก์ใน reader อย่างน้อย 2 ตัว; บันทึก warning และข้อจำกัดตามจริง
+- [ ] Regression Phase 8 และงานเก่าไม่มีสารบัญแก้มือผ่าน; เนื้อหาไม่หายและสร้างซ้ำตามกติกา deterministic
+- [ ] เพิ่ม `tests/phase9/`, `phase9/evidence.md`, manifest ตามกติกาชุดข้อมูลร่วม, validator report และหลักฐาน browser/reader ก่อนเสนอ Gemini ตรวจรับ
+
+บันทึกผล: วางแผน / ยังไม่เริ่มพัฒนา | วันที่ 2026-10-04 | ผู้ตรวจรับ Gemini | ยังไม่มีผลทดสอบ Phase 9
+
 ## สรุปการอนุมัติแต่ละ Phase
 
 | Phase | ผลส่งมอบ | สถานะเริ่มต้น | หลักฐาน/ผู้ตรวจ |
@@ -508,6 +564,7 @@ aw.txt ที่ประกอบแล้ว; ระบุ tolerance ของ
 | ก่อน 7 | แก้ Bug 1–7 และ S1–S11 พร้อมตรวจรับซ้ำส่วนที่กระทบ | ผ่านการตรวจรับซ้ำ 100% | tests/test_bug*.py (17/17 PASS), Phase 4-6 regression (49/50 PASS) / Codex/Antigravity |
 | 7 | ส่งออก HTML พื้นฐานและพร้อม Local AI | ผ่านสมบูรณ์ 100% | phase7/evidence.md, tests/phase7/ (25/25 PASS), phase7/font_style_manifest.json, phase7/benchmark_results.json, phase7/browser_automation.log, tests/phase2 (27/27 PASS) / Antigravity |
 | 8 | ส่งออก EPUB แบบ reflowable พร้อม XHTML Quick Preview ก่อน package | กำลังพัฒนา / ยังไม่ผ่านการตรวจรับ | tests/phase8/ (6/6 PASS), phase8/evidence.md; รอ EPUBCheck, browser automation และ compatibility matrix |
+| 9 | แก้ไขสารบัญ EPUB และ stable targets | วางแผน / ยังไม่เริ่มพัฒนา | รอ tests/phase9/, phase9/evidence.md และ Gemini ตรวจรับ |
 
 หมายเหตุ: กรณีไม่เกี่ยวข้อง เช่น multi-user ในระบบ localhost ให้บันทึก N/A พร้อมเหตุผล ไม่ถือเป็นผลทดสอบผ่าน ส่วนเกณฑ์บังคับที่ยังไม่ผ่านต้องคงสถานะไว้ตามจริง
 
