@@ -161,7 +161,7 @@ flowchart TB
     HtmlExport <--> ExportFiles
     EpubExport <--> ExportFiles
     HtmlExport --> AILock
-    Runner -. "OCR+AI active" .-> AILock
+    Runner -.->|OCR+AI active| AILock
     AILock <--> LLM
     API --> Queue --> Runner
     Runner <--> DB
@@ -256,14 +256,14 @@ flowchart TD
     subgraph DualEditor ["ระบบแก้ไขสองโหมด (Dual-Mode Editor)"]
         CodeView["CodeMirror 5.65.21<br/>(แก้ไขโค้ด HTML โดยตรง)"]
         VisualView["Visual Editor แบบ Word<br/>(WYSIWYG: Bold/Italic/H1-H3/Lists/Links)"]
-        CodeView <-->|"Bidirectional Sync (ไม่มี Autosave)"| VisualView
+        CodeView <--> VisualView
     end
 
     EditorWorkspace --> DualEditor
     DualEditor --> LivePreview["Sandboxed Preview Iframe<br/>(CSP ปลอดภัย อัปเดต debounce 350ms)"]
     DualEditor --> ManualSave["กดบันทึก Final HTML หรือ Ctrl+S/Cmd+S"]
     ManualSave --> RevCheck{"ตรวจ base_revision conflict หรือไม่?"}
-    RevCheck -->|ชน (409)| RevModal["แจ้งเตือน Revision Conflict<br/>ยืนยัน Overwrite หรือยกเลิก"]
+    RevCheck -->|ชน 409 Conflict| RevModal["แจ้งเตือน Revision Conflict<br/>ยืนยัน Overwrite หรือยกเลิก"]
     RevModal -->|ยกเลิก| DualEditor
     RevModal -->|ยืนยัน| SanitizeEngine
     RevCheck -->|ไม่ชน| SanitizeEngine["StrictHtmlSanitizer<br/>- กรอง Active content / Unsafe links<br/>- ตัด Head และ Title ออกจาก Body (ป้องกัน Title Leak)"]
@@ -380,7 +380,7 @@ flowchart TD
     Y --> Z{"เลือกรูปแบบการแก้ไข"}
     Z -->|Code View| AA1["แก้ไขซอร์สโค้ด HTML ผ่าน CodeMirror 5.65.21"]
     Z -->|Visual View| AA2["แก้ไขแบบ Word ผ่าน WYSIWYG Editor (Bold/Italic/Heading/Lists)"]
-    AA1 <-->|"ซิงก์เนื้อหาอัตโนมัติ"| AA2
+    AA1 <--> AA2
     AA1 --> AB["ดูผลลัพธ์ทันทีใน Sandboxed Preview (CSP)"]
     AA2 --> AB
     AB --> AC["กด 'บันทึก Final HTML' หรือกด Ctrl+S / Cmd+S"]
