@@ -1062,6 +1062,11 @@ class JobDatabase:
             rows = cursor.fetchall()
             for r in rows:
                 jid = r["job_id"]
+                # Explicit cleanup of all finalized jobs must not depend on
+                # legacy/malformed timestamps or clock skew.
+                if max_age_seconds == 0:
+                    expired_ids.append(jid)
+                    continue
                 up_str = r["updated_at"]
                 try:
                     up_dt = datetime.fromisoformat(up_str)

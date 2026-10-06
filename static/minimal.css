@@ -1,0 +1,203 @@
+/* Shared minimal studio skin. Functional selectors remain in app.css. */
+:root {
+  --bg-primary: #10151d;
+  --bg-secondary: #171e28;
+  --bg-tertiary: #202a37;
+  --bg-card: #171e28;
+  --bg-card-border: #344052;
+  --bg-card-hover: #202a37;
+  --text-primary: #edf2f8;
+  --text-secondary: #b8c4d4;
+  --text-muted: #a4b2c6;
+  --accent-primary: #2563eb;
+  --accent-primary-hover: #1d4ed8;
+  --accent-primary-glow: #2563eb33;
+  --success: #16805d;
+  --danger: #c93743;
+  --warning: #ad690b;
+  --info: #2275b5;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --shadow-glow: none;
+  color-scheme: dark;
+}
+body.theme-light {
+  --bg-primary: #f5f7fa;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #edf1f6;
+  --bg-card: #ffffff;
+  --bg-card-border: #d6dee9;
+  --bg-card-hover: #edf1f6;
+  --text-primary: #182438;
+  --text-secondary: #4c5e75;
+  --text-muted: #596a80;
+  --shadow-md: none;
+  --shadow-lg: none;
+  color-scheme: light;
+}
+body { font-size: 14px; }
+h1, h2, h3 { text-wrap: balance; }
+input, select, textarea { font-family: var(--font-sans); }
+input::placeholder, textarea::placeholder { color: var(--text-muted); opacity: 1; }
+.app-container { max-width: 1480px; padding: 28px 36px; gap: 24px; }
+.app-header { padding: 0 0 22px; border: 0; border-bottom: 1px solid var(--bg-card-border); border-radius: 0; background: transparent; backdrop-filter: none; box-shadow: none; gap: 20px; flex-wrap: wrap; }
+.brand { gap: 12px; min-width: 0; }
+.brand-title { font-size: 1.25rem; letter-spacing: -0.025em; }
+.brand-title, body.theme-light .brand-title { background: none; background-clip: border-box; -webkit-text-fill-color: currentColor; color: var(--text-primary); }
+.brand-subtitle { margin-top: 3px; font-size: 0.8rem; }
+.logo-icon { width: 42px; height: 42px; background: var(--accent-primary); box-shadow: none; border-radius: 10px; flex-shrink: 0; }
+.header-status { flex-wrap: wrap; gap: 8px; }
+.status-badge { border-radius: 6px; font-size: 0.75rem; }
+.main-tabs { width: 100%; border: 0; border-bottom: 1px solid var(--bg-card-border); border-radius: 0; background: transparent; padding: 0 0 10px; gap: 8px; box-shadow: none; }
+.main-tab-btn { min-height: 44px; padding: 10px 16px; font-weight: 500; }
+.main-tab-btn.active { color: var(--accent-primary); background: var(--accent-primary-glow); font-weight: 600; }
+body.theme-dark .main-tab-btn.active { color: #9dc2ff; }
+.main-tab-number { display: none; }
+.card { padding: 24px; backdrop-filter: none; box-shadow: none; }
+.card-header { gap: 14px; flex-wrap: wrap; }
+.card-title { font-size: 1rem; }
+.badge { border-radius: 5px; font-weight: 500; }
+.badge-info { color: var(--text-secondary); background: var(--bg-tertiary); }
+.dropzone { padding: 46px 20px; border: 1px dashed var(--text-muted); background: var(--bg-primary); border-radius: 10px; }
+.dropzone:hover, .dropzone.dragover { background: var(--accent-primary-glow); box-shadow: none; }
+.dropzone-icon { width: 56px; height: 56px; border-radius: 14px; background: var(--bg-secondary); }
+.dropzone-title { font-size: 1rem; }
+.dropzone-hint { margin-top: 6px; }
+.text-accent { text-decoration: none; }
+.page-options { background: var(--bg-primary); border: 0; border-radius: 8px; }
+.option-card { background: transparent; }
+.option-card:has(input:checked) { border-color: var(--accent-primary); background: var(--accent-primary-glow); }
+.option-card:hover { border-color: var(--text-muted); }
+.page-marker-option { border: 0; padding: 12px 0; }
+.action-footer { justify-content: flex-start; padding-top: 20px; }
+.btn, .btn-icon, .btn-icon-sm, .html-subtab-btn, .tab-btn, .visual-toolbar button { transition: background-color 160ms ease-out, border-color 160ms ease-out, color 160ms ease-out; }
+.btn { min-height: 38px; padding: 8px 14px; font-weight: 500; box-shadow: none; }
+.btn-xs { min-height: 32px; padding: 5px 10px; }
+.btn-large { min-height: 46px; padding: 12px 20px; }
+.btn-primary, .btn-primary:hover:not(:disabled) { background: var(--accent-primary); box-shadow: none; }
+.btn-primary:hover:not(:disabled) { background: var(--accent-primary-hover); }
+.btn-success, .btn-success:hover:not(:disabled) { background: var(--success); }
+.btn-danger { background: var(--danger); }
+.btn-outline { background: transparent; }
+.btn-outline.btn-danger { color: var(--danger); border-color: var(--danger); background: transparent; }
+.btn-outline.btn-success { color: var(--success); background: transparent; }
+.btn-outline.btn-warning { color: var(--warning); background: transparent; }
+body.theme-dark .btn-outline.btn-danger { color: #ffa3ac; }
+body.theme-dark .btn-outline.btn-success { color: #79d7b7; }
+body.theme-dark .btn-outline.btn-warning { color: #f4c575; }
+.btn-outline.btn-danger:hover:not(:disabled) { background: var(--danger-bg); color: var(--danger); }
+.btn-text { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; }
+#btn-remove-file { color: #ffffff; background: var(--danger); padding: 6px 12px; border-radius: var(--radius-sm); }
+#btn-remove-file:hover { background: #ad2632; text-decoration: none; }
+.btn:disabled { opacity: 0.55; }
+:where(button, a, input, select, textarea, [role="button"]):focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 3px; }
+.history-row { background: transparent; padding: 14px; }
+.history-list { max-height: 520px; }
+.current-processing-page { border-left: 0; border-radius: var(--radius-sm); background: var(--bg-tertiary); }
+.config-main { width: 100%; max-width: 820px; }
+.config-card { padding: 30px; }
+.config-form { gap: 20px; }
+.form-field input { background: var(--bg-secondary); font-weight: 400; }
+.html-export-toolbar, .epub-config-grid, .pane-header, .editor-actions { background: var(--bg-secondary); }
+.html-ai-progress { margin: 16px 0; padding: 16px; border-radius: var(--radius-md); background: var(--bg-tertiary); }
+.html-ai-progress-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.html-ai-progress progress { display: block; width: 100%; height: 8px; margin: 12px 0; accent-color: var(--accent-primary); }
+.html-ai-progress p { margin: 6px 0; color: var(--text-secondary); font-size: 0.8rem; overflow-wrap: anywhere; }
+.html-ai-progress #html-ai-progress-error { color: var(--danger); }
+body.theme-dark .html-ai-progress #html-ai-progress-error { color: #ffa3ac; }
+#btn-retry-html-ai { margin-top: 8px; }
+.tab-empty-state { padding: 60px 24px; gap: 8px; }
+.tab-empty-state strong { font-size: 1rem; }
+.file-name, .brand-subtitle { overflow-wrap: anywhere; }
+@media (max-width: 900px) {
+  .app-container { padding: 20px; }
+  .header-status { width: 100%; }
+  .app-header { align-items: flex-start; }
+}
+@media (max-width: 640px) {
+  .app-container { padding: 16px; gap: 18px; }
+  .card, .config-card { padding: 16px; }
+  .brand-subtitle { display: block; font-size: 0.75rem; }
+  .header-status .status-badge { max-width: 100%; overflow-wrap: anywhere; }
+  .main-tab-btn { padding: 9px 12px; }
+  .dropzone { padding: 32px 16px; }
+  .card-header .badge { white-space: normal; }
+  .range-heading { flex-wrap: wrap; }
+  .page-range-control input { min-width: 0; }
+  .action-footer .btn { min-width: 0; white-space: normal; }
+  .history-row { grid-template-columns: minmax(0, 1fr); }
+  .history-actions, .history-row-actions { gap: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+
+/* Decorative masks keep icons present through textContent/innerHTML updates. */
+:root {
+  --icon-action: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m9%205%207%207-7%207%22/%3E%3C/svg%3E");
+  --icon-upload: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2016V3m-5%205%205-5%205%205M4%2016v4h16v-4%22/%3E%3C/svg%3E");
+  --icon-file: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%203H5v18h14V8Z%20M14%203v5h5M8%2012h8m-8%204h6%22/%3E%3C/svg%3E");
+  --icon-code: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m8%206-6%206%206%206m8-12%206%206-6%206m-3-14-2%2016%22/%3E%3C/svg%3E");
+  --icon-book: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%205v16M3%203l9%202%209-2v16l-9%202-9-2Z%22/%3E%3C/svg%3E");
+  --icon-history: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%2011a9%209%200%201%201%202%207M3%204v7h7m2-5v6l4%202%22/%3E%3C/svg%3E");
+  --icon-refresh: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M20%207a9%209%200%200%200-15-2L2%208m0-5v5h5m-3%209a9%209%200%200%200%2015%202l3-3m0%205v-5h-5%22/%3E%3C/svg%3E");
+  --icon-settings: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%207h16M4%2017h16%22/%3E%3Ccircle%20cx%3D%229%22%20cy%3D%227%22%20r%3D%223%22/%3E%3Ccircle%20cx%3D%2215%22%20cy%3D%2217%22%20r%3D%223%22/%3E%3C/svg%3E");
+  --icon-save: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%203h13l3%203v15H4ZM8%203v6h8V3M8%2021v-7h8v7%22/%3E%3C/svg%3E");
+  --icon-download: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203v12m-5-5%205%205%205-5M4%2017v4h16v-4%22/%3E%3C/svg%3E");
+  --icon-delete: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%206h18M9%206V3h6v3M5%206l1%2015h12l1-15M10%2010v7m4-7v7%22/%3E%3C/svg%3E");
+  --icon-check: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m5%2012%204%204L19%206%22/%3E%3C/svg%3E");
+  --icon-eye: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2%2012s4-7%2010-7%2010%207%2010%207-4%207-10%207S2%2012%202%2012Z%22/%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223%22/%3E%3C/svg%3E");
+  --icon-link: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m9%2015%206-6m-5-3%202-2a5%205%200%200%201%207%207l-2%202m-3%205-2%202a5%205%200%200%201-7-7l2-2%22/%3E%3C/svg%3E");
+  --icon-copy: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%228%22%20y%3D%228%22%20width%3D%2212%22%20height%3D%2213%22%20rx%3D%222%22/%3E%3Cpath%20d%3D%22M16%208V3H3v13h5%22/%3E%3C/svg%3E");
+  --icon-back: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m10%205-7%207%207%207M3%2012h18%22/%3E%3C/svg%3E");
+  --icon-spark: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m12%203%202.5%206.5L21%2012l-6.5%202.5L12%2021l-2.5-6.5L3%2012l6.5-2.5Z%22/%3E%3C/svg%3E");
+}
+:where(.btn, .btn-text, .main-tab-btn, .html-subtab-btn, .tab-btn, .dropdown-item):not(:has(svg))::before { content: ""; display: inline-block; width: 16px; height: 16px; flex: 0 0 16px; background: currentColor; mask: var(--button-icon, var(--icon-action)) center / contain no-repeat; }
+.html-subtab-btn, .tab-btn, .dropdown-item { display: inline-flex; align-items: center; gap: 6px; }
+[data-main-tab="upload"], #btn-start-job { --button-icon: var(--icon-upload); }
+[data-main-tab="progress"], #tab-final, #tab-raw { --button-icon: var(--icon-file); }
+[data-main-tab="html"], #html-mode-code, #btn-subtab-source, #btn-epub-subtab-source { --button-icon: var(--icon-code); }
+[data-main-tab="epub"], #btn-build-epub { --button-icon: var(--icon-book); }
+[data-main-tab="history"] { --button-icon: var(--icon-history); }
+[id*="refresh"], [id*="retry"], [data-retry-mode], #btn-conflict-reload, #btn-test-ai-connection, #btn-test-connection { --button-icon: var(--icon-refresh); }
+a[href="/config.html"] { --button-icon: var(--icon-settings); }
+[id*="save"] { --button-icon: var(--icon-save); }
+a[download] { --button-icon: var(--icon-download); }
+[id*="delete"], [id*="cleanup"], #btn-remove-file, [data-history-delete] { --button-icon: var(--icon-delete); }
+[id*="accept"], [data-accept] { --button-icon: var(--icon-check); }
+[id*="preview"], #html-mode-visual, [data-history-open] { --button-icon: var(--icon-eye); }
+#visual-link, [data-visual-command="unlink"] { --button-icon: var(--icon-link); }
+#btn-conflict-copy { --button-icon: var(--icon-copy); }
+a.btn[href="/"], [id*="revert"], [data-revert] { --button-icon: var(--icon-back); }
+#btn-generate-html-ai, #btn-full-text-ai { --button-icon: var(--icon-spark); }
+#visual-link::before, [data-visual-command="unlink"]::before { content: ""; width: 16px; height: 16px; display: inline-block; background: currentColor; mask: var(--icon-link) center / contain no-repeat; }
+/* EPUB metadata uses the same compact fields as the rest of the studio. */
+.epub-config-grid textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  padding: 9px 12px;
+  border: 1px solid var(--bg-card-border);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: inherit;
+  font: inherit;
+}
+.epub-config-grid .epub-cover-toggle {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  align-self: end;
+  gap: 8px;
+  min-height: 36px;
+}
+.epub-config-grid input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  min-height: 16px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--accent-primary);
+}

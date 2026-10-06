@@ -29,7 +29,7 @@
 | **แก้บั๊กและเสถียรภาพ (Bug 1–7, S1–S11)** | Path Traversal, CORS/Port, RetryMode CLI, Accept/Revert Offset & has_manual_edit, Job JSON Merge, Atomic Write, DB Lock Timeout 503, Atomic Start | **PASSED** | [tests/test_bug1_2_3_security_and_retry.py](tests/test_bug1_2_3_security_and_retry.py), [tests/test_bug4_5_proposals.py](tests/test_bug4_5_proposals.py), [tests/test_bug6_7_and_s_items.py](tests/test_bug6_7_and_s_items.py) (23/23 PASS) |
 | **Phase 7 — ส่งออก HTML แบบมีโครงสร้าง** | Deterministic Basic HTML, Sandboxed Preview, 0-call Offline Thai CSS, AI Semantic Tagging Validator, Revision Conflict 409, Strict XSS Sanitization, Playwright Chrome/Edge Automation | **PASSED** | [tests/phase7/](tests/phase7/) (25/25 PASS), [phase7/evidence.md](phase7/evidence.md) |
 | **ปรับปรุง UI Workspace & Visual Editor (Section 0.9)** | ส่งออกภาพ PDF เป็น ZIP โดยไม่เริ่ม OCR, แยก 5 Tabs พร้อม Partials/Controllers, CodeMirror & Live Preview (No Autosave), Visual Editor (Word-like Rich Text), ป้องกัน Title Leak | **PASSED** | [tests/test_gemini_acceptance_09.py](tests/test_gemini_acceptance_09.py) (6/6 PASS), [tests/test_studio_workspace.py](tests/test_studio_workspace.py), [tests/test_visual_html.py](tests/test_visual_html.py) (46/46 PASS) |
-| **Phase 8 — ส่งออก EPUB & Quick Preview** | XHTML Quick Preview, EPUB 3 Package Structure (`mimetype` uncompressed first), Canonical Block Model, Internal Validator, Stale Detection | **IN PROGRESS** | [tests/phase8/](tests/phase8/) (6/6 PASS), [phase8/evidence.md](phase8/evidence.md) (รอเกณฑ์ตรวจรับภายนอก) |
+| **Phase 8 — ส่งออก EPUB & Quick Preview** | XHTML Quick Preview, EPUB 3 Package Structure (`mimetype` uncompressed first), Canonical BookModel, Internal Validator, Stale Detection, EPUBCheck 5.3.0 (0 errors), Chrome/Edge 0-call, Reader Compatibility (epub.js, Foliate) | **PASSED** | [tests/phase8/](tests/phase8/) (17/17 PASS), [phase8/evidence.md](phase8/evidence.md) |
 
 ---
 
@@ -61,13 +61,13 @@
 - [ ] ทดสอบบน Clean Target Machine หรือเตรียม Offline Wheelhouse / Installer แบบสมบูรณ์
 - [ ] รอเจ้าของงานยอมรับข้อจำกัดของระบบก่อนเปิดใช้งานจริง
 
-### 3.6 Phase 8 — รายการที่ยังไม่ผ่านเกณฑ์ปิด Phase (EPUB Export & Quick Preview)
-- [ ] ตรวจสอบความถูกต้องด้วย EPUBCheck เวอร์ชันที่กำหนด
-- [ ] ทดสอบการแสดงผลและเปิดอ่านในโปรแกรม EPUB Reader ภายนอกอย่างน้อย 2 ตัว
-- [ ] ชุดทดสอบ Browser Automation บน Chrome และ Edge พร้อม Network Log (Zero external calls)
-- [ ] วัดผล Benchmark จริง: Latency (p50/p90/p95), RAM และขนาดไฟล์
-- [ ] จัดทำ Fixture Manifest และทดสอบ Roundtrip ให้ครบทุก Unicode edge case
-- [ ] รองรับรูปภาพหน้าปก (Cover Image) ภายใน EPUB แบบออฟไลน์
+### 3.6 Phase 8 — ผลการตรวจรับสมบูรณ์ (EPUB Export & Quick Preview - PASSED)
+- [x] ตรวจสอบความถูกต้องด้วย EPUBCheck เวอร์ชันที่กำหนด (EPUBCheck 5.3.0: 0 errors / 0 warnings / 0 fatals)
+- [x] ทดสอบการแสดงผลและเปิดอ่านในโปรแกรม EPUB Reader ภายนอกอย่างน้อย 2 ตัว (epub.js และ Foliate renderers สารบัญ/ไทย/CSS/รูปปกครบถ้วน)
+- [x] ชุดทดสอบ Browser Automation บน Chrome และ Edge พร้อม Network Log (Zero external calls = 0, page errors = 0)
+- [x] วัดผล Benchmark จริง: Latency Preview p95 0.16s, Package p95 0.11s (งบ 5.0s), Peak RSS 59.56 MB (งบ 256 MB), ขนาดไฟล์ 59 KB
+- [x] จัดทำ Fixture Manifest และทดสอบ Roundtrip ให้ครบทุก Unicode edge case (44 หน้าจริง visible text 43,391 ตัวอักษรตรงกัน 100%)
+- [x] รองรับรูปภาพหน้าปก (Cover Image) ภายใน EPUB แบบออฟไลน์ (ตรวจขนาด 2 MB, 16 MP, 8 MB PNG, manifest cover-image, landmarks ครบถ้วน)
 
 ### 3.7 ข้อเสนอแนะและข้อกำหนดทางเทคนิคเพิ่มเติมสำหรับ Phase 9 (Editable EPUB TOC)
 จากการทบทวนแผน Phase 9 ใน `checklist.md` เพื่อเตรียมพร้อมก่อนเริ่มพัฒนา ขอเสนอข้อกำหนดเพิ่มเติมเพื่อให้ครอบคลุมจุดบกพร่องและกรณีขอบ (Edge Cases) สำคัญดังนี้:

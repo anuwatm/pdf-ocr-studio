@@ -1,0 +1,11 @@
+{
+  "scope": "Approved Phase 7/8 OCR HTML for demo/01.pdf-04.pdf and demo/01.png-02.png",
+  "pages": 44,
+  "source_artifact": "tests/artifacts/approved_44pages_job/export/basic.html",
+  "source_sha256": "18362d2557ecf5fd1ffe40889dc9dd6012abbe5607c4c05eeb436bf1f708f537",
+  "cover": "demo/01.png",
+  "toc_entries": 27,
+  "chapter_split": "page",
+  "status": "Phase 9 automated acceptance passed",
+  "provenance": "Reuses approved Phase 7/8 artifact; no OCR or Local AI rerun"
+}

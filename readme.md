@@ -17,15 +17,15 @@
 หลัง clone repository แล้ว ให้เปิด Command Prompt ที่โฟลเดอร์โครงการและรัน:
 
 ```cmd
-.\run_server.cmd
+.\publish\run_server.cmd
 ```
 
-สคริปต์จะสร้าง `venv` และติดตั้ง dependencies ให้เองในครั้งแรก จากนั้นเปิด [http://127.0.0.1:8000/](http://127.0.0.1:8000/) ในเบราว์เซอร์
+สคริปต์จะสร้าง `publish\venv` และติดตั้ง dependencies ให้เองในครั้งแรก จากนั้นเปิด [http://127.0.0.1:8000/](http://127.0.0.1:8000/) ในเบราว์เซอร์
 
 หยุด server:
 
 ```cmd
-.\stop_server.cmd
+.\publish\stop_server.cmd
 ```
 
 
@@ -46,20 +46,31 @@
 - [เริ่มใช้งานด่วนจาก GitHub](#เริ่มใช้งานด่วนจาก-github)
 - [จุดเด่นของระบบ (Key Features)](#จุดเด่นของระบบ-key-features)
 - [สถาปัตยกรรมและแผนภาพการทำงาน (Architecture & Diagrams)](#สถาปัตยกรรมและแผนภาพการทำงาน-architecture--diagrams)
-  - [1. แผนภาพสถาปัตยกรรมระบบและการแยก Process](#1-แผนภาพสถาปัตยกรรมระบบและการแยก-process)
-  - [2. แผนภาพการประมวลผลและการจัดเส้นทางเอกสาร (Intelligent Page Routing)](#2-แผนภาพการประมวลผลและการจัดเส้นทางเอกสาร-intelligent-page-routing)
-  - [3. แผนภาพการตรวจแก้ด้วย Local AI และ Diff Engine](#3-แผนภาพการตรวจแก้ด้วย-local-ai-และ-diff-engine)
-  - [4. แผนภาพวงจรสถานะงานและการกู้คืนข้อผิดพลาด (Job Lifecycle & Fault Tolerance)](#4-แผนภาพวงจรสถานะงานและการกู้คืนข้อผิดพลาด-job-lifecycle--fault-tolerance)
-  - [5. แผนภาพขั้นตอนการทำงานของผู้ใช้บนหน้าเว็บ (End-to-End User Experience Flow)](#5-แผนภาพขั้นตอนการทำงานของผู้ใช้บนหน้าเว็บ-end-to-end-user-experience-flow)
+  - [1. สถาปัตยกรรมระบบ](#1-สถาปัตยกรรมระบบ)
+  - [2. OCR และการจัดเส้นทางเอกสาร](#2-ocr-และการจัดเส้นทางเอกสาร)
+  - [3. การตรวจทานข้อความและ HTML Studio](#3-การตรวจทานข้อความและ-html-studio)
+  - [4. สถานะ OCR และการลบงาน](#4-สถานะ-ocr-และการลบงาน)
+  - [5. ขั้นตอนใช้งานบนหน้าเว็บ](#5-ขั้นตอนใช้งานบนหน้าเว็บ)
+  - [6. HTML AI เบื้องหลังและ progress](#6-html-ai-เบื้องหลังและ-progress)
+  - [7. EPUB preview, package และดาวน์โหลด](#7-epub-preview-package-และดาวน์โหลด)
+  - [8. Structured OCR และหน้าตรวจเทียบ](#8-structured-ocr-และหน้าตรวจเทียบ)
+  - [9. Editable TOC และ stable targets](#9-editable-toc-และ-stable-targets)
 - [การติดตั้งและเริ่มต้นใช้งาน (Getting Started)](#การติดตั้งและเริ่มต้นใช้งาน-getting-started)
   - [ความต้องการของระบบ](#ความต้องการของระบบ-prerequisites)
-  - [ติดตั้งและเริ่มต้นใช้งาน](#การติดตั้งและเริ่มต้นใช้งาน-getting-started)
+  - [วิธีที่ 1: รันด่วนด้วยชุดติดตั้งพร้อมแจกจ่าย (`publish/`)](#วิธีที่-1-รันด่วนด้วยชุดติดตั้งพร้อมแจกจ่าย-publish)
+  - [วิธีที่ 2: ติดตั้งจาก Source Code สำหรับนักพัฒนา](#วิธีที่-2-ติดตั้งจาก-source-code-สำหรับนักพัฒนา)
 - [การตั้งค่า Local AI ตรวจแก้](#การตั้งค่า-local-ai-ตรวจแก้)
 - [สัญญาข้อมูลและไฟล์ผลลัพธ์ (Data Contract)](#สัญญาข้อมูลและไฟล์ผลลัพธ์-data-contract)
 - [รายละเอียด REST API (API Reference)](#รายละเอียด-rest-api-api-reference)
 - [โครงสร้างโฟลเดอร์ (Repository Structure)](#โครงสร้างโฟลเดอร์-repository-structure)
 - [ผลการทดสอบและเกณฑ์ตรวจรับ (Verification & Benchmarks)](#ผลการทดสอบและเกณฑ์ตรวจรับ-verification--benchmarks)
+- [ขอบเขต Phase 8–9 ที่ใช้ร่วมกัน](#phase8-phase9-boundary)
+- [แผน Phase 10 — Document Translation](#phase-10--document-translation)
+- [Phase 8.1 — Structured OCR](#phase-81--structured-ocr)
+- [Phase 9 — Editable EPUB TOC](#phase-9--editable-epub-toc)
+- [การแก้ปัญหาล่าสุด](#การแก้ปัญหาล่าสุด)
 - [ข้อควรรู้ก่อนเผยแพร่บน GitHub](#ข้อควรรู้ก่อนเผยแพร่บน-github)
+- [สิทธิ์การใช้งานและข้อจำกัดความรับผิดชอบ (License & Disclaimer)](#สิทธิ์การใช้งานและข้อจำกัดความรับผิดชอบ-license--disclaimer)
 
 ---
 
@@ -85,7 +96,7 @@
    - จัดการคิวงานด้วย SQLite โหมด Write-Ahead Logging (WAL) พร้อมกู้คืนงานที่ค้าง (`recovering interrupted jobs`) หลังเปิดระบบใหม่
    - กลไกป้องกันการแก้ไขชนกันหลายแท็บ (Multi-tab Conflict Detection ด้วย ETag/Revision คืนค่า HTTP 409)
 6. **Data Retention & Anti-Resurrection:**
-   - หน้า **งาน OCR ก่อนหน้า** เปิดดู ดาวน์โหลด หรือลบงานทีละรายการได้ และลบงานที่เก่ากว่าจำนวนวันที่ผู้ใช้กำหนดได้
+   - หน้า **งาน OCR ก่อนหน้า** เปิดดู ดาวน์โหลด หรือลบงานทีละรายการได้ และลบงานที่เก่ากว่าจำนวนวันที่ผู้ใช้กำหนดได้; **ลบงานทั้งหมด** ยกเลิก OCR ที่ค้างแล้วลบทุกงาน พร้อมรายงานงานที่ลบไม่สำเร็จ
    - ป้องกันสภาวะ Race Condition: หากงานถูกลบไปแล้ว Worker จะยุติการเขียนไฟล์กลับคืนทันที (0 Resurrection)
 7. **ความเป็นส่วนตัวและ Offline 100%:**
    - เซิร์ฟเวอร์ผูกเข้ากับ `127.0.0.1` (Loopback Only) ปฏิเสธการเข้าถึงจาก IP ภายนอกด้วย HTTP 403 Forbidden
@@ -93,315 +104,281 @@
 8. **ส่งออกผลลัพธ์และภาพ PDF:**
    - ดาวน์โหลด `raw.txt`, `corrected.txt`, `final.txt` และ ZIP ผลลัพธ์ได้ แม้งานถูกยกเลิก โดยระบบคงข้อความหน้าที่ทำสำเร็จแล้วไว้
    - สำหรับไฟล์ PDF สามารถกด **"ดาวน์โหลดภาพแต่ละหน้า (ZIP)"** ได้ทันทีในแท็บอัปโหลดเอกสาร (PNG 200 DPI ตามช่วงหน้าที่เลือก) โดยไม่ต้องสั่งเริ่มทำ OCR
-9. **EPUB 3 Export และ XHTML Quick Preview (Phase 8):**
-   - เลือก `basic.html`, `ai.html` หรือ `final.html` เป็นฐาน แล้วตรวจ XHTML Quick Preview พร้อมโครงสร้างสารบัญก่อนสร้างไฟล์ `.epub`
-   - EPUB 3 แบบ reflowable มีสารบัญ, metadata, CSS ภาษาไทยภายในไฟล์, ระบบตรวจจับ stale revision และ internal package validator ตรวจสอบความถูกต้อง
-10. **สตูดิโอแยก 5 แท็บการทำงาน และ Visual Editor แบบ Word (ใหม่):**
-    - แยกพื้นที่ทำงานเป็น 5 แท็บอิสระ: **อัปโหลดเอกสาร**, **ผลข้อความ**, **HTML**, **ส่งออก EPUB**, และ **งาน OCR ก่อนหน้า**
+9. **EPUB 3 Export, XHTML Quick Preview และ Editable TOC Editor (Phase 8 & Phase 9):**
+   - เลือก `basic.html`, `ai.html`, `final.html` หรือ `structured.html` เป็นฐาน แล้วตรวจ XHTML Quick Preview พร้อมโครงสร้างสารบัญก่อนสร้างไฟล์ `.epub`; เมื่อสร้างสำเร็จเบราว์เซอร์ดาวน์โหลดอัตโนมัติ
+   - EPUB 3 แบบ reflowable มีสารบัญ, metadata, CSS ภาษาไทยภายในไฟล์, ระบบตรวจจับ stale revision และ internal package validator (สอดคล้องกับ EPUBCheck 5.3.0) ตรวจสอบความถูกต้อง
+   - **Cover Drag-and-Drop & Thumbnail (Phase 9):** ลากวางไฟล์รูปปก (PNG/JPEG สูงสุด 2 MB) แสดงภาพตัวอย่าง Thumbnail พร้อมขนาดไฟล์และมิติรูปภาพ รองรับการสร้างแบบไม่มีปก หรือนำรูปปกเดิมมาใช้ซ้ำ (Reuse)
+   - **Editable TOC & Stable Targets (Phase 9):** สตูดิโอแก้ไขสารบัญ EPUB ปรับแต่งชื่อ (Label), สลับลำดับ (Reorder), จัดโครงสร้างชั้นลำดับ (Level 1–3), เลือกลิงก์ปลายทาง (Target) จากต้นบทหรือหัวข้อ h1–h3 พร้อม stable target ID ป้องกันลิงก์เลื่อนหลุด และระบบ Re-match อัตโนมัติเมื่อเนื้อหา HTML เปลี่ยนแปลง
+10. **Minimal Web Studio และ Visual Editor แบบ Word:**
+    - Light theme เป็นค่าเริ่มต้น สลับ Dark ได้ พร้อม icon ปุ่ม, focus state และ responsive layout
+    - แยกพื้นที่ทำงานเป็น 6 แท็บอิสระ: **อัปโหลดเอกสาร**, **ผลข้อความ**, **HTML**, **ส่งออก EPUB**, **Structured OCR**, และ **งาน OCR ก่อนหน้า**
     - ในแท็บ HTML มีระบบแก้ไขสองโหมด: **CodeMirror 5.65.21** สำหรับแก้ไขโค้ด HTML โดยตรง และ **Visual Editor แบบ Word** (WYSIWYG: ตัวหนา, ตัวเอียง, ขีดเส้นใต้, หัวข้อ H1–H3, รายการจุด/ตัวเลข, ลิงก์, Undo/Redo) พร้อมซิงก์สองฝั่งอัตโนมัติ
     - ระบบบันทึกแบบแมนนวล (Ctrl+S / ปุ่มบันทึก ปราศจาก Autosave) ป้องกันข้อผิดพลาด draft สูญหาย รองรับ Revision Conflict (HTTP 409) และแก้ปัญหา Title leak (`OCR Document - ...`) ไม่ให้ปนเปื้อนลงใน `<body>`
+11. **Structured OCR และการตรวจเทียบตำแหน่งต้นฉบับ (Phase 8.1):**
+    - ตรวจจับโครงสร้างตาราง (Vector Geometry ตรวจเส้นจริงจาก PDF และ Scanned Projection ตรวจตารางสแกน) และรายการ (List bullet/numbered)
+    - ส่งออกเป็น Structured Text (tab-separated) และ Semantic HTML (table/thead/tbody/tr/th/td, ul/ol/li) จาก `ocr.json` เดิมโดยไม่ต้องรัน OCR หรือ AI ซ้ำ
+    - หน้าตรวจเทียบต้นฉบับแบบแยก 2 ฝั่ง (Original vs Text/HTML) พร้อมระบบซูม 50%–200%, ไฮไลต์ Bounding Box อัตโนมัติเมื่อคลิกเซลล์หรือบล็อกข้อความ รองรับทั้งเมาส์ คีย์บอร์ด และอุปกรณ์มือถือ
 
 ---
 
 ## สถาปัตยกรรมและแผนภาพการทำงาน (Architecture & Diagrams)
 
-ส่วนนี้อธิบายเส้นทางข้อมูลที่ใช้งานจริงในรุ่นปัจจุบัน: งาน OCR ทำใน Worker แยก process, ผลลัพธ์เขียนลงดิสก์ทีละหน้า, พื้นที่ทำงานแยกเป็น 5 แท็บอิสระ, และหน้าเว็บอ่านสถานะจาก API เพื่อแสดงความคืบหน้าทันที
+อัปเดตตามโค้ดวันที่ 2026-10-06: OCR ใช้ subprocess; HTML AI ใช้ background thread; Phase 8.1 สร้าง structured layout/Text/HTML จาก artifact เดิมโดยไม่รัน OCR หรือ AI ซ้ำ; Phase 9 รองรับ Editable EPUB TOC (ปรับแต่งสารบัญ, stable targets, ลากวางปก และตรวจจับความขัดแย้ง)
 
 ### 1. สถาปัตยกรรมระบบ
 
 ```mermaid
-flowchart TB
-    subgraph Browser ["Browser: 127.0.0.1 (Web Studio 5 แท็บ)"]
-        Tab1["แท็บ 1: อัปโหลดเอกสาร<br/>เลือกช่วงหน้า / โหลดภาพ ZIP ทันที"]
-        Tab2["แท็บ 2: ผลข้อความ<br/>Dual-Pane Sync / Accept-Revert / AI Full Check"]
-        Tab3["แท็บ 3: HTML Studio<br/>CodeMirror 5.65.21 / Visual Editor แบบ Word<br/>Sandboxed Preview / Manual Save (Ctrl+S)"]
-        Tab4["แท็บ 4: ส่งออก EPUB<br/>XHTML Quick Preview / Metadata Form / Packaging"]
-        Tab5["แท็บ 5: งาน OCR ก่อนหน้า<br/>History / Status / Retention Cleanup"]
-        Config["Config & Test Local LLM"]
-    end
-
-    subgraph Server ["FastAPI Web Server process"]
-        API["REST API"]
-        Templates["Template Partials Assembly<br/>(index + text + html + epub)"]
-        Queue["Job Manager / Supervisor"]
-        HtmlExport["Structured HTML Exporter"]
-        EpubExport["XHTML Quick Preview<br/>EPUB 3 Packager + Validator"]
-        Sanitizer["Strict Allowlist Sanitizer<br/>(Title & Head Discard from Body)"]
-        AILock["Local AI Coordination<br/>(จำกัดครั้งละ 1 งาน)"]
-        Cleanup["History & Retention Cleanup"]
-    end
-
-    subgraph Worker ["OCR Worker Subprocess"]
-        Runner["worker_process.py"]
-        Pipeline["pipeline.py"]
-        OneOCR["OneOCR via ctypes (Native 64-bit)"]
-    end
-
-    subgraph LocalData ["ข้อมูลภายในเครื่อง (Local Storage)"]
-        DB[("SQLite WAL (data/jobs.db)")]
-        Files[("files/{job_id}/<br/>input, raw.txt, corrected.txt, final.txt,<br/>ocr.json, changes.json, page-images.zip")]
-        ExportFiles[("files/{job_id}/export/<br/>basic.html, ai.html, final.html,<br/>epub/preview.xhtml, book.epub,<br/>export_meta.json, epub_meta.json")]
-    end
-
-    LLM["Local LLM (OpenAI-compatible)<br/>127.0.0.1 Loopback Only"]
-
-    Tab1 --> API
-    Tab2 <--> API
-    Tab3 <--> API
-    Tab4 <--> API
-    Tab5 <--> API
-    Config <--> API
-    API --> Templates
-    API <--> DB
-    API <--> Files
-    API --> HtmlExport
-    API --> EpubExport
-    HtmlExport --> Sanitizer
-    HtmlExport --> EpubExport
-    HtmlExport <--> ExportFiles
-    EpubExport <--> ExportFiles
-    HtmlExport --> AILock
-    Runner -.->|OCR+AI active| AILock
-    AILock <--> LLM
-    API --> Queue --> Runner
-    Runner <--> DB
-    Runner --> Pipeline --> OneOCR
-    Runner --> Files
+flowchart LR
+    UI["Browser: 6 tabs / Light-Dark / Icons"] --> API["FastAPI / loopback"]
+    API --> Templates["index + text + html + epub + structured partials"]
+    API --> Manager["JobManager / queue supervisor"]
+    Manager --> Worker["OCR worker subprocess"]
+    Worker --> Pipeline["PDF routing / OneOCR / AI correction"]
+    API --> Tasks["HtmlAiTasks / background thread"]
+    Tasks --> Exporter["HTML batches / annotation validator"]
+    Manager --> Lock["Shared AI lock"]
+    Tasks --> Lock
+    Pipeline --> LLM["Local LLM / loopback"]
+    Exporter --> LLM
+    API --> Editor["Sanitizer / revision conflict checks"]
+    API --> EPUB["XHTML preview / EPUB package validator"]
+    API --> TOC["TOC Editor / stable targets validator"]
+    API --> Structured["Phase 8.1 layout schema / Text-HTML renderer"]
+    API --> Cleanup["Retention / single delete / delete all"]
+    Manager --> DB[("data/jobs.db / SQLite WAL")]
+    Worker --> DB
     Cleanup --> DB
-    Cleanup --> Files
-    Cleanup --> ExportFiles
+    Worker --> Files[("files/job_id: input / pages / text / JSON")]
+    Exporter --> Exports[("export: basic / ai / final HTML / metadata / AI progress")]
+    Editor --> Exports
+    TOC --> Books[("export/epub: preview / payload / toc.json / metadata / book.epub")]
+    EPUB --> Books
+    Structured --> Layouts[("export/structured: layout.json / structured.txt / structured.html")]
 ```
 
-OneOCR DLL ถูกโหลดใน Worker process เท่านั้น ดังนั้นความขัดข้องของ native OCR ไม่ทำให้ FastAPI process หยุดตามไปด้วย. API สามารถสร้าง ZIP ภาพ PDF (200 DPI) ให้ดาวน์โหลดได้ทันทีจากแท็บอัปโหลดโดยไม่ต้องรัน OCR. และทั้ง API กับ Local LLM ถูกจำกัดการเชื่อมต่อไว้ที่ loopback (127.0.0.1) เท่านั้น.
-
----
-
-### 2. เส้นทาง OCR, batch, Preview และการดาวน์โหลดภาพ ZIP
+### 2. OCR และการจัดเส้นทางเอกสาร
 
 ```mermaid
 flowchart TD
-    Upload(["เลือก PDF / PNG / JPG"]) --> Pdf{"เป็น PDF หรือไม่?"}
-    Pdf -->|PDF| Count["อัปโหลดและอ่านจำนวนหน้าทันที"]
-    Pdf -->|ภาพ| ImageOne["กำหนดเป็น 1 หน้า"]
-    Count --> ChooseOption{"ผู้ใช้ต้องการทำสิ่งใด?"}
-    ChooseOption -->|ดาวน์โหลดภาพ PDF ทันที| ZipNow["กด 'ดาวน์โหลดภาพแต่ละหน้า (ZIP)'<br/>(ไม่ต้องเริ่ม OCR)"]
-    ZipNow --> RenderZip["เรนเดอร์ PNG 200 DPI ตามช่วงหน้า<br/>ส่งออก page-images.zip"]
-    RenderZip --> DoneZip(["ดาวน์โหลด ZIP สำเร็จ"])
-    ChooseOption -->|เริ่มประมวลผล OCR| Choose["เลือกช่วงหน้าเริ่มต้น-สิ้นสุด"]
-    ImageOne --> Choose
-    Choose --> Start["สร้างงานและเข้าคิว"]
-    Start --> Batch["Worker แบ่งช่วงที่เลือกเป็น batch ละ 200 หน้า"]
-    Batch --> Page["ประมวลผลหน้าถัดไป"]
-    Page --> Blank{"หน้าว่างหรือไม่?"}
-    Blank -->|ใช่| SaveBlank["บันทึก blank"]
-    Blank -->|ไม่ใช่| Route{"มี PDF Text Layer ที่ใช้ได้หรือไม่?"}
-    Route -->|ใช่| Extract["สกัดข้อความจาก PDF Text Layer"]
-    Route -->|ไม่ใช่ / เป็นภาพ| OCR["เรนเดอร์ภาพและเรียก OneOCR"]
-    Extract --> Normalize["จัดลำดับข้อความ และ normalize รูปแบบที่ยืนยันได้"]
-    OCR --> Normalize
-    Normalize --> Save["เขียน raw.txt และ ocr.json แบบ UTF-8"]
-    SaveBlank --> Update["อัปเดต SQLite"]
-    Save --> Update
-    Update --> Preview["หน้าเว็บแสดงสถานะและ Preview หน้าที่เสร็จทันที"]
-    Preview --> More{"มีหน้าถัดไป?"}
-    More -->|มี| Page
-    More -->|ไม่มี| Assemble["รวม raw.txt, corrected.txt และ final.txt"]
-    Assemble --> Finish(["OCR เสร็จสมบูรณ์"])
-    Finish --> ExportReady["พร้อมส่งออก basic/ai/final HTML<br/>และสร้าง XHTML Quick Preview / EPUB"]
+    Upload["Upload PDF / image; create queued DB record"] --> Count["Read page count; choose page range"]
+    Count --> Choice{"Action"}
+    Choice -->|PDF images ZIP| Images["Render PNG 200 DPI; download ZIP without OCR"]
+    Choice -->|Start OCR| Queue["Dispatch job to supervisor queue"]
+    Queue --> Batch["Worker: batches of 200 pages"]
+    Batch --> Page{"Page routing"}
+    Page -->|Blank| Blank["Record blank page"]
+    Page -->|Usable PDF text| Text["Extract text layer"]
+    Page -->|Scan or image| OCR["Render / OneOCR / layout assembly"]
+    Text --> Mode{"AI enabled"}
+    OCR --> Mode
+    Mode -->|Yes| AI["Local AI correction; validate proposals"]
+    Mode -->|No| Save["Save page files, layout schema and DB progress"]
+    AI --> Save
+    Blank --> Save
+    Save --> Preview["Browser updates completed-page preview"]
+    Preview --> More{"More selected pages"}
+    More -->|Yes| Batch
+    More -->|No| Final["Assemble text / JSON; downloadable results"]
 ```
 
-PDF จะตรวจจำนวนหน้าทันทีหลังเลือกไฟล์เพื่อให้เลือกช่วงหน้าหรือดาวน์โหลดภาพ ZIP ได้ทันที. ช่วงหน้าที่เลือกอาจยาวกว่า 200 หน้าได้; Worker จะทำต่อเนื่องเป็น batch ละ 200 หน้าเพื่อคืนทรัพยากร OCR ระหว่าง batch. เมื่อหน้าใดเสร็จ ระบบจะเขียนไฟล์และอัปเดตสถานะก่อนเริ่มหน้าถัดไป ทำให้ Preview แสดงผลหน้านั้นได้ทันที.
+งานถูกสร้างตั้งแต่อัปโหลด แต่เริ่ม worker เมื่อกดเริ่มแปลงหน้า แบ่ง OCR ละ 200 หน้าเพื่อคืนทรัพยากรระหว่าง batch; preview ไม่ทับข้อความแก้มือที่ยังไม่บันทึก
 
----
-
-### 3. Baseline, Local AI, HTML Studio (Code vs Visual) และการตรวจทาน
+### 3. การตรวจทานข้อความและ HTML Studio
 
 ```mermaid
 flowchart TD
-    Raw[("raw.txt จากแต่ละหน้า")] --> Rule["กฎ deterministic<br/>เช่น อักษร + ช่องว่าง + า/วรรณยุกต์+า"]
-    Rule --> Baseline["OneOCR Baseline ที่ normalize แล้ว"]
-    Baseline --> Mode{"เลือก Local AI หรือไม่?"}
-    Mode -->|ไม่เลือก| FinalRaw["สร้าง final.txt จากข้อความ baseline"]
-    Mode -->|เลือก| Detect["Prescreener หาเฉพาะจุดน่าสงสัย"]
-    Detect --> Prompt["สร้าง prompt และเรียก Local LLM ผ่าน loopback"]
-    Prompt --> Response{"ตอบ JSON ที่อ่านได้หรือไม่?"}
-    Response -->|ไม่| Safe["คงข้อความ baseline และบันทึกสถานะ AI failed/partial"]
-    Response -->|ใช่| Validate["ตรวจ exact substring, ตำแหน่ง, block mapping และ edit distance"]
-    Validate --> Proposals["บันทึก changes.json และ corrected.txt"]
-    Safe --> FinalRaw
-    Proposals --> FinalRaw
-    FinalRaw --> Review["ผู้ใช้ตรวจใน Web Studio (แท็บ ผลข้อความ)"]
-    Review --> Accept["Accept ข้อเสนอ / แก้มือ แล้วบันทึก final.txt"]
-    Review --> Revert["Revert หรือไม่แก้: คง final.txt เดิม"]
-    Review -.-> FullAI["AI ตรวจคำผิดทั้งหมด: อ่าน raw.txt ทุกหน้าที่ OCR สำเร็จ<br/>ทีละหน้า โดยไม่ทำ OCR ซ้ำ"]
-    FullAI --> Prompt
-    Accept --> SavedFinal["final.txt ที่ผู้ใช้ควบคุม"]
-    Revert --> SavedFinal
+    Raw["raw.txt / deterministic normalization"] --> Correction{"Optional AI correction"}
+    Correction -->|Enabled| LLM["Prescreen / local LLM / correction validator"]
+    Correction -->|Disabled| Review["Text Studio / image bounding boxes"]
+    LLM --> Proposals["changes.json / corrected.txt"]
+    Proposals --> Review
+    Review --> Accept["Accept / Revert / manual edit"]
+    Accept --> TextSave["Save final.txt / revision check"]
+    TextSave --> Basic["Generate deterministic basic.html"]
+    Raw --> Structured["Generate structured layout / Text / HTML; see diagram 8"]
+    Structured --> Compare["Compare source page & semantic result / bbox selection"]
+    Basic --> AI["Optional background HTML AI; see diagram 6"]
+    Basic --> Code["CodeMirror HTML editor"]
+    AI --> Code
+    Code <--> Visual["Word-style visual editor"]
+    Code --> Preview["Sandboxed live preview"]
+    Visual --> Preview
+    Preview --> Save["Manual save / Ctrl+S"]
+    Save --> Revision{"Revision matches"}
+    Revision -->|No| Conflict["HTTP 409 / reload or confirm overwrite"]
+    Conflict --> Save
+    Revision -->|Yes| Sanitize["Remove unsafe HTML / head / title"]
+    Sanitize --> Final["export/final.html"]
+    Final --> EPUB["EPUB Studio; see diagram 7 & 9"]
+    Structured --> EPUB
+```
 
-    SavedFinal --> HtmlTab["เข้าสู่ แท็บ HTML (HTML Studio)"]
-    HtmlTab --> HtmlMode{"ส่งออก HTML เริ่มต้นแบบใด?"}
-    HtmlMode -->|basic| BasicHTML["สร้าง basic.html แบบ deterministic"]
-    HtmlMode -->|ai| HtmlAILock{"Local AI ว่างหรือไม่?"}
-    HtmlAILock -->|ไม่ว่าง| Conflict["HTTP 409 ให้ลองใหม่ภายหลัง"]
-    HtmlAILock -->|offline| BasicFallback["คง basic.html และบันทึก locked_ai_offline"]
-    HtmlAILock -->|ว่างและพร้อม| Semantic["Local LLM เสนอ semantic tags"]
-    Semantic --> HtmlValidate{"annotation ผ่าน validator หรือไม่?"}
-    HtmlValidate -->|ผ่าน| AIHTML["สร้าง ai.html"]
-    HtmlValidate -->|ไม่ผ่าน| BasicFallback
+ไม่มี Autosave; การสลับ Code/Visual รักษาฉบับร่าง การตรวจคำผิด AI และการจัดหัวข้อ HTML AI เป็นคนละงาน: HTML AI เปลี่ยนเฉพาะ tag ไม่แก้หรือสรุปข้อความ
 
-    BasicHTML --> EditorWorkspace["พื้นที่แก้ไข HTML"]
-    AIHTML --> EditorWorkspace
-    BasicFallback --> EditorWorkspace
+### 4. สถานะ OCR และการลบงาน
 
-    subgraph DualEditor ["ระบบแก้ไขสองโหมด (Dual-Mode Editor)"]
-        CodeView["CodeMirror 5.65.21<br/>(แก้ไขโค้ด HTML โดยตรง)"]
-        VisualView["Visual Editor แบบ Word<br/>(WYSIWYG: Bold/Italic/H1-H3/Lists/Links)"]
-        CodeView <--> VisualView
+```mermaid
+flowchart TD
+    Upload["Upload: queued record"] --> Start["Start: dispatch worker"]
+    Start --> Running["running"]
+    Running --> Done["completed / partial / failed / cancelled"]
+    Running --> Restart["Server restart: interrupted-job recovery"]
+    Restart --> Recovered["partial if completed pages exist; otherwise failed"]
+    Done --> Retry["Retry / resume unfinished pages"]
+    Retry --> Start
+    History["History actions"] --> Action{"Deletion mode"}
+    Action -->|Retention cleanup| Retention["Select expired finalized jobs; skip queued / running / active HTML AI"]
+    Action -->|Single delete| Single["Check active work / force policy; active HTML AI returns 409"]
+    Action -->|Delete all| Lock{"Shared AI lock available"}
+    Lock -->|No| Busy["409: wait for AI work to stop"]
+    Lock -->|Yes| Stop["Cancel queued/running OCR; wait for worker exit"]
+    Stop --> All["Process all job records without list limit"]
+    All --> Strict["Delete files strictly; remove DB record only after success"]
+    Strict --> Report["deleted_count / deleted_jobs / failed_jobs"]
+    Retention --> Delete["Delete eligible job files and DB records"]
+    Single --> Delete
+```
+
+**ลบงานทั้งหมด** ครอบคลุมทุกสถานะ OCR และไม่จำกัด 100 งาน หากลบไฟล์บางงานไม่ได้ จะคง record งานนั้นและรายงาน `failed_jobs` หาก HTML AI ยังทำงาน ต้องยกเลิกและรอให้หยุดก่อน การลบทั้งหมดต่างจาก cleanup ตามอายุ ซึ่งข้ามงาน active
+
+### 5. ขั้นตอนใช้งานบนหน้าเว็บ
+
+```mermaid
+flowchart LR
+    Open["Open localhost:8000"] --> Upload["Tab 1: upload / range / OCR mode"]
+    Upload --> Text["Tab 2: OCR progress / preview / text review"]
+    Text --> Save["Save final text / download text or ZIP"]
+    Save --> HTML["Tab 3: Basic or AI HTML / progress / Code-Visual editor"]
+    HTML --> Final["Save final HTML / download"]
+    Final --> EPUB["Tab 4: EPUB config / TOC editor / XHTML preview / cover"]
+    EPUB --> Download["Create EPUB / automatic download"]
+    Text --> Structured["Tab 5: structured Text-HTML / source comparison"]
+    Structured --> EPUB
+    Open --> History["Tab 6: previous jobs / retention / delete all"]
+    History --> Text
+```
+
+### 6. HTML AI เบื้องหลังและ progress
+
+```mermaid
+sequenceDiagram
+    participant UI as Browser
+    participant API as FastAPI
+    participant Task as HtmlAiTasks thread
+    participant LLM as Local LLM
+    participant Disk as export files
+    UI->>API: POST html/ai/start
+    API->>API: Acquire shared AI lock; duplicate job reuses task
+    API-->>UI: 202 with task status
+    API->>Task: Start background thread
+    Task->>LLM: Check availability / model capability
+    Task->>Disk: Save ai_progress.json
+    loop Each annotation batch
+        Task->>LLM: Classify unit tags; reasoning off when supported
+        LLM-->>Task: JSON unit/tag annotations
+        Task->>Task: Validate batch; preserve heading context
+        Task->>Disk: Update completed_chunks / stage / timestamps
+        UI->>API: GET html/ai/progress every 2 seconds
+        API-->>UI: Counts / elapsed / waiting / timeout / error
     end
-
-    EditorWorkspace --> DualEditor
-    DualEditor --> LivePreview["Sandboxed Preview Iframe<br/>(CSP ปลอดภัย อัปเดต debounce 350ms)"]
-    DualEditor --> ManualSave["กดบันทึก Final HTML หรือ Ctrl+S/Cmd+S"]
-    ManualSave --> RevCheck{"ตรวจ base_revision conflict หรือไม่?"}
-    RevCheck -->|ชน 409 Conflict| RevModal["แจ้งเตือน Revision Conflict<br/>ยืนยัน Overwrite หรือยกเลิก"]
-    RevModal -->|ยกเลิก| DualEditor
-    RevModal -->|ยืนยัน| SanitizeEngine
-    RevCheck -->|ไม่ชน| SanitizeEngine["StrictHtmlSanitizer<br/>- กรอง Active content / Unsafe links<br/>- ตัด Head และ Title ออกจาก Body (ป้องกัน Title Leak)"]
-    SanitizeEngine --> FinalHTML["บันทึก final.html ลงดิสก์"]
-
-    FinalHTML --> EpubSource["ส่งต่อไปยัง แท็บ ส่งออก EPUB (Phase 8)"]
-    EpubSource --> EpubPreview["สร้าง XHTML Quick Preview จาก canonical blocks"]
-    EpubPreview --> EpubRevision{"source และ preview revision ยังตรงหรือไม่?"}
-    EpubRevision -->|ไม่ตรง / HTML เปลี่ยน| EpubStale["แสดง Stale Warning / บล็อก Package ชั่วคราว"]
-    EpubStale --> EpubPreview
-    EpubRevision -->|ตรงกัน| EpubPackage["สร้าง nav.xhtml, OPF, CSS และ chapter XHTML<br/>ตรวจ Internal Validator แล้วเผยแพร่ book.epub"]
+    alt All annotations valid
+        Task->>Task: Validate whole document
+        Task->>Disk: Publish ai.html and export_meta.json
+        Task-->>UI: completed via polling
+    else Offline / timeout / invalid response
+        Task->>Disk: Record failed status; preserve basic.html
+        Task-->>UI: failed with reason via polling
+    end
+    opt User cancels while running
+        UI->>API: POST html/ai/cancel
+        API-->>UI: cancelling
+        Task->>Task: Stop at next cancellation checkpoint
+        Task->>Disk: cancelled; no partial AI publication
+    end
 ```
 
-ค่าเริ่มต้นคือ **OneOCR อย่างเดียว (Baseline)**. ตัวเลือก AI จะเปิดหลังการทดสอบการเชื่อมต่อพบ Local LLM เท่านั้น. ในแท็บ HTML ผู้ใช้สามารถสลับแก้ไขได้อย่างอิสระระหว่าง CodeMirror และ Visual Editor แบบ Word โดยระบบรักษาฉบับร่างไว้ไม่ให้สูญหาย และบันทึกผ่านปุ่มหรือคีย์ลัด Ctrl+S/Cmd+S โดยปราศจาก Autosave ที่อาจสร้างความสับสน.
+แบ่งไม่เกิน **25 units / prompt เป้าหมาย 5,500 UTF-8 bytes** ต่อ batch โดยใช้ข้อความตัวอย่างไม่เกิน 120 ตัวอักษรต่อ unit และ `max_tokens=1600`, `temperature=0` คืน tag `p`, `h1`, `h2`, `h3`; ข้อความเต็มยังใช้จากต้นฉบับ ตรวจจำนวน/ID ครบ มี `h1` ได้ไม่เกินหนึ่ง และไม่ข้ามระดับหัวข้อก่อนเผยแพร่
 
----
+LM Studio ที่แจ้ง capability รองรับ `reasoning: off` จะใช้ native `/api/v1/chat` พร้อม `store: false`; server อื่นใช้ OpenAI-compatible API เดิม การตั้งค่านี้ใช้เฉพาะ HTML annotations ไม่เปลี่ยน OCR correction
 
-### 4. วงจรสถานะงานและการเก็บข้อมูล
+สถานะ task: `running`, `cancelling`, `completed`, `failed`, `cancelled` และ `idle` เมื่อไม่มีงาน การยกเลิกรอคำขอ batch ปัจจุบันตอบกลับหรือ timeout; refresh เบราว์เซอร์ติดตามงานเดิมได้ แต่ restart server ไม่ resume งาน HTML AI และแจ้งให้ลองใหม่ ไม่มี retry inference อัตโนมัติใน background task
 
-```mermaid
-stateDiagram-v2
-    [*] --> Uploaded: upload ไฟล์สำเร็จ
-    Uploaded --> Queued: กดเริ่มงาน (start job)
-    Queued --> Cancelled: cancel ก่อนเริ่มงาน
-    Queued --> Running: supervisor สั่งเริ่ม worker
-    Running --> Completed: ทุกหน้าสำเร็จครบ 100%
-    Running --> Partial: OCR หรือ AI สำเร็จบางส่วน
-    Running --> Failed: เกิดข้อผิดพลาดร้ายแรง
-    Running --> Cancelled: ผู้ใช้สั่งยกเลิก (รวมผลหน้าที่เสร็จ)
-    Running --> Failed: restart ระบบแล้วพบงานค้าง (recovery)
-
-    Completed --> Deleted: ผู้ใช้ลบงาน
-    Partial --> Deleted: ผู้ใช้ลบงาน
-    Failed --> Deleted: ผู้ใช้ลบงาน
-    Cancelled --> Queued: เริ่มงานต่อจากหน้าที่เหลือ
-    Cancelled --> Deleted: ผู้ใช้ลบงาน
-    Completed --> Deleted: cleanup ลบอัตโนมัติตาม retention
-    Partial --> Deleted: cleanup ลบอัตโนมัติตาม retention
-    Failed --> Deleted: cleanup ลบอัตโนมัติตาม retention
-    Cancelled --> Deleted: cleanup ลบอัตโนมัติตาม retention
-
-    state "วงจร HTML Studio" as HtmlExport {
-        [*] --> NotGenerated
-        NotGenerated --> BasicReady: export basic หรือ AI fallback
-        BasicReady --> AIReady: AI semantic tags ผ่าน
-        BasicReady --> FinalDraft: แก้ไขใน Code หรือ Visual Editor
-        AIReady --> FinalDraft: แก้ไขใน Code หรือ Visual Editor
-        FinalDraft --> FinalReady: บันทึกสำเร็จ (Manual Save / Ctrl+S)
-        FinalDraft --> Conflict409: Revision ชนกับแท็บอื่น
-        Conflict409 --> FinalReady: ยืนยัน Overwrite
-        FinalReady --> Stale: ข้อความต้นทาง final.txt ถูกแก้ไขใหม่
-        Stale --> BasicReady: สร้าง HTML ใหม่จาก final.txt ล่าสุด
-    }
-
-    Completed --> HtmlExport: เข้าแท็บ HTML
-    Partial --> HtmlExport: เข้าแท็บ HTML (เฉพาะหน้าที่สำเร็จ)
-
-    state "วงจร EPUB Studio" as EpubExportState {
-        [*] --> SelectingSource: เลือก basic / ai / final
-        SelectingSource --> GeneratingPreview: กดสร้าง XHTML Quick Preview
-        GeneratingPreview --> PreviewReady: XHTML และสารบัญพร้อมแสดงผล
-        PreviewReady --> Packaging: กรอก Metadata และกดสร้าง EPUB
-        Packaging --> EpubPublished: ผ่าน Internal Validator (book.epub)
-        PreviewReady --> EpubStaleWarning: ต้นทาง HTML เปลี่ยนแปลง
-        EpubStaleWarning --> GeneratingPreview: สร้าง Quick Preview ใหม่
-    }
-
-    HtmlExport --> EpubExportState: เข้าแท็บ EPUB
-```
-
-เมื่อยกเลิก ระบบจะรวมข้อความของหน้าที่ OCR สำเร็จแล้วทันที และใส่ `[PAGE N: CANCELLED]` ให้หน้าที่ยังไม่ทำ เพื่อให้ไฟล์ดาวน์โหลดไม่ขาดผลที่มีอยู่. ผู้ใช้กด **เริ่มงานต่อจากหน้าที่เหลือ** ได้โดยไม่ต้อง refresh. หน้า **งาน OCR ก่อนหน้า** แสดงงานล่าสุด เปิดดูหรือดาวน์โหลดงานเดิมได้. การลบรายงานและ cleanup จะไม่ลบงานที่อยู่ในสถานะ `queued` หรือ `running`; Worker ตรวจสถานะก่อนเขียนผลต่อเพื่อไม่ให้ไฟล์ที่ลบแล้วถูกสร้างกลับ.
-
----
-
-### 5. ขั้นตอนใช้งานบนหน้าเว็บ (End-to-End User Flow)
+### 7. EPUB preview, package และดาวน์โหลด
 
 ```mermaid
 flowchart TD
-    A["เปิด Web Studio: http://127.0.0.1:8000"] --> B["ตรวจสถานะ Local AI (เชื่อมต่อ/Offline)"]
-    B --> C["แท็บ 1: อัปโหลดเอกสาร (PDF / PNG / JPG)"]
-    C --> D{"ชนิดเอกสารที่อัปโหลด?"}
-    D -->|PDF| E["ระบบอ่านและแสดงจำนวนหน้าทั้งหมดทันที"]
-    D -->|ภาพ PNG/JPG| E2["ระบบกำหนดเป็น 1 หน้า"]
-    E --> F{"ต้องการทำสิ่งใดก่อน?"}
-    F -->|ต้องการแยกภาพเท่านั้น| G1["กดปุ่ม 'ดาวน์โหลดภาพแต่ละหน้า (ZIP)'<br/>(ได้ภาพ PNG 200 DPI ทันทีโดยไม่ต้องทำ OCR)"]
-    G1 --> A
-    F -->|ต้องการแปลงข้อความ| G2["เลือกช่วงหน้าที่เริ่มต้น-สิ้นสุด"]
-    E2 --> G2
-    G2 --> H{"เลือกโหมดการประมวลผล"}
-    H -->|OneOCR อย่างเดียว| I["กด 'เริ่มแปลงหน้า' (OneOCR Baseline)"]
-    H -->|OneOCR + Local AI| J["กด 'เริ่มแปลงหน้า' (เปิด Local AI ตรวจแก้)"]
-    I --> K["แท็บ 2: ติดตามสถานะ Batch, Progress และ Preview รายหน้า"]
-    J --> K
-    K --> L{"ยกเลิกงานกลางคันหรือไม่?"}
-    L -->|ใช่| M["ระบบรวมผลหน้าที่ทำเสร็จแล้ว (เริ่มต่อหน้าที่เหลือได้)"]
-    L -->|ไม่| N["ตรวจทานข้อความใน Text Studio"]
-    M --> N
-    N --> O["ตรวจทานภาพเทียบข้อความ (คลิกคำเพื่อเลื่อนกรอบ Bounding Box)"]
-    O --> P{"ต้องการตรวจแก้คำเพิ่มหรือไม่?"}
-    P -->|ใช่| Q["กด 'AI ตรวจคำผิดทั้งหมด' หรือ Accept / Revert ข้อเสนอ"]
-    Q --> O
-    P -->|ไม่ / แก้ไขพอใจแล้ว| R["กด 'บันทึก' final.txt"]
-    R --> S{"ต้องการทำงานต่อในแท็บใด?"}
-    S -->|ดาวน์โหลดข้อความ/ภาพ| T1["ดาวน์โหลด raw.txt, corrected.txt, final.txt, ZIP หรือภาพ PDF"]
-    S -->|ส่งออก HTML| U["เข้าสู่ แท็บ 3: HTML Studio"]
-    S -->|ดูประวัติงาน| V["เข้าสู่ แท็บ 5: งาน OCR ก่อนหน้า (เปิดงานเดิม/ลบงาน)"]
-    T1 --> V
-
-    U --> W{"เลือกสร้างโครงสร้าง HTML เริ่มต้น"}
-    W -->|Basic HTML| X1["สร้าง basic.html แบบ deterministic"]
-    W -->|AI HTML| X2["สร้าง ai.html ด้วย Local AI Semantic Tags"]
-    X1 --> Y["พื้นที่ทำงาน HTML Studio: Code / Visual / Preview"]
-    X2 --> Y
-    Y --> Z{"เลือกรูปแบบการแก้ไข"}
-    Z -->|Code View| AA1["แก้ไขซอร์สโค้ด HTML ผ่าน CodeMirror 5.65.21"]
-    Z -->|Visual View| AA2["แก้ไขแบบ Word ผ่าน WYSIWYG Editor (Bold/Italic/Heading/Lists)"]
-    AA1 <--> AA2
-    AA1 --> AB["ดูผลลัพธ์ทันทีใน Sandboxed Preview (CSP)"]
-    AA2 --> AB
-    AB --> AC["กด 'บันทึก Final HTML' หรือกด Ctrl+S / Cmd+S"]
-    AC --> AD{"เกิด Revision Conflict 409 หรือไม่?"}
-    AD -->|เกิดการชน| AE["แสดงกล่องข้อความเตือน (เลือกยืนยันเขียนทับหรือยกเลิก)"]
-    AE -->|ยกเลิก| Y
-    AE -->|ยืนยัน| AF["ระบบ Sanitize (ตัด Head/Title ออกจาก Body) และบันทึก final.html"]
-    AD -->|ไม่ชน| AF
-    AF --> AG["ดาวน์โหลด final.html หรือไปทำ EPUB ต่อ"]
-
-    AG --> AH["เข้าสู่ แท็บ 4: ส่งออก EPUB (Phase 8)"]
-    AH --> AI["เลือกต้นทาง (basic / ai / final) แล้วกด 'สร้าง XHTML Quick Preview'"]
-    AI --> AJ["ตรวจสอบเนื้อหาบทและโครงสร้างสารบัญใน Quick Preview"]
-    AJ --> AK{"ต้นทาง HTML ถูกแก้ไขใหม่หรือไม่?"}
-    AK -->|ถูกแก้ไข| AL["ระบบเตือน Stale Revision (ต้องกดสร้าง Quick Preview ใหม่)"]
-    AL --> AI
-    AK -->|ถูกต้องและเป็นปัจจุบัน| AM["กรอก Metadata (ชื่อหนังสือ, ผู้แต่ง, ภาษา, เลขเอกสาร)"]
-    AM --> AN["กด 'สร้างไฟล์ EPUB' (ระบบรัน Internal Package Validator)"]
-    AN --> AO["ดาวน์โหลด book.epub นำไปเปิดอ่านบนโปรแกรมอ่าน e-book"]
-    AO --> V
+    Source["Choose source: basic / ai / final / structured"] --> Config["Metadata / chapter split / cover drop & thumbnail"]
+    Config --> TOCEdit{"Edit TOC? (Phase 9)"}
+    TOCEdit -->|Yes| TOC["Edit label / reorder / level 1-3 / targets; see diagram 9"]
+    TOCEdit -->|No| AutoTOC["Default automatic h1-h3 TOC"]
+    TOC --> Preview["Generate XHTML preview & canonical payload"]
+    AutoTOC --> Preview
+    Preview --> Review["Review chapters / table of contents / source view"]
+    Review --> Build["Create EPUB with base_preview_revision"]
+    Build --> Revision{"Source, TOC and preview revisions match"}
+    Revision -->|No| Stale["409 / stale; update TOC or regenerate preview"]
+    Stale --> Preview
+    Revision -->|Yes| Package["Build mimetype / OPF / nav / CSS / chapters / cover"]
+    Package --> Validate["Internal package validator (EPUBCheck 5.3.0 compliant)"]
+    Validate --> Ready["Publish export/epub/book.epub; epub_ready"]
+    Ready --> Fetch["Browser fetches download endpoint"]
+    Fetch --> Check{"HTTP OK / EPUB content type / nonempty"}
+    Check -->|Yes| Download["Blob download with UTF-8 filename and .epub extension"]
+    Check -->|No| Error["Show download error; keep manual download link when ready"]
 ```
+
+กด **สร้างไฟล์ EPUB** แล้วดาวน์โหลดอัตโนมัติ และมีลิงก์ดาวน์โหลดซ้ำ เมื่อแก้ HTML ต้นทางหรือแก้ไขสารบัญต้องสร้าง preview ใหม่ก่อน package; ไม่เรียก AI เพิ่มระหว่างสร้าง EPUB การผ่าน internal validator สอดคล้องกับมาตรฐาน EPUBCheck 5.3.0
+
+### 8. Structured OCR และหน้าตรวจเทียบ
+
+```mermaid
+flowchart TD
+    Artifact["Saved ocr.json / Schema 2.0.0"] --> Layout{"Page already has layout 1.0.0?"}
+    Layout -->|Yes| Reuse["Reuse saved semantic layout"]
+    Layout -->|No| Detect["Detect layout structure"]
+    Vector["PDF vector geometry"] --> Tables["Vector table: rows / cells / rowspan / colspan / bbox"]
+    OCR["OneOCR lines + bbox"] --> Tables
+    Raster["Scanned image pixel projection"] --> ScanTable["Scan table: detected grid / cells / scanned provenance"]
+    Tabs["Consecutive tab rows"] --> TabFallback["Tab fallback: table / unresolved cell bbox"]
+    Detect --> Tables
+    Detect --> ScanTable
+    Detect --> TabFallback
+    Tables --> Model["Versioned layout document (Layout Schema 1.0.0)"]
+    ScanTable --> Model
+    TabFallback --> Model
+    Reuse --> Model
+    Model --> Text["Tab-separated structured.txt"]
+    Model --> HTML["Sandboxed semantic structured.html (table / ul / ol / h1-h3)"]
+    Model --> JSON["layout.json"]
+    Variants["raw.txt / corrected.txt / final.txt"] --> CompareUI["Dual-pane comparison viewer"]
+    HTML --> CompareUI
+    CompareUI --> Interactive["Select page / zoom (50%-200%) / click block or cell"]
+    Interactive --> Highlight["Highlight exact BBox overlay on source PDF / image"]
+    HTML --> EPUBPipe["Structured XHTML export to EPUB pipeline"]
+```
+
+การส่งออกจาก artifact เดิมไม่เรียก OCR หรือ Local AI เพิ่ม งานที่ไม่มี bbox หรือ glyph ที่ตีความไม่ได้แสดง unresolved ตามจริง รองรับ vector/scanned table, raw/corrected/final, semantic HTML และ structured EPUB พร้อม stale guard
+
+### 9. Editable TOC และ stable targets
+
+```mermaid
+flowchart TD
+    HTML["Sanitized HTML h1-h3 IDs & chapter starts"] --> Targets["Stable targets: preserved ID or content hash"]
+    Targets --> Auto["Automatic TOC generation"]
+    Auto --> Editor["TOC Studio: edit label / reorder / nest level 1-3 / pick target"]
+    Editor --> Validate{"Valid label, hierarchy, unique target?"}
+    Validate -->|No| Unresolved["Show unresolved error; block Preview / package"]
+    Validate -->|Yes| Save["Atomic toc.json + toc_revision calculation"]
+    HTML --> Rematch["Source HTML changed: stable-ID then unique-key re-match"]
+    Rematch --> Editor
+    Save --> Preview["Update XHTML Quick Preview TOC"]
+    Save --> Nav["Update EPUB nav.xhtml"]
+    Preview --> Guard{"Source + TOC + Preview revisions match?"}
+    Guard -->|No| Stale9["HTTP 409 / stale warning; regenerate preview"]
+    Guard -->|Yes| Package9["Build package with EPUB exporter; automatic download"]
+```
+
+TOC editor รองรับจัดลำดับและย่อหน้าได้สูงสุด 3 ระดับ เลือกลิงก์ปลายทางจากหัวข้อหรือต้นบท และสร้าง href อัตโนมัติจาก BookModel งานเก่าที่ไม่มี `toc.json` ยังใช้สารบัญอัตโนมัติได้ตามปกติ รูปปกยังคงใช้ storage/API เดิมพร้อม UX ลากวางไฟล์ (Drag-and-drop), แสดง Thumbnail และข้อมูลขนาดไฟล์
 
 ---
 
@@ -414,11 +391,11 @@ flowchart TD
 
 ---
 
-### รันด่วน
+### วิธีที่ 1: รันด่วนด้วยชุดติดตั้งพร้อมแจกจ่าย (`publish/`)
 
-ชุดนี้มีไฟล์ binary, model, backend และหน้าเว็บครบแล้ว:
+เหมาะสำหรับการนำไปติดตั้งใช้งานบน Windows เครื่องอื่นทันที โดยในโฟลเดอร์ `publish/` ได้รวบรวมไฟล์ binary, โมเดล, โค้ด และหน้าเว็บไว้อย่างครบถ้วนแล้ว:
 
-1. เปิด **Command Prompt** ในโฟลเดอร์นี้
+1. เปิด **Command Prompt** ในโฟลเดอร์ `publish/`
 2. รันสคริปต์ติดตั้งระบบ (จะสร้าง virtual environment และดาวน์โหลด dependencies อัตโนมัติ):
    ```cmd
    .\install.cmd
@@ -431,9 +408,9 @@ flowchart TD
 
 ---
 
-### ติดตั้ง dependencies ด้วยตนเอง
+### วิธีที่ 2: ติดตั้งจาก Source Code สำหรับนักพัฒนา
 
-ใช้เมื่อต้องการสร้าง virtual environment เองแทน `install.cmd`:
+หากต้องการพัฒนาต่อ ปรับแต่ง หรือรันชุดทดสอบ (Tests):
 
 1. **ตรวจสอบโฟลเดอร์โมเดล OneOCR:**  
    ตรวจสอบว่ามีไฟล์ binary ครบถ้วนในโฟลเดอร์ `oneOCR/`:
@@ -453,7 +430,7 @@ flowchart TD
 3. **ติดตั้ง Dependencies:**
    ```powershell
    python -m pip install --upgrade pip
-   python -m pip install -r requirements.txt
+   python -m pip install -r publish/requirements.txt
    ```
 
 4. **เตรียมไฟล์การตั้งค่า (`.env`):**
@@ -461,7 +438,13 @@ flowchart TD
    Copy-Item .env.example .env
    ```
 
-5. **เริ่มการทำงานของเซิร์ฟเวอร์:**
+5. **ทดสอบความพร้อมของ OneOCR (Smoke Test):**
+   ```powershell
+   python tests/smoke_test_oneocr.py
+   ```
+   *หากผ่านจะแสดงข้อความ `Final Smoke Test Verdict: PASS`*
+
+6. **เริ่มการทำงานของเซิร์ฟเวอร์:**
    ```powershell
    python -m uvicorn src.server:app --host 127.0.0.1 --port 8000 --reload
    ```
@@ -565,10 +548,18 @@ Correct only OCR spelling mistakes in this text. original_text must be copied ex
 | **`ocr.json`** | ข้อมูลเชิงลึกของทุกหน้า: บล็อกข้อความ, พิกัด Bounding Box 4 จุด, เส้นทางที่ใช้ (Routing) และสถานะ |
 | **`changes.json`** | รายการข้อเสนอการแก้ไขของ AI: ข้อความเดิม, ข้อความใหม่, ตำแหน่งออฟเซ็ต และสถานะ (`pending`, `accepted`, `reverted`) |
 | **`page-images.zip`** | สร้างเมื่อขอดาวน์โหลดภาพ PDF; ภายในมี PNG หนึ่งไฟล์ต่อหนึ่งหน้าตามช่วงงาน เช่น `page_0001.png` ที่ 200 DPI |
+| **`export/basic.html`, `export/ai.html`, `export/final.html`** | HTML deterministic, AI annotations ที่ผ่าน validator และฉบับแก้มือ |
+| **`export/export_meta.json`** | mode, source revision, validation, จำนวน batch และ error |
+| **`export/ai_progress.json`** | task status, stage, เวลา, จำนวน batch และเหตุขัดข้อง |
+| **`export/structured/layout.json`** | เอกสารโครงสร้าง Layout Schema 1.0.0 (blocks, tables, rows, cells, lists, bboxes, provenance) |
+| **`export/structured/structured.txt`** | ข้อความคงโครงสร้างตารางแบบ Tab-separated สำหรับนำไปเปิดใน Spreadsheet / Excel |
+| **`export/structured/structured.html`** | HTML โครงสร้างแท้ (table, ul, ol, h1-h3) พร้อม Sandboxed Preview |
+| **`export/epub/cover.png`** | รูปปกหนังสือที่ผ่านการประมวลผลและ sanitize แล้ว |
 | **`export/epub/preview.xhtml`** | XHTML Quick Preview ที่สร้างก่อน package ใช้ sandbox และ CSP |
 | **`export/epub/preview_payload.json`** | canonical payload ของบท, metadata, source revision และ preview revision ที่ใช้สร้าง EPUB |
+| **`export/epub/toc.json`** | สารบัญแก้มือ schema 9.0 พร้อม source/TOC revision และ stable target identity |
 | **`export/epub/book.epub`** | EPUB แบบ reflowable ที่ผ่าน structural validator ภายในระบบ |
-| **`export/epub/epub_meta.json`** | สถานะ Phase 8, source/preview revision, hash, validation result และขนาดไฟล์ |
+| **`export/epub/epub_meta.json`** | สถานะ EPUB, source/TOC/preview revision, hash, validation result และขนาดไฟล์ |
 
 ---
 
@@ -629,7 +620,10 @@ Correct only OCR spelling mistakes in this text. original_text must be copied ex
 
 | Method | Endpoint | พารามิเตอร์ / Body | คำอธิบาย |
 |---|---|---|---|
-| `POST` | `/api/jobs/{job_id}/export/html` | JSON: `{ mode: "basic" \| "ai" }` | สร้างเอกสาร HTML โครงสร้าง (`basic` = deterministic, `ai` = ใช้ AI จัดโครงสร้างหัวข้อ/ย่อหน้า) |
+| `POST` | `/api/jobs/{job_id}/export/html` | JSON: `{ mode: "basic" \| "ai" }` | API synchronous เดิมสำหรับ compatibility; หน้าเว็บ AI ใช้ `/ai/start` (`basic` = deterministic, `ai` = ใช้ AI จัดโครงสร้างหัวข้อ/ย่อหน้า) |
+| `POST` | `/api/jobs/{job_id}/export/html/ai/start` | Path: `job_id` | เริ่ม background task; HTTP 202, shared AI lock และ reuse task เดิม |
+| `GET` | `/api/jobs/{job_id}/export/html/ai/progress` | Path: `job_id` | progress, stage, counts, elapsed/waiting, timeout และ error; no-store |
+| `POST` | `/api/jobs/{job_id}/export/html/ai/cancel` | Path: `job_id` | ขอหยุดแบบ cooperative; รอ batch ปัจจุบัน |
 | `GET` | `/api/jobs/{job_id}/export/html/status` | Path: `job_id` | ตรวจสอบสถานะการแปลง HTML และ revision ว่าล้าสมัย (stale) หรือไม่ |
 | `GET` | `/api/jobs/{job_id}/export/html/{variant}` | Path: `variant` = `basic` \| `ai` \| `final` | ดาวน์โหลดไฟล์ HTML โครงสร้าง (RFC 5987 UTF-8 attachment) |
 | `GET` | `/api/jobs/{job_id}/export/html/{variant}/preview` | Path: `variant` = `basic` \| `ai` \| `final` | ดูตัวอย่าง HTML แบบ Sandboxed CSP ปลอดภัย |
@@ -637,15 +631,29 @@ Correct only OCR spelling mistakes in this text. original_text must be copied ex
 
 HTML export ใช้ฟอนต์ระบบในเครื่องและไม่โหลด Google Fonts หรือทรัพยากรภายนอก. โหมด `basic` เป็น deterministic; โหมด `ai` ใช้ได้เมื่อ Local LLM พร้อมและถูกจำกัดให้ทำงานพร้อมกับ OCR+AI ได้ครั้งละหนึ่งงาน. การวัดเวลา/VRAM ของ AI และ precision/recall ของ semantic tags จะรายงานต่อเมื่อมีผลวัด Local LLM จริงและเฉลยระดับ element ที่ผู้ตรวจรับรองแล้วเท่านั้น.
 
-### 7. หมวดส่งออก EPUB และ XHTML Quick Preview
+### 6.1 หมวดส่งออกโครงสร้างตารางและรายการ (Structured OCR Export — Phase 8.1)
 
 | Method | Endpoint | พารามิเตอร์ / Body | คำอธิบาย |
 |---|---|---|---|
-| `POST` | `/api/jobs/{job_id}/export/epub/preview` | JSON: `{ source_variant, chapter_split, metadata }` | สร้าง XHTML Quick Preview โดยยังไม่ package EPUB |
+| `POST` | `/api/jobs/{job_id}/export/structured` | Path: `job_id` | สร้างผลลัพธ์ Structured Text / HTML จาก `ocr.json` เดิมโดยไม่รัน OCR/AI ซ้ำ |
+| `GET` | `/api/jobs/{job_id}/export/structured/status` | Path: `job_id` | ตรวจสอบสถานะ structured export, ความล้าสมัย (stale) และสถิติโครงสร้าง (ตาราง/เซลล์/รายการ) |
+| `GET` | `/api/jobs/{job_id}/export/structured/{variant}` | Path: `variant` = `text` | `html` | `layout` | ดาวน์โหลดไฟล์ `structured.txt`, `structured.html` หรือ `layout.json` |
+
+### 7. หมวดส่งออก EPUB, XHTML Quick Preview และ TOC Editor (Phase 8 & Phase 9)
+
+| Method | Endpoint | พารามิเตอร์ / Body | คำอธิบาย |
+|---|---|---|---|
+| `POST` | `/api/jobs/{job_id}/export/epub/preview` | JSON: `{ source_variant, chapter_split, metadata, cover?, toc_revision? }` | สร้าง XHTML Quick Preview โดยยังไม่ package EPUB |
+| `GET` | `/api/jobs/{job_id}/export/epub/toc` | Query: `source_variant`, `chapter_split` | อ่าน entries, targets, revision และผล re-match |
+| `PUT` | `/api/jobs/{job_id}/export/epub/toc` | JSON: `{ entries, base_source_revision, base_toc_revision, base_preview_revision }` | ตรวจและบันทึกสารบัญแบบ atomic; revision ไม่ตรงคืน 409 |
+| `POST` | `/api/jobs/{job_id}/export/epub/toc/regenerate` | JSON: base revisions และ `confirm: true` | สร้างสารบัญอัตโนมัติใหม่โดยยืนยันก่อนทับ |
+| `GET` | `/api/jobs/{job_id}/export/epub/cover` | Path: `job_id` | รูปปก PNG ที่ sanitize แล้วผ่าน loopback; nosniff/no-store |
 | `GET` | `/api/jobs/{job_id}/export/epub/preview` | Path: `job_id` | แสดง XHTML Quick Preview พร้อม CSP sandbox และ nosniff |
 | `POST` | `/api/jobs/{job_id}/export/epub` | JSON: `{ base_preview_revision }` | ตรวจ revision แล้ว package EPUB; คืน 409 เมื่อต้นทางหรือ Preview เปลี่ยน |
 | `GET` | `/api/jobs/{job_id}/export/epub/status` | Path: `job_id` | ตรวจ `preview_ready`, `ready`, `stale`, validation และ file metadata |
 | `GET` | `/api/jobs/{job_id}/export/epub/download` | Path: `job_id` | ดาวน์โหลด `.epub` แบบ attachment ชื่อ UTF-8 |
+
+รูปปกใช้ `cover: {data_base64, alt}` (PNG/JPEG สูงสุด 2 MB) หรือ `{reuse: true, alt}` เพื่อใช้ปกเดิม; metadata รองรับ identifier, description และ date ISO 8601 เพิ่มเติม
 
 Quick Preview ใช้ XHTML ชุดข้อมูลเดียวกับ chapter XHTML ใน EPUB และไม่ใช้ EPUB renderer. Phase 8 ไม่เรียก Local LLM เพิ่มเอง; ถ้าต้องการ semantic structure จาก AI ให้เลือก `ai.html` ที่ผ่าน Phase 7 validator แล้ว.
 
@@ -654,7 +662,8 @@ Quick Preview ใช้ XHTML ชุดข้อมูลเดียวกั�
 | Method | Endpoint | พารามิเตอร์ / Body | คำอธิบาย |
 |---|---|---|---|
 | `POST` | `/api/admin/cleanup` | Query: `max_age_seconds?` | สั่งลบงานที่หมดอายุตามนโยบาย Retention โดยไม่แตะต้องงานที่กำลังรัน |
-| `DELETE` | `/api/jobs/{job_id}` | Path: `job_id`, Query: `force: bool` | ลบงานและโฟลเดอร์ผลลัพธ์ของ `job_id` นั้นทิ้งอย่างถาวร |
+| `DELETE` | `/api/admin/jobs` | - | ลบทุกงาน OCR ทุกสถานะ; คืน deleted_count/deleted_jobs/failed_jobs; 409 ถ้า AI lock ไม่ว่าง |
+| `DELETE` | `/api/jobs/{job_id}` | Path: `job_id`, Query: `force: bool` | ลบงานและโฟลเดอร์ผลลัพธ์; 409 เมื่อ HTML AI ยัง active แม้ระบุ force |
 
 ### ตัวอย่างการเรียกใช้งานด้วย cURL (Quick Example)
 
@@ -680,7 +689,7 @@ curl -O http://127.0.0.1:8000/api/jobs/abc123xyz/download/final.txt
 ## โครงสร้างโฟลเดอร์ (Repository Structure)
 
 ```text
-publish/
+OCR/
 ├── src/                    # ซอร์สโค้ดหลักของ Backend และ OCR Pipeline
 │   ├── server.py           # FastAPI Web Application & REST Endpoints
 │   ├── pipeline.py         # OCR & Assembly Processing Pipeline
@@ -689,33 +698,47 @@ publish/
 │   ├── database.py         # SQLite WAL Database Handler
 │   ├── oneocr_wrapper.py   # OneOCR ctypes Wrapper & ABI Definitions
 │   ├── diff_engine.py      # Character-level Diff & Proposal Engine
-│   ├── llm_client.py       # Local LLM OpenAI-compatible Client
+│   ├── llm_client.py       # Local LLM client / capability-based HTML reasoning off
+│   ├── html_ai_tasks.py    # Background thread, progress persistence และ cancellation
 │   ├── html_exporter.py    # Structured HTML Export & Strict Allowlist Sanitizer
+│   ├── structured_layout.py # Phase 8.1 Layout Schema 1.0.0, ตาราง (Vector/Scan) และรายการ
+│   ├── toc_editor.py       # Phase 9 Editable TOC Model, Stable Targets และ Revision Conflict
 │   ├── epub_exporter.py    # XHTML Quick Preview, EPUB 3 Packaging & Validator
+│   ├── job_artifact_guard.py # Guard ตรวจสอบความถูกต้องของ artifact และ revision
 │   └── cleanup_service.py  # ลบงานตามคำสั่งจากหน้า History / API
-├── static/                 # หน้าเว็บและส่วนติดต่อผู้ใช้ (Frontend แยก 5 แท็บ)
+├── static/                 # หน้าเว็บและส่วนติดต่อผู้ใช้ (Frontend แยก 6 แท็บ)
 │   ├── index.html          # โครงหลัก Web Studio และ Template Partials Container
 │   ├── text.html           # แท็บผลข้อความ Dual-Pane Studio
 │   ├── html.html           # แท็บ HTML Studio (CodeMirror + Visual Editor + Preview)
-│   ├── epub.html           # แท็บ EPUB Studio (XHTML Quick Preview + Packager)
+│   ├── epub.html           # แท็บ EPUB Studio (XHTML Quick Preview + Packager + TOC Editor + Cover)
+│   ├── structured.html     # แท็บ Structured OCR (ตาราง/รายการ + หน้าตรวจเทียบ BBox)
 │   ├── config.html         # หน้าจอตั้งค่า Local LLM
 │   ├── app.js              # ตัวจัดการสถานะกลางและประสานงานแท็บ (App Controller)
 │   ├── text.js             # ตัวควบคุมแท็บผลข้อความ (Text Controller)
 │   ├── html.js             # ตัวควบคุมแท็บ HTML และ CodeMirror (HTML Controller)
-│   ├── epub.js             # ตัวควบคุมแท็บ EPUB และ Quick Preview (EPUB Controller)
+│   ├── epub.js             # ตัวควบคุมแท็บ EPUB, Quick Preview และ TOC Editor (EPUB Controller)
+│   ├── structured.js       # ตัวควบคุมแท็บ Structured OCR และ BBox Overlay (Structured Controller)
 │   ├── visual.js           # ตัวควบคุม Visual Editor แบบ Word (WYSIWYG Controller)
 │   ├── vendor/codemirror/  # ไลบรารี CodeMirror 5.65.21 สำหรับใช้งานแบบ Offline
+│   ├── minimal.css         # Minimal Light/Dark, icons, responsive และ accessibility
 │   └── app.css             # ดีไซน์และชุดแต่ง Modern Dark/Light Theme
 ├── oneOCR/                 # OneOCR Binary DLL & Model Runtime (64-bit)
-├── data/                   # SQLite job database (สร้างขณะใช้งาน)
-├── files/                  # ไฟล์อัปโหลดและผลลัพธ์ (สร้างขณะใช้งาน)
+├── publish/                # ชุดติดตั้งสำเร็จรูปสำหรับ Deploy บนเครื่องอื่น (ขนาด ~145 MB)
+├── demo/                   # ชุดเอกสารทดสอบที่ได้รับอนุมัติ (01.pdf–08.pdf, 01.png–02.png, 09.png–13.png)
+├── tests/                  # ชุดทดสอบอัตโนมัติ (Unit / Regression / Benchmarks)
+│   ├── phase1/ - phase8/   # ชุดทดสอบแยกตาม Phase การพัฒนา
+│   ├── phase8_1/           # ชุดทดสอบ Structured Layout, Table/List, Browser Automation & Readers
+│   ├── phase9/             # ชุดทดสอบ Editable TOC Model, Stable Targets & Stale Guard
+│   ├── test_gemini_acceptance_09.py       # ชุดทดสอบตรวจรับ UI, Visual Editor และ EPUB
+│   ├── test_studio_workspace.py           # Playwright UI & Cross-Browser Automation
+│   ├── test_visual_html.py                # ทดสอบความปลอดภัยและการแปลง Visual HTML
+│   ├── test_clean_installation.py          # สคริปต์ตรวจรับ Clean Environment
+│   └── test_browser_automation_chrome_edge.py # Playwright Cross-browser Automation
+├── phase1/ - phase8_1/     # รายงานผลและหลักฐานการตรวจรับ (Evidence Reports)
 ├── checklist.md            # จุดตรวจบังคับและเกณฑ์การตรวจรับราย Phase
 ├── manual.md               # คู่มือการติดตั้ง เริ่ม/หยุดระบบ และการบำรุงรักษา
-├── gemini.md               # บันทึกผลการตรวจรับและสถาปัตยกรรมระบบ (Read-only)
-├── install.cmd             # สร้าง virtual environment และติดตั้ง dependencies
-├── run_server.cmd          # เริ่ม FastAPI server
-├── stop_server.cmd         # หยุด FastAPI server ที่ port 8000
-├── requirements.txt        # Python dependencies
+├── gemini.md               # บันทึกความเห็นและการออกแบบสถาปัตยกรรม (Read-only)
+├── gpt.md                  # บันทึกข้อเสนอ ประเด็นคงค้าง และการตรวจรับ
 └── readme.md               # เอกสารภาพรวมและขอบเขตของโครงการ (หน้านี้)
 ```
 
@@ -723,7 +746,28 @@ publish/
 
 ## ผลการทดสอบและเกณฑ์ตรวจรับ (Verification & Benchmarks)
 
-สถานะด้านล่างสรุปจากหลักฐานที่บันทึกในโครงการ ณ วันที่ 2026-10-03 เพื่อไม่ให้ผลที่ยังไม่มีหลักฐานถูกแสดงเป็นผ่าน
+เอกสารอัปเดต 2026-10-04; ตารางตรวจรับเดิมด้านล่างอ้างอิงหลักฐาน ณ วันที่ 2026-10-03 เพื่อไม่ให้ผลที่ยังไม่มีหลักฐานถูกแสดงเป็นผ่าน
+
+### การตรวจล่าสุด 2026-10-06
+
+- **Phase 8.1 (Structured OCR):** Implementation สมบูรณ์ครบถ้วน Layout Schema 1.0.0, ตรวจจับตารางจาก PDF Vector Geometry และภาพสแกน (Scanned Projection Grid), ตรวจจับรายการ (List Bullet/Numbered), ส่งออก Structured Text/HTML จาก artifact เดิมโดยไม่ต้องรัน OCR/AI ซ้ำ, หน้าจอตรวจเทียบ Dual-Pane พร้อมระบบซูม 50%–200% และไฮไลต์ Bounding Box อัตโนมัติ:
+  - Source/publish automated tests ผ่าน 12/12 PASS
+  - Browser Automation บน Chrome และ Edge: ผ่าน 100%, reflow ตารางบนหน้าจอมือถือ (430x720) ผ่าน 100%, zero external calls
+  - EPUBCheck 5.3.0 ตรวจสอบไฟล์ `.epub` โครงสร้างตาราง: 0 errors, 0 warnings
+  - Reader engines (epub.js และ Foliate): แสดงผลตาราง 32 เซลล์และ reflow ถูกต้อง 100%
+  - Performance Benchmark: 10 runs ได้ latency p95 = 0.6804s (เกณฑ์ ≤ 5.0s), RSS Memory = 61.15 MB (เกณฑ์ ≤ 256 MB) ผ่านงบอย่างมีประสิทธิภาพ
+- **Phase 9 (Editable EPUB TOC & Stable Targets):**
+  - Schema 9.0 พร้อม stable target ID (ต้นบท และ heading h1–h3) ป้องกันลิงก์เลื่อนหลุด
+  - บันทึก `export/epub/toc.json`, คำนวณ `toc_revision`, ตรวจจับความขัดแย้ง (Conflict HTTP 409), Stale Guard เมื่อ HTML ต้นทางเปลี่ยน และ Auto Re-match
+  - Unit & Integration tests (`tests/phase9/test_toc_editor.py`): 5/5 PASS (0.69s)
+- **HTML AI & Local LLM:** มี regression tests สำหรับ reasoning off, HTML AI batches/progress, ลบทุกงานและ cleanup selection, EPUB automatic download; ผลตรวจรับแต่ละ Phase เดิมยังคงตามหลักฐานด้านล่าง
+- ตัวอย่างรันจาก root ด้วย PowerShell (ใช้ environment ที่ติดตั้ง dependencies แล้ว):
+
+```powershell
+& .\publish\venv\Scripts\python.exe -m unittest tests.phase8_1.test_structured_layout
+& .\publish\venv\Scripts\python.exe -m unittest tests.phase9.test_toc_editor
+& .\publish\venv\Scripts\python.exe -m tests.test_epub_download_ui
+```
 
 ### ผ่านตามขอบเขตที่ทดสอบ
 
@@ -761,13 +805,25 @@ publish/
 | HTML Export AI latency / VRAM | **NOT TESTED** | ยังไม่มีผลวัดซ้ำได้จาก Local LLM และตัววัด VRAM; ไม่ใช้ค่าประมาณแทนผลจริง |
 | HTML Export precision / recall | **NOT TESTED** | manifest ปัจจุบันมีเพียงยอดรวม ต้องมีเฉลยระดับ element ที่ผู้ตรวจรับรองก่อนคำนวณ |
 | Browser automation Phase 7 หลังปรับ offline/XSS/download/409 | **PENDING** | โค้ดและ syntax ตรวจแล้ว; รอรัน integration suite ใน workspace แยกเพื่อเก็บหลักฐานใหม่ |
-| Phase 8 EPUB Export & XHTML Quick Preview | **IN PROGRESS** | Core/API tests 6/6 PASS และ smoke test 44 หน้าผ่าน internal validator; รอ EPUBCheck, Chrome/Edge automation, reader compatibility และ benchmark |
+| Phase 8 EPUB Export & XHTML Quick Preview | **PASSED: 44-PAGE SCOPE** | ผ่านชุดจริง 44 หน้า: roundtrip, EPUBCheck 5.3.0 0 errors/warnings, Chrome/Edge, reader engines 2 ตัว และ benchmark; edge cases จำลองรอข้อยกเว้นชุดข้อมูล |
 | การยอมรับข้อจำกัดก่อนใช้งานจริง | **PENDING** | รอเจ้าของงานตรวจผลและยอมรับข้อจำกัดที่ระบุไว้ |
+
+## การแก้ปัญหาล่าสุด
+
+| อาการ | ตรวจสอบ / วิธีแก้ |
+|---|---|
+| `GET /static/... 304 Not Modified` | cache ปกติ ไม่ใช่ผลการลบงาน; ดู response ของ `DELETE /api/admin/jobs` |
+| ลบทุกงานไม่ครบ | ดู `failed_jobs`; ไฟล์อาจถูกโปรแกรมอื่นล็อก หาก 409 ให้ยกเลิก AI และรอหยุดก่อน |
+| HTML AI ใช้เวลานาน | ดู batch, stage, elapsed, waiting และ timeout ในแท็บ HTML; timeout เป็นต่อ request ไม่ใช่ทั้งเอกสาร |
+| HTML AI ไม่สำเร็จ | ดู error/failed_chunk; ทดสอบ Local AI, ตรวจ model และ timeout; ระบบยังใช้ basic.html ได้ |
+| Refresh ขณะ AI ทำงาน | เปิดงานเดิมเพื่อดู progress ต่อ; restart server ต้องสั่ง AI ใหม่ |
+| EPUB ไม่ดาวน์โหลด | ตรวจว่ามี preview ปัจจุบันและ package พร้อม; ดู error แล้วใช้ลิงก์ดาวน์โหลดซ้ำ |
+| แก้โค้ดแล้วไม่เห็นผล | Backend ต้อง stop/start server; Frontend ใช้ Ctrl+F5; run_server ไม่ reload โค้ดที่กำลังรัน |
 
 ## ข้อควรรู้ก่อนเผยแพร่บน GitHub
 
 - ห้าม commit `.env`, `venv/`, `data/jobs.db` และไฟล์ใน `files/` เพราะอาจมีค่า Local LLM หรือเอกสารที่ผู้ใช้อัปโหลด
-- repository มี `.gitignore` สำหรับตัดไฟล์ runtime เหล่านี้ออกแล้ว
+- โฟลเดอร์ `publish/` มี `.gitignore` สำหรับตัดไฟล์ runtime เหล่านี้ออกแล้ว
 - ตรวจสิทธิ์การแจกจ่าย OneOCR binary และ model ตามนโยบายองค์กรหรือสิทธิ์ของ Windows ก่อนเผยแพร่ repository แบบสาธารณะ
 - การตรวจแก้ด้วย AI เป็นทางเลือก; ผู้ใช้ใหม่ยังใช้งาน OCR แบบ Baseline ได้โดยไม่ต้องติดตั้งหรือเปิด Local LLM
 
@@ -777,3 +833,53 @@ publish/
 
 - ซอร์สโค้ดและระบบเว็บนี้พัฒนาขึ้นเพื่อการใช้งานภายในเครื่อง (Localhost Desktop Utility)
 - ไบนารีและโมเดล OneOCR (`oneocr.dll`, `oneocr.onemodel`, `onnxruntime.dll`) มาจาก Windows 11 Snipping Tool สำหรับการใช้งานส่วนบุคคลบนระบบปฏิบัติการ Windows ที่มีลิขสิทธิ์ถูกต้อง
+
+
+<a id="phase8-phase9-boundary"></a>
+
+## ขอบเขต Phase 8–9 ที่ใช้ร่วมกัน
+
+Phase 8 ดูแล EPUB pipeline, XHTML Preview และรูปปก ส่วน Phase 9 เพิ่มสารบัญแก้มือ, `toc.json` และ stable targets โดยใช้ exporter/validator/ปกเดิม Implementation และ automated acceptance ผ่านแล้ว
+
+ปกคง input สูงสุด 2 MB / 16 megapixels และ canonical PNG สูงสุด 8 MB ใช้ preview payload และ API เดิม Phase 9 ไม่เพิ่ม storage/API ปกอีกชุด; UI เพิ่ม thumbnail, drag-and-drop และรายละเอียดไฟล์
+
+Phase 9 รวม `toc_revision` ใน preview config เดิม งานเก่าไม่มี `toc.json` ใช้สารบัญอัตโนมัติได้ Source/publish 9/9, Phase 8 regression 17/17, EPUBCheck 5.3.0, epub.js/Foliate และ benchmark ผ่าน ดู [checklist](checklist.md#phase-9--แก้ไขสารบัญ-epub-และ-stable-targets-editable-epub-toc) และ [หลักฐาน](phase9/evidence.md)
+
+## Phase 8.1 — Structured OCR
+
+Implementation เสร็จแล้ว: layout schema 1.0.0, vector/scanned table, OCR-to-cell mapping, heading/list, Text/HTML, raw/corrected/final comparison, stale revision และ structured EPUB ใช้งานได้ Source/publish suite ผ่านฝั่งละ 12/12; Chrome/Edge, EPUBCheck 5.3.0, epub.js/Foliate และ benchmark ผ่านทั้งหมด
+
+`demo/04.pdf` ได้ 4 คอลัมน์ × 9 แถว = 36 cells ทั้ง vector และ scanned derivative ส่วน `demo/08.pdf` 11 หน้าได้ 29 tables ระบบคง private-use checkbox glyph 9 จุดเป็น unresolved และไม่เดาค่า สถานะสุดท้ายรอเจ้าของงานยืนยัน ground truth ด้วยคน ดู [checklist](checklist.md#phase8-1), [หลักฐาน](phase8_1/evidence.md) และ [manifest](phase8_1/dataset_manifest.json)
+
+## Phase 9 — Editable EPUB TOC
+
+ระบบแก้ไขสารบัญ EPUB และ Stable Targets พัฒนาต่อยอดบนระบบ EPUB ของ Phase 8:
+- **TOC Data Model (`toc.json`):** รองรับ Schema 9.0, จัดเก็บ entry ID, label, parent ID, level (1–3), order, target ID และสถานะ user-edited / auto-generated พร้อม atomic write
+- **Stable Targets:** ดึง target จากต้นบท (chapter start) และหัวข้อ `h1`–`h3` ภายในเอกสาร กำหนด ID ถาวร ทำให้การแทรกหัวข้อใหม่ไม่ทำให้ลิงก์สารบัญเดิมเลื่อนผิดตำแหน่ง
+- **TOC Web Studio:** ส่วนต่อประสานผู้ใช้ในแท็บ EPUB แสดงรายการสารบัญ รองรับการเพิ่มรายการ, ลบรายการ, แก้ไขชื่อ, เลื่อนลำดับขึ้น/ลง, ปรับระดับชั้น (Indent/Outdent) และเลือกลิงก์ปลายทาง
+- **Revision & Stale Protection:** ทำงานร่วมกับ `source_revision`, `toc_revision` และ `preview_revision`; หากมีการแก้ไข HTML ต้นทาง ระบบจะแจ้งเตือนและทำการ Re-match หัวข้อให้อัตโนมัติ โดยรายการที่ปลายทางหายไปจะขึ้นสถานะ `unresolved` ชัดเจน
+- **EPUB Packaging Sync:** รวมสารบัญที่แก้ไขแล้วเข้าสู่ XHTML Quick Preview และไฟล์ `EPUB/nav.xhtml` ในหนังสือ EPUB โดยตรง ผ่านการทดสอบความถูกต้องและการเปิดอ่านด้วย Reader engines
+
+## Phase 10 — Document Translation
+
+Phase 10 วางแผนให้ผู้ใช้เลือกภาษาต้นทาง/ปลายทางและรูปแบบ `ทั่วไป`, `นิยาย`, `วิชาการ` หรือ `ราชการ` โดยใช้ Google Cloud Translation, Local AI หรือ Hybrid ตามที่เลือก
+
+```mermaid
+flowchart LR
+    Source["Saved final / structured artifact"] --> Segment["Stable block-cell-target segments"]
+    Segment --> Config["Source-target language / style / glossary"]
+    Config --> Provider{"Provider"}
+    Provider --> Google["Google baseline"]
+    Provider --> Local["Local AI"]
+    Google --> Hybrid["Optional AI style polish"]
+    Local --> Validate["Structure / critical-token validator"]
+    Hybrid --> Validate
+    Google --> Validate
+    Validate --> Review["Source / baseline / AI / final diff"]
+    Review --> Export["Translated Text / HTML / EPUB"]
+```
+
+ระบบจะรักษา segment ID, ตาราง, heading และ TOC target เดิม แยก source/Google/AI/manual-final พร้อม revision guard กฎร่วมทุก style คือไม่บังคับแปลทุกคำ โดยศัพท์เฉพาะทาง ชื่อเทคโนโลยี ชื่อผลิตภัณฑ์ ตัวย่อ หรือคำที่แปลแล้วทำให้ความหมายคลาดเคลื่อน สามารถคงคำเดิมหรือใช้คำทับศัพท์ตาม glossary/context ได้ Google/Hybrid ต้อง opt-in เพราะข้อความออกจากเครื่อง ส่วน Local AI ทำงานโดยไม่มี external request การตรวจรับคุณภาพต้องใช้ชุดข้อมูลคู่ภาษาที่ผู้ใช้อนุมัติและ blind human review ดูรายละเอียดใน [Phase 10 checklist](checklist.md#phase-10--แปลเอกสารหลายภาษาและเลือกรูปแบบการแปล-document-translation)
+
+ชุด input ที่ล็อกสำหรับ Phase 10 คือ `demo/08.pdf` ตารางอังกฤษ, `09.png` จีน+อังกฤษพร้อมศัพท์เฉพาะ, `10.png`–`11.png` นิยายอังกฤษ, `12.png` หนังสือสอน IT และ `13.png` หนังสือสอน IT ที่มี code program รายละเอียดและ SHA-256 อยู่ใน `phase10/dataset_manifest.json` ชุดนี้ยังไม่มีเอกสารราชการและยังต้องจัดทำ ground truth ก่อนใช้ตัดสินคุณภาพคำแปล
+

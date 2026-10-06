@@ -49,6 +49,9 @@ DEFAULT_OUTPUT_DIR = "files"
 # Global managers
 db = JobDatabase(db_path=DEFAULT_DB_PATH)
 job_manager = JobManager(db_path=DEFAULT_DB_PATH, output_dir=DEFAULT_OUTPUT_DIR)
+from src.html_ai_tasks import HtmlAiTasks
+html_ai_tasks = HtmlAiTasks(db, job_manager, DEFAULT_OUTPUT_DIR)
+job_manager.html_ai_tasks = html_ai_tasks
 
 JOB_ID_PATTERN = r"^[A-Za-z0-9_-]{1,64}$"
 JobId = Annotated[str, Path(pattern=JOB_ID_PATTERN, description="Unique job identifier")]
@@ -87,6 +90,7 @@ async def lifespan(app: FastAPI):
     db.recover_interrupted_jobs()
     yield
     # Shutdown
+    html_ai_tasks.shutdown()
     job_manager.shutdown()
 
 
@@ -863,7 +867,7 @@ def serve_index():
     if os.path.exists(index_file):
         with open(index_file, encoding="utf-8") as source:
             markup = source.read()
-        for name in ("text", "html", "epub"):
+        for name in ("text", "html", "epub", "structured"):
             with open(os.path.join(STATIC_DIR, f"{name}.html"), encoding="utf-8") as partial:
                 markup = markup.replace(f"<!-- include:{name}.html -->", partial.read())
         return HTMLResponse(markup)
@@ -899,6 +903,15 @@ def trigger_cleanup(max_age_seconds: Optional[float] = Query(None, description="
     return res
 
 
+@app.delete("/api/admin/jobs")
+def delete_all_jobs_endpoint():
+    """Explicit confirmed bulk deletion, including queued and running jobs."""
+    try:
+        return job_manager.delete_all_jobs()
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+
+
 @app.delete("/api/jobs/{job_id}")
 def delete_job_endpoint(job_id: JobId, force: bool = Query(False)):
     """
@@ -906,6 +919,8 @@ def delete_job_endpoint(job_id: JobId, force: bool = Query(False)):
     If job is currently running or queued and force=False, returns HTTP 400.
     """
     from src.cleanup_service import delete_single_job
+    if html_ai_tasks.is_active(job_id):
+        raise HTTPException(status_code=409, detail="กรุณายกเลิกการสร้าง HTML ด้วย AI และรอให้หยุดก่อนลบงาน")
     try:
         res = delete_single_job(
             job_id=job_id,
@@ -918,7 +933,7 @@ def delete_job_endpoint(job_id: JobId, force: bool = Query(False)):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
         return res
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=409 if str(e).startswith("Conflict:") else 400, detail=str(e))
 
 
 # ------------------------------------------------------------------------------
@@ -939,10 +954,106 @@ class EpubPreviewRequest(BaseModel):
     source_variant: str = "auto"
     metadata: Optional[Dict[str, Any]] = None
     chapter_split: str = "heading"
+    cover: Optional[Dict[str, Any]] = None
+    toc_revision: Optional[str] = None
 
 
 class EpubPackageRequest(BaseModel):
     base_preview_revision: str
+
+
+class TocSaveRequest(BaseModel):
+    entries: List[Dict[str, Any]]
+    base_source_revision: str
+    base_toc_revision: str
+    base_preview_revision: Optional[str] = None
+    source_variant: str = "auto"
+    chapter_split: str = "heading"
+
+
+class TocRegenerateRequest(BaseModel):
+    confirm: bool = False
+    base_source_revision: str
+    base_toc_revision: str
+    base_preview_revision: Optional[str] = None
+    source_variant: str = "auto"
+    chapter_split: str = "heading"
+
+
+# ------------------------------------------------------------------------------
+# Phase 8.1: Structured OCR exports (reuses saved OCR; never starts OCR/AI)
+# ------------------------------------------------------------------------------
+
+@app.post("/api/jobs/{job_id}/export/structured")
+def export_structured_endpoint(job_id: JobId):
+    if not db.get_job_status(job_id):
+        raise HTTPException(status_code=404, detail="Job not found")
+    from src.structured_layout import generate_structured_exports
+    try:
+        meta = generate_structured_exports(job_id, files_dir=DEFAULT_OUTPUT_DIR)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except (ValueError, TypeError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {"status": "ready", "meta": meta}
+
+
+@app.get("/api/jobs/{job_id}/export/structured/status")
+def export_structured_status_endpoint(job_id: JobId):
+    if not db.get_job_status(job_id):
+        raise HTTPException(status_code=404, detail="Job not found")
+    from src.structured_layout import get_structured_status
+    return get_structured_status(job_id, files_dir=DEFAULT_OUTPUT_DIR)
+
+
+@app.get("/api/jobs/{job_id}/export/structured/{variant}")
+def download_structured_endpoint(
+    job_id: JobId,
+    variant: str = Path(pattern=r"^(text|html|layout)$"),
+):
+    job = db.get_job_status(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    names = {"text": ("structured.txt", "text/plain; charset=utf-8"),
+             "html": ("structured.html", "text/html; charset=utf-8"),
+             "layout": ("layout.json", "application/json; charset=utf-8")}
+    filename, media_type = names[variant]
+    file_path = os.path.abspath(os.path.join(DEFAULT_OUTPUT_DIR, job_id, "export", "structured", filename))
+    if is_path_traversal(file_path, DEFAULT_OUTPUT_DIR) or not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail=f"Structured {variant} export not found")
+    from urllib.parse import quote
+    download_name = f"{job.filename}_{filename}"
+    headers = {
+        "Content-Disposition": f"attachment; filename=\"{filename}\"; filename*=UTF-8''{quote(download_name)}",
+        "Content-Security-Policy": "sandbox; default-src 'none'; style-src 'unsafe-inline'",
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "no-store",
+    }
+    return FileResponse(file_path, media_type=media_type, headers=headers)
+
+
+@app.post("/api/jobs/{job_id}/export/html/ai/start", status_code=202)
+def start_html_ai_task(job_id: JobId):
+    if not db.get_job_status(job_id):
+        raise HTTPException(status_code=404, detail="Job not found")
+    try:
+        return html_ai_tasks.start(job_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+
+
+@app.get("/api/jobs/{job_id}/export/html/ai/progress")
+def get_html_ai_progress(job_id: JobId):
+    if not db.get_job_status(job_id):
+        raise HTTPException(status_code=404, detail="Job not found")
+    return JSONResponse(html_ai_tasks.status(job_id), headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/jobs/{job_id}/export/html/ai/cancel")
+def cancel_html_ai_task(job_id: JobId):
+    if not db.get_job_status(job_id):
+        raise HTTPException(status_code=404, detail="Job not found")
+    return html_ai_tasks.cancel(job_id)
 
 
 @app.post("/api/jobs/{job_id}/export/html")
@@ -959,6 +1070,8 @@ def export_html_endpoint(job_id: JobId, req: HtmlExportRequest = HtmlExportReque
     mode = req.mode.lower().strip()
     if mode not in ("basic", "ai"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Allowed export modes: 'basic', 'ai'")
+    if html_ai_tasks.is_active(job_id):
+        raise HTTPException(status_code=409, detail="กำลังสร้าง HTML ด้วย AI กรุณารอหรือยกเลิกงานเดิมก่อนสร้างใหม่")
 
     if mode == "ai":
         from src.llm_client import LocalLLMClient
@@ -985,7 +1098,7 @@ def export_html_endpoint(job_id: JobId, req: HtmlExportRequest = HtmlExportReque
                 basic_html, meta = generate_basic_html(job_id, files_dir=DEFAULT_OUTPUT_DIR)
                 job_dir = os.path.abspath(os.path.join(DEFAULT_OUTPUT_DIR, job_id))
                 from datetime import datetime, timezone
-                _update_export_meta(job_dir, "ai", {
+                ai_meta = {
                     "mode": "ai",
                     "model": getattr(client, "model", "google/gemma-3-1b"),
                     "prompt_version": "v1.0",
@@ -994,16 +1107,19 @@ def export_html_endpoint(job_id: JobId, req: HtmlExportRequest = HtmlExportReque
                     "chunk_count": 0,
                     "source_revision": meta.get("source_revision", ""),
                     "validator_status": "locked_ai_offline",
-                    "message": "Local AI is offline. Basic HTML preserved.",
-                })
+                    "message": health.get("error") or "Local AI is offline. Basic HTML preserved.",
+                }
+                _update_export_meta(job_dir, "ai", ai_meta)
                 return {
                     "status": "locked_ai_offline",
                     "mode": "ai",
-                    "detail": "Local AI is offline; basic.html preserved",
-                    "meta": meta,
+                    "detail": ai_meta["message"],
+                    "ai_applied": False,
+                    "meta": ai_meta,
                 }
             content, meta = generate_ai_html(job_id, files_dir=DEFAULT_OUTPUT_DIR, llm_client=client)
-            return {"status": meta.get("validator_status", "ready"), "mode": "ai", "meta": meta}
+            return {"status": meta.get("validator_status", "ready"), "mode": "ai",
+                    "ai_applied": meta.get("validator_status") == "passed", "meta": meta}
         finally:
             job_manager.ai_lock.release()
 
@@ -1117,13 +1233,15 @@ def prepare_epub_preview_endpoint(job_id: JobId, req: EpubPreviewRequest):
             source_variant=req.source_variant,
             metadata=req.metadata,
             chapter_split=req.chapter_split,
+            cover=req.cover,
+            toc_revision=req.toc_revision,
             files_dir=DEFAULT_OUTPUT_DIR,
         )
         return {"status": "preview_ready", "meta": meta}
     except FileNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+        raise HTTPException(status_code=409 if str(exc).startswith("Conflict:") else 400, detail=str(exc))
 
 
 @app.get("/api/jobs/{job_id}/export/epub/preview")
@@ -1136,15 +1254,80 @@ def get_epub_preview_endpoint(job_id: JobId):
         content = get_epub_preview(job_id, files_dir=DEFAULT_OUTPUT_DIR)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
     return Response(
         content=content,
         media_type="application/xhtml+xml; charset=utf-8",
         headers={
-            "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+            "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src http://127.0.0.1:* http://localhost:* http://[::1]:*; sandbox",
             "X-Content-Type-Options": "nosniff",
             "Cache-Control": "no-store",
         },
     )
+
+
+@app.get("/api/jobs/{job_id}/export/epub/toc")
+def get_epub_toc_endpoint(
+    job_id: JobId,
+    source_variant: str = Query("auto", pattern=r"^(auto|basic|ai|final|structured)$"),
+    chapter_split: str = Query("heading", pattern=r"^(heading|page)$"),
+):
+    if not db.get_job_status(job_id):
+        raise HTTPException(status_code=404, detail="Job not found")
+    from src.toc_editor import editor_state
+    try:
+        return editor_state(job_id, DEFAULT_OUTPUT_DIR, source_variant, chapter_split)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=409 if str(exc).startswith("Conflict:") else 422, detail=str(exc))
+
+
+@app.put("/api/jobs/{job_id}/export/epub/toc")
+def save_epub_toc_endpoint(job_id: JobId, req: TocSaveRequest):
+    if not db.get_job_status(job_id):
+        raise HTTPException(status_code=404, detail="Job not found")
+    from src.toc_editor import save_editor_toc
+    try:
+        model = save_editor_toc(job_id, req.entries, req.base_source_revision, req.base_toc_revision,
+                                req.base_preview_revision, DEFAULT_OUTPUT_DIR,
+                                req.source_variant, req.chapter_split)
+        return {"status": "saved", "toc": model}
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=409 if str(exc).startswith("Conflict:") else 422, detail=str(exc))
+
+
+@app.post("/api/jobs/{job_id}/export/epub/toc/regenerate")
+def regenerate_epub_toc_endpoint(job_id: JobId, req: TocRegenerateRequest):
+    if not db.get_job_status(job_id):
+        raise HTTPException(status_code=404, detail="Job not found")
+    from src.toc_editor import regenerate_toc
+    try:
+        model = regenerate_toc(job_id, req.confirm, req.base_source_revision, req.base_toc_revision,
+                               req.base_preview_revision, DEFAULT_OUTPUT_DIR,
+                               req.source_variant, req.chapter_split)
+        return {"status": "saved", "toc": model}
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=409 if str(exc).startswith("Conflict:") else 422, detail=str(exc))
+
+
+@app.get("/api/jobs/{job_id}/export/epub/cover")
+def get_epub_cover_endpoint(job_id: JobId):
+    if not db.get_job_status(job_id):
+        raise HTTPException(status_code=404, detail="Job not found")
+    from src.epub_exporter import _safe_job_dir, _read_json
+    import base64
+    path = os.path.join(_safe_job_dir(DEFAULT_OUTPUT_DIR, job_id), 'export', 'epub', 'preview_payload.json')
+    cover = _read_json(path).get('cover')
+    if not cover:
+        raise HTTPException(status_code=404, detail="No cover")
+    return Response(base64.b64decode(cover['data_base64']), media_type='image/png',
+                    headers={'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-store'})
 
 
 @app.post("/api/jobs/{job_id}/export/epub")
@@ -1188,14 +1371,22 @@ def download_epub_endpoint(job_id: JobId):
     from urllib.parse import quote
     base_name = os.path.splitext(job.filename or "document")[0]
     encoded_filename = quote(f"{base_name}.epub")
-    return FileResponse(
-        file_path,
-        media_type="application/epub+zip",
-        headers={
-            "Content-Disposition": f"attachment; filename=\"book.epub\"; filename*=UTF-8''{encoded_filename}",
-            "X-Content-Type-Options": "nosniff",
-        },
-    )
+    from src.job_artifact_guard import artifact_access
+    from src.epub_exporter import get_epub_status
+    try:
+        with artifact_access(job_id, DEFAULT_OUTPUT_DIR):
+            if not get_epub_status(job_id, files_dir=DEFAULT_OUTPUT_DIR).get('epub_ready'):
+                raise HTTPException(status_code=409, detail='EPUB is stale or not ready; regenerate preview and package')
+            with open(file_path, 'rb') as stream:
+                content = stream.read()
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail='EPUB not generated')
+    return Response(content, media_type="application/epub+zip", headers={
+        "Content-Disposition": f"attachment; filename=\"book.epub\"; filename*=UTF-8''{encoded_filename}",
+        "X-Content-Type-Options": "nosniff", "Cache-Control": "no-store"})
+
 
 
 if __name__ == "__main__":

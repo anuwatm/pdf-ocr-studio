@@ -16,7 +16,7 @@
   };
 
   function setTheme() {
-    const theme = localStorage.getItem("theme") || "theme-dark";
+    const theme = localStorage.getItem("theme") || "theme-light";
     document.body.className = theme;
     el.themeToggle.addEventListener("click", () => {
       const next = document.body.classList.contains("theme-dark") ? "theme-light" : "theme-dark";

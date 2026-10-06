@@ -1,0 +1,15 @@
+{
+  "scope": "Approved 44-page OCR HTML from Phase 7/8; editable TOC and PNG cover",
+  "source_sha256": "18362d2557ecf5fd1ffe40889dc9dd6012abbe5607c4c05eeb436bf1f708f537",
+  "toc_revision": "b43bf7c900a8272d1498f619",
+  "preview_revision": "95214360be685b85424a6243",
+  "toc_entries": 27,
+  "chapters": 44,
+  "epub_sha256": "bb949a6a7e9bb30b22c7e86f28270d5c564fdbef20ea4855d23c8a3cd9996907",
+  "bytes": 302246,
+  "validation": {
+    "valid": true,
+    "errors": [],
+    "warnings": []
+  }
+}

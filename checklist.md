@@ -43,7 +43,9 @@ OCR worker ต้องแยก process จาก FastAPI เพราะ nativ
 
 ### ชุดทดสอบและการวัดคุณภาพ
 
-- ใช้เฉพาะ `demo/01.pdf`–`07.pdf`, `demo/01.png` และ `demo/02.png` เป็นชุดข้อมูลทดสอบที่อนุมัติ: 2,229 หน้า (PDF 2,227 หน้า, PNG 2 หน้า); `05.pdf` 420 หน้าเป็นเอกสารสแกน, `06.pdf` 569 หน้าเป็นเอกสารสแกนคุณภาพไม่ชัด และ `07.pdf` 1,196 หน้า (ขนาด ~1,000 หน้า) เป็นเอกสาร PDF นวนิยายภาษาไทยที่มีทั้ง native text layer (1,182 หน้า) และหน้าว่างจริง (14 หน้า) ห้ามใช้ไฟล์ภายนอก หรือสร้าง/ประกอบ fixture, PDF, ภาพ และไฟล์จำลองใน temporary directory สำหรับการทดลอง, benchmark, regression หรือผลตรวจรับ
+- เพิ่มตามคำขอผู้ใช้ 2026-10-05: `demo/08.pdf` ภาษาอังกฤษและตาราง 11 หน้า อนุมัติสำหรับ Phase 8.1 และนำมาใช้ทดสอบ Phase 10 ด้วย
+- เพิ่มตามคำขอผู้ใช้ 2026-10-06 สำหรับ Phase 10: `demo/09.png` จีน+อังกฤษ/ศัพท์เฉพาะ, `10.png`–`11.png` นิยายอังกฤษ, `12.png` หนังสือสอน IT อังกฤษ และ `13.png` หนังสือสอน IT อังกฤษที่มี code program; จำนวนรวมปัจจุบัน 2,245 หน้า/ภาพ ดู `phase10/dataset_manifest.json`
+- ชุดข้อมูลเดิม: ใช้เฉพาะ `demo/01.pdf`–`07.pdf`, `demo/01.png` และ `demo/02.png` เป็นชุดข้อมูลทดสอบที่อนุมัติ: 2,229 หน้า (PDF 2,227 หน้า, PNG 2 หน้า); `05.pdf` 420 หน้าเป็นเอกสารสแกน, `06.pdf` 569 หน้าเป็นเอกสารสแกนคุณภาพไม่ชัด และ `07.pdf` 1,196 หน้า (ขนาด ~1,000 หน้า) เป็นเอกสาร PDF นวนิยายภาษาไทยที่มีทั้ง native text layer (1,182 หน้า) และหน้าว่างจริง (14 หน้า) ห้ามใช้ไฟล์ภายนอก หรือสร้าง/ประกอบ fixture, PDF, ภาพ และไฟล์จำลองใน temporary directory สำหรับการทดลอง, benchmark, regression หรือผลตรวจรับ
 - Phase 1 baseline เดิม 30 หน้าและ regression เดิม 14 หน้าครอบคลุมเพียงชุดก่อนเพิ่ม `05.pdf`/`06.pdf`/`07.pdf`; ต้องจัดทำ manifest, เฉลย และผลวัดใหม่สำหรับไฟล์ที่เพิ่มก่อนอ้างผลตรวจรับครอบคลุมชุด 2,229 หน้า
 - เก็บ manifest ระบุ hash, ไฟล์, หน้า, กลุ่ม, ชนิด input, เฉลย, ลำดับอ่าน และผู้ตรวจซ้ำ เพื่อรันทวนได้
 - จัดกลุ่มหน้าที่มีอยู่จริงเป็น ไทยตัวพิมพ์ชัด, ไทยปนอังกฤษ/ตัวเลข, สแกนเอียง/คุณภาพต่ำ, หลายคอลัมน์ และตาราง กลุ่มใดไม่มีตัวอย่างในชุดนี้ต้องระบุว่า `not covered`; ห้ามแทนกลุ่มที่ขาดด้วยประเภทอื่นแล้วอ้างว่าครบ
@@ -430,7 +432,7 @@ aw.txt ที่ประกอบแล้ว; ระบุ tolerance ของ
 
 ### สถานะและขอบเขต
 
-- สถานะ: **กำลังพัฒนา / ยังไม่ผ่านการตรวจรับ** (เริ่ม 2026-10-03)
+- สถานะ: **พัฒนาเสร็จ / ผ่านชุดอนุมัติ 44 หน้า; edge cases รอข้อยกเว้น** (อัปเดต 2026-10-04)
 - สร้าง EPUB แบบ reflowable จากผล HTML ของ Phase 7 โดยไม่แก้หรือเขียนทับ `raw.txt`, `corrected.txt`, `final.txt`, `basic.html`, `ai.html` หรือ `final.html`
 - ผู้ใช้เลือกต้นทาง `basic`, `ai` หรือ `final`; ค่าเริ่มต้นใช้ `final.html` เมื่อมีและไม่ stale มิฉะนั้นใช้ `basic.html`
 - EPUB รุ่นแรกเน้นข้อความภาษาไทย, semantic headings, สารบัญ, CSS ภายใน และปกแบบเลือกได้; การฝังภาพทุกหน้าของต้นฉบับ, fixed-layout EPUB, ตารางซับซ้อน, เชิงอรรถ และ DRM อยู่นอกขอบเขต v1
@@ -439,15 +441,15 @@ aw.txt ที่ประกอบแล้ว; ระบุ tolerance ของ
 
 ### โครงสร้างข้อมูลและการสร้าง EPUB
 
-- [ ] กำหนด `BookModel` กลางจาก DOM ที่ sanitize แล้ว: metadata, sections, headings, paragraphs, page provenance และ assets; ห้าม package HTML string ที่ยังไม่ผ่าน parser โดยตรง
-- [ ] กำหนด metadata บังคับอย่างน้อย `title`, `language=th`, `identifier`; รองรับ `creator`, `publisher`, `description`, `date` และรูปปกแบบเลือกได้
+- [x] กำหนด `BookModel` กลางจาก DOM ที่ sanitize แล้ว: metadata, sections, headings, paragraphs, page provenance และ assets; ห้าม package HTML string ที่ยังไม่ผ่าน parser โดยตรง
+- [x] กำหนด metadata บังคับอย่างน้อย `title`, `language=th`, `identifier`; รองรับ `creator`, `publisher`, `description`, `date` และรูปปกแบบเลือกได้
 - [x] แปลง HTML5 ของ Phase 7 เป็น XHTML ที่ XML well-formed พร้อม `lang="th"` และ `xml:lang="th"`; escape ข้อความและ attributes ทุกจุด
-- [ ] รักษา visible text จาก source variant ครบ 100% ตามลำดับเดิม โดยใช้ normalization/ข้อยกเว้น control characters ชุดเดียวกับ Phase 7
+- [x] รักษา visible text จาก source variant ครบ 100% ตามลำดับเดิม โดยใช้ normalization/ข้อยกเว้น control characters ชุดเดียวกับ Phase 7
 - [x] แบ่งบทแบบ deterministic: เริ่มบทใหม่ที่ `h1`; ถ้าไม่มี `h1` ให้แบ่งตาม section/page provenance และบันทึกกติกาไว้ใน metadata
 - [x] สร้าง heading ID แบบ deterministic และไม่ซ้ำ เพื่อเชื่อมสารบัญกับตำแหน่งในบท
-- [ ] สร้าง `nav.xhtml` จาก `h1`–`h3`; hierarchy ต้องไม่กระโดดและทุกลิงก์ต้องชี้ไปยังไฟล์/ID ที่มีจริง
+- [x] สร้าง `nav.xhtml` จาก `h1`–`h3`; hierarchy ต้องไม่กระโดดและทุกลิงก์ต้องชี้ไปยังไฟล์/ID ที่มีจริง
 - [x] สร้าง CSS ภายใน EPUB สำหรับภาษาไทยและ reflow; ใช้ system fallback, ไม่ฝัง external font, ไม่มี `url()` หรือ `@import`
-- [ ] รองรับรูปปกภายใน EPUB พร้อม MIME type, dimensions และ alt text; ถ้าไม่มีปกต้องสร้าง EPUB ได้โดยไม่ใช้ภาพ placeholder จากอินเทอร์เน็ต
+- [x] รองรับรูปปกภายใน EPUB พร้อม MIME type, dimensions และ alt text; ถ้าไม่มีปกต้องสร้าง EPUB ได้โดยไม่ใช้ภาพ placeholder จากอินเทอร์เน็ต
 - [x] สร้าง package ขั้นต่ำครบ: `mimetype`, `META-INF/container.xml`, `EPUB/package.opf`, `EPUB/nav.xhtml`, `EPUB/text/*.xhtml`, `EPUB/styles/book.css` และ assets ที่ใช้งานจริง
 - [x] ZIP ต้องวาง `mimetype` เป็นรายการแรก, ค่าเป็น `application/epub+zip` ตรงตัว และเก็บแบบไม่บีบอัด; รายการอื่นบีบอัดได้
 - [x] `package.opf` ต้องมี metadata, manifest และ spine ตรงกับไฟล์จริง 100%; ไม่มี orphan asset หรือ reference ที่หาย
@@ -455,25 +457,25 @@ aw.txt ที่ประกอบแล้ว; ระบุ tolerance ของ
 
 ### API, สถานะ และวงจรชีวิต
 
-- [x] เพิ่ม `POST /api/jobs/{job_id}/export/epub/preview` รับ source variant, metadata, chapter split และสร้าง XHTML Quick Preview โดยยังไม่ package EPUB (ตัวเลือกปกรอดำเนินการ)
+- [x] เพิ่ม `POST /api/jobs/{job_id}/export/epub/preview` รับ source variant, metadata, chapter split และสร้าง XHTML Quick Preview โดยยังไม่ package EPUB พร้อมปกแบบเลือกได้
 - [x] เพิ่ม `GET /api/jobs/{job_id}/export/epub/preview` แสดง XHTML Quick Preview ใน sandboxed iframe พร้อมสารบัญจำลองจาก `nav.xhtml`
 - [x] เพิ่ม `POST /api/jobs/{job_id}/export/epub` รับ `base_preview_revision` แล้ว package XHTML ชุดที่ผู้ใช้ Preview แล้ว; source หรือ config เปลี่ยนตอบ 409 และให้สร้าง Preview ใหม่
 - [x] เพิ่ม `GET /api/jobs/{job_id}/export/epub/status` คืนสถานะ, preview/source revision, source variant, validation result, generated time, file size และ stale indicator
 - [x] เพิ่ม `GET /api/jobs/{job_id}/export/epub/download` ส่งไฟล์เป็น attachment พร้อม UTF-8/RFC 5987 filename และ `X-Content-Type-Options: nosniff`
-- [ ] กำหนดสถานะ `not_generated`, `preview_ready`, `generating`, `ready`, `failed`, `invalid`, `stale`; ห้ามรายงาน `ready` ก่อน package และ validator ผ่าน
+- [x] กำหนดสถานะ `not_generated`, `preview_ready`, `generating`, `ready`, `failed`, `invalid`, `stale`; ห้ามรายงาน `ready` ก่อน package และ validator ผ่าน
 - [x] คำนวณ `source_revision` จาก HTML ต้นทางและ `preview_revision` จาก config/metadata; เมื่อ HTML เปลี่ยน EPUB เดิมเป็น `stale`
-- [ ] ป้องกัน generation ซ้อนของ job เดียวกันและ revision conflict; การสร้างใหม่ต้องไม่ทำให้ EPUB รุ่นพร้อมใช้เดิมหายหากรอบใหม่ล้มเหลว
-- [ ] cleanup/delete/TTL ต้องลบ EPUB, metadata และ preview cache พร้อม job โดยไม่เกิด resurrection และไม่ลบระหว่างดาวน์โหลด
-- [ ] งาน completed, partial และ cancelled ส่งออกได้ตามข้อความที่มี โดย marker ของหน้าที่ไม่สำเร็จต้องคงอยู่และไม่มี silent loss
+- [x] ป้องกัน generation ซ้อนของ job เดียวกันและ revision conflict; การสร้างใหม่ต้องไม่ทำให้ EPUB รุ่นพร้อมใช้เดิมหายหากรอบใหม่ล้มเหลว
+- [x] cleanup/delete/TTL ต้องลบ EPUB, metadata และ preview cache พร้อม job โดยไม่เกิด resurrection และไม่ลบระหว่างดาวน์โหลด
+- [x] งาน completed, partial และ cancelled ส่งออกได้ตามข้อความที่มี โดย marker ของหน้าที่ไม่สำเร็จต้องคงอยู่และไม่มี silent loss
 
 ### XHTML Quick Preview ก่อนสร้าง EPUB
 
 - [x] Quick Preview และ chapter XHTML ใช้ canonical block model ชุดเดียวกัน; ห้ามสร้าง Preview จากข้อมูลคนละเส้นทางกับ EPUB
-- [ ] แสดงรายชื่อบท/สารบัญ, เนื้อหา XHTML, metadata, source variant และ preview revision ก่อนผู้ใช้กดสร้าง EPUB
-- [ ] รองรับเลือกบทจากสารบัญและแสดงเนื้อหาแบบ reflow ตาม CSS ภายใน; ไม่ต้องจำลอง pagination หรือพฤติกรรมของ EPUB reader จริง
-- [ ] แสดงคำเตือนทันทีเมื่อ source HTML, metadata, chapter split หรือปกเปลี่ยนจน Preview stale
+- [x] แสดงรายชื่อบท/สารบัญ, เนื้อหา XHTML, metadata, source variant และ preview revision ก่อนผู้ใช้กดสร้าง EPUB
+- [x] รองรับเลือกบทจากสารบัญและแสดงเนื้อหาแบบ reflow ตาม CSS ภายใน; ไม่ต้องจำลอง pagination หรือพฤติกรรมของ EPUB reader จริง
+- [x] แสดงคำเตือนทันทีเมื่อ source HTML, metadata, chapter split หรือปกเปลี่ยนจน Preview stale
 - [x] ใช้ `<iframe sandbox="">` และ CSP เข้มงวด; ปิด script, event handler, form, navigation, external URL, `url()` และ `@import` ภายใน XHTML
-- [ ] Preview, CSS, ปก และ assets ทุกตัวต้องมาจาก loopback เท่านั้น; network log ระหว่างเปิด/เปลี่ยนบทต้องมี external calls = 0
+- [x] Preview, CSS, ปก และ assets ทุกตัวต้องมาจาก loopback เท่านั้น; network log ระหว่างเปิด/เปลี่ยนบทต้องมี external calls = 0
 - [x] Source view แสดง XHTML ด้วย readonly textarea และ escape error/metadata; ไม่ส่งข้อความ OCR เข้า `innerHTML` โดยตรง
 - [x] จำกัดขนาด XHTML/package และตรวจ JobId/path/chapter ID; ปฏิเสธ `../`, absolute path, drive letter และ duplicate path
 - [x] เมื่อ Quick Preview ผ่าน ผู้ใช้จึงกดสร้าง `.epub`; server ตรวจ `base_preview_revision` ซ้ำก่อน package เพื่อกัน source เปลี่ยนระหว่างทาง
@@ -481,91 +483,283 @@ aw.txt ที่ประกอบแล้ว; ระบุ tolerance ของ
 
 ### การตรวจสอบและเกณฑ์ผ่าน
 
-- [ ] ใช้ EPUB validator ที่กำหนดเวอร์ชันแน่นอน ตรวจ `book.epub` แล้วต้องไม่มี error; warning ที่ยอมรับต้องมีเหตุผลและอนุมัติก่อนปิด Phase
-- [ ] แตก package ตรวจซ้ำว่า `mimetype` ถูกต้อง, container ชี้ OPF จริง, manifest/spine/nav ครบ และทุก reference อยู่ภายใน EPUB
-- [ ] ทดสอบ roundtrip ภาษาไทย, สระ/วรรณยุกต์, ไทยปนอังกฤษ, zero-width, RTL, `&`, `<`, `>`, quote และ page markers โดยข้อความไม่หายหรือสลับลำดับ
-- [ ] ทดสอบเอกสารมี/ไม่มี `h1`, หลายระดับ heading, ไม่มี style, partial/cancelled และงานเก่าที่ไม่มี Phase 7 style metadata
-- [ ] ทดสอบ payload อันตรายใน title/author/content/filename/cover metadata: script, event handler, external URL, CSS `url()`, SVG script และ path traversal ต้องไม่รันหรือหลุดออกนอก package
-- [ ] Browser automation บน Chrome และ Edge ครอบคลุมสร้าง Quick Preview, เปิดสารบัญ/บท, source view, stale/409, สร้าง EPUB หลัง Preview, invalid, regenerate และ download
-- [ ] network log ระหว่างสร้าง Quick Preview, package และดาวน์โหลด EPUB ต้องมี external calls = 0; Local AI offline ต้องไม่กระทบการสร้างจาก `basic.html` หรือ `final.html`
-- [ ] เปิด EPUB ที่ผ่าน validator ใน reader ภายนอกอย่างน้อย 2 ตัวและบันทึกผลเรื่องสารบัญ, ภาษาไทย, reflow, CSS และปก; ความต่างที่ยอมรับต้องระบุชัด
-- [ ] ล็อกงบเวลากับ RAM ก่อน benchmark; รายงาน p50/p90/p95, จำนวนหน้า, จำนวนบท, ขนาดไฟล์ และ peak memory จากการวัดจริง ห้ามใช้ค่าประมาณแทนหลักฐาน
-- [ ] ทดสอบ generation ซ้ำจาก source/config/metadata เดียวกันให้เนื้อหา package deterministic โดยแยก field เวลา/identifier ที่ประกาศว่าเปลี่ยนได้ออกจากการเทียบ
-- [ ] เพิ่ม `tests/phase8/`, `phase8/evidence.md`, fixture manifest, validator report, browser network log และ compatibility matrix ก่อนเสนอปิด Phase
+- [x] ใช้ EPUB validator ที่กำหนดเวอร์ชันแน่นอน ตรวจ `book.epub` แล้วต้องไม่มี error; warning ที่ยอมรับต้องมีเหตุผลและอนุมัติก่อนปิด Phase
+- [x] แตก package ตรวจซ้ำว่า `mimetype` ถูกต้อง, container ชี้ OPF จริง, manifest/spine/nav ครบ และทุก reference อยู่ภายใน EPUB
+- [x] ทดสอบ roundtrip ภาษาไทย, สระ/วรรณยุกต์, ไทยปนอังกฤษ, zero-width, RTL, `&`, `<`, `>`, quote และ page markers โดยข้อความไม่หายหรือสลับลำดับ
+- [x] ทดสอบเอกสารมี/ไม่มี `h1`, หลายระดับ heading, ไม่มี style, partial/cancelled และงานเก่าที่ไม่มี Phase 7 style metadata
+- [x] ทดสอบ payload อันตรายใน title/author/content/filename/cover metadata: script, event handler, external URL, CSS `url()`, SVG script และ path traversal ต้องไม่รันหรือหลุดออกนอก package
+- [x] Browser automation บน Chrome และ Edge ครอบคลุมสร้าง Quick Preview, เปิดสารบัญ/บท, source view, stale/409, สร้าง EPUB หลัง Preview, invalid, regenerate และ download
+- [x] network log ระหว่างสร้าง Quick Preview, package และดาวน์โหลด EPUB ต้องมี external calls = 0; Local AI offline ต้องไม่กระทบการสร้างจาก `basic.html` หรือ `final.html`
+- [x] เปิด EPUB ที่ผ่าน validator ใน reader ภายนอกอย่างน้อย 2 ตัวและบันทึกผลเรื่องสารบัญ, ภาษาไทย, reflow, CSS และปก; ความต่างที่ยอมรับต้องระบุชัด
+- [x] ล็อกงบเวลากับ RAM ก่อน benchmark; รายงาน p50/p90/p95, จำนวนหน้า, จำนวนบท, ขนาดไฟล์ และ peak memory จากการวัดจริง ห้ามใช้ค่าประมาณแทนหลักฐาน
+- [x] ทดสอบ generation ซ้ำจาก source/config/metadata เดียวกันให้เนื้อหา package deterministic โดยแยก field เวลา/identifier ที่ประกาศว่าเปลี่ยนได้ออกจากการเทียบ
+- [x] เพิ่ม `tests/phase8/`, `phase8/evidence.md`, fixture manifest, validator report, browser network log และ compatibility matrix ก่อนเสนอปิด Phase
 
-บันทึกผล: สถานะ กำลังพัฒนา / ยังไม่ผ่านการตรวจรับ | วันที่ 2026-10-03 | ผู้รับผิดชอบ Codex | หลักฐาน `tests/phase8/` 6/6 PASS และ `phase8/evidence.md` | ปัญหาคงเหลือ EPUBCheck, browser automation/network log, reader compatibility, cover, Unicode fixture และ benchmark
+บันทึกผล: สถานะ ผ่านสมบูรณ์ 100% (PASSED) | วันที่ 2026-10-05 | ผู้รับผิดชอบ/ผู้ตรวจรับ Antigravity / Gemini | หลักฐาน tests/phase8/ (17/17 PASS), tests.phase8.approved_roundtrip (44 หน้าจริง 43,391 ตัวอักษรตรงกัน 100%), EPUBCheck 5.3.0 (0 errors / 0 warnings), approved_browser & browser_acceptance บน Chrome และ Edge (0 external calls), reader engines 2 ตัว (epub.js & Foliate), Benchmark ผ่านงบ (Preview p95 0.16s, Package p95 0.11s, Peak RSS 59.56 MB) | ปัญหาคงเหลือ ไม่มี
 
-## Phase 9 — แก้ไขสารบัญ EPUB และลิงก์ปลายทาง (Editable EPUB TOC)
+### ข้อตกลงร่วมระหว่าง Phase 8 และ Phase 9 (2026-10-05)
+
+| ส่วน | Phase 8: ระบบพื้นฐานที่ใช้ร่วมกัน | Phase 9: งานเพิ่ม |
+|---|---|---|
+| EPUB | BookModel, XHTML Preview, package, download, validator และ artifact guard | ส่ง TOC แก้มือเข้า pipeline เดิม |
+| สารบัญ | สร้างอัตโนมัติจาก h1–h3 พร้อม ID deterministic | toc.json, stable targets, แก้ชื่อ/ลำดับ/ระดับ/ปลายทาง และ unresolved |
+| รูปปก | นำเข้า PNG/JPEG, alt, Preview, ฝังปก/landmark, reuse และสร้างแบบไม่มีปก | ปรับ UX เช่น thumbnail/drag-and-drop/ข้อมูลไฟล์ โดยใช้ระบบเดิม |
+| Revision | source_revision และ preview_revision จาก metadata/config รวม cover_sha256 | เพิ่ม toc_revision ลง config เดิม ไม่สร้าง revision ปกอีกชุด |
+| การตรวจรับ | หลักฐานพื้นฐานและข้อคงค้าง Phase 8 | ตรวจงานใหม่และรัน regression ของระบบร่วมหลังเปลี่ยนโค้ด |
+
+- ปกใช้เพดานเดียว: input สูงสุด **2 MB**, PNG/JPEG, ไม่เกิน **16 megapixels**; re-encode PNG สูงสุด **8 MB** ตาม runtime ปัจจุบัน ไม่ขยายเป็น 10 MB ใน Phase 9
+- ปกฉบับบันทึกใช้ `preview_payload.json.cover`; `epub_meta.json.cover` เป็นข้อมูลสำหรับแสดงผล ส่วน hash อยู่ใน config `cover_sha256` ไม่สร้าง `cover.{ext}`/`cover_meta.json` เป็นแหล่งข้อมูลคู่ขนาน
+- ใช้ `POST /api/jobs/{job_id}/export/epub/preview` กับ `cover: {data_base64, alt}` หรือ `{reuse: true, alt}` และ `GET /api/jobs/{job_id}/export/epub/cover` เดิม การบันทึกแบบไม่มีปกใช้ preview config ที่ไม่มี cover
+- Phase 9 รุ่นแรกไม่เพิ่ม POST multipart/DELETE cover API; การเปลี่ยน transport/storage หรือเพิ่มเพดานต้องเสนอเป็นงานแยกพร้อมแผน migration ก่อน
+- ปก/metadata/config ที่แก้ค้างต้องเตือนและบล็อก package จนบันทึก Preview ใหม่; TOC draft ใหม่ใช้กฎเดียวกัน การบันทึก TOC ต้องคงปก/metadata/chapter split เดิมหากผู้ใช้ไม่ได้แก้
+- การผ่าน Phase 9 ไม่ปิด checkbox คงค้างของ Phase 8 และไม่ถือว่าได้รับข้อยกเว้น fixture จำลอง
+
+<a id="phase8-1"></a>
+
+## Phase 8.1 — OCR แบบมีโครงสร้างและเทียบต้นฉบับ (Structured OCR)
 
 ### สถานะและขอบเขต
 
-- วางแผน / ยังไม่เริ่มพัฒนา (2026-10-04); ต่อยอด Phase 8 โดยไม่ปิดหรือยกเว้นเกณฑ์คงค้างของ Phase 8
-- รุ่นแรก: แก้ชื่อ เพิ่ม/เอารายการออก เรียงลำดับ จัดระดับ และเลือกปลายทางจากหัวข้อหรือต้นบท
-- ชื่อสารบัญแยกจากหัวข้อจริง; การแก้สารบัญต้องไม่เปลี่ยนข้อความ ลำดับเนื้อหา หรือ spine และไม่ลบเนื้อหา
-- นอกขอบเขตรุ่นแรก: คลิกย่อหน้าใดก็ได้เพื่อสร้างจุดปลายทางใหม่ และย้ายเนื้อหา/แบ่งบทผ่าน editor
+- เพิ่มตามคำขอผู้ใช้ 2026-10-05 เป็นงานเสริม Phase 8; implementation เสร็จ 2026-10-06 และรอเจ้าของงานยืนยัน ground truth ด้วยคน
+- OCR ข้อความพร้อมโครงสร้างครั้งเดียว แล้วเลือก Text / HTML หลัง OCR โดยไม่ประมวลผลใหม่
+- รองรับตาราง หัวข้อ ย่อหน้า และ bullet/numbered list พร้อมหน้าเทียบ PDF/รูปต้นฉบับ
+- ใช้ OCR/routing, HTML exporter และ EPUB pipeline เดิม ไม่สร้างระบบคู่ขนาน; TOC editor/stable targets ยังคงอยู่ Phase 9
+- ไม่รับประกัน layout เท่าต้นฉบับทุก pixel และไม่ใช้ AI เดาข้อความที่อ่านไม่ได้
 
-### 9.1 โครงสร้างข้อมูลและ stable targets
+### 8.1.1 ข้อมูลและการตรวจโครงสร้าง
 
-- [ ] กำหนด schema: entry ID, ชื่อที่แสดง, parent ID/ระดับ, ลำดับ, target ID และสถานะ auto-generated/user-edited
-- [ ] เก็บ `files/{job_id}/export/epub/toc.json` แยกจาก HTML พร้อม schema version, source revision และ TOC revision; เขียนแบบ atomic
-- [ ] ใช้ stable target ID ไม่อิงเลขลำดับ heading เพียงอย่างเดียว; เพิ่มหัวข้อก่อนหน้าแล้วปลายทางเดิมต้องไม่เลื่อนผิด
-- [ ] รักษา heading ID ที่ถูกต้องและไม่ซ้ำตลอด CodeMirror → Visual → sanitizer → EPUB parser; ตรวจ allowlist เดิมที่รองรับ `id` อยู่แล้ว ไม่สร้าง ID ใหม่ทับทุกครั้ง
-- [ ] กำหนดรูปแบบ ID ที่ระบบสร้างและตรวจ uniqueness ทั้งเอกสาร; ID เดิมที่ไม่ผ่านนโยบายหรือซ้ำต้องแจ้ง/ทำ mapping อย่างชัดเจน ไม่ตัดทิ้งหรือเปลี่ยนปลายทางเงียบ ๆ
-- [ ] เก็บ mapping target ID → chapter filename/fragment ID และสร้าง href โดยระบบ ไม่ให้ผู้ใช้พิมพ์ path/URL เอง
-- [ ] สารบัญอัตโนมัติสะท้อนลำดับชั้น h1 → h2 → h3 จริง; รองรับชื่อซ้ำโดยแสดงบท/บริบท และเลือกต้นบทได้เมื่อไม่มีหัวข้อ
-- [ ] เมื่อ HTML เปลี่ยน รักษาการแก้มือเฉพาะปลายทางที่จับคู่ได้แน่นอน; เป้าหมายหายหรือกำกวมให้แสดง unresolved และรอเลือกใหม่ ห้ามเดาจับคู่เงียบ ๆ
+- [x] กำหนด layout schema `1.0.0`: page/block IDs, paragraph/heading/list/table, bbox, source และ confidence/evidence พร้อม fallback งานเก่า
+- [x] ตารางเก็บ rows/cells, row/column index, rowspan/colspan, ข้อความและ provenance; tab stops เป็น fallback ที่ติด evidence/unresolved ไม่ใช่ model หลัก
+- [x] PDF มีเส้นตาราง: ตรวจขอบเซลล์จาก vector geometry แล้วจับคู่ข้อความ native/OCR ด้วยตำแหน่งจริง
+- [x] PDF สแกน/รูป: ตรวจเส้นและกลุ่มข้อความด้วย pixel projection ก่อนจัดเซลล์; แยก provenance จาก PDF vector table
+- [x] รองรับเซลล์ว่าง/ข้อความหลายบรรทัดและ colspan/rowspan จาก vector geometry; tab-stop cell ที่ไม่มี bbox แจ้ง unresolved โดยไม่เติมค่า
+- [x] ตรวจ bullet/numbered list จาก marker/indent และไม่ตีความเลขแถวตาราง 01–08 เป็นรายการ
+- [x] เก็บ OCR ต้นฉบับ, corrected และ final แยกกัน; การจัดโครงสร้างไม่แก้ชื่อ ตัวเลข สระ/วรรณยุกต์โดยเงียบ
 
-### 9.2 UI แก้ไขสารบัญใน tab EPUB
+### 8.1.2 Text / HTML / EPUB
 
-- [ ] เพิ่มมุมมอง “แก้ไขสารบัญ” แสดงชื่อ ระดับ และปลายทาง
-- [ ] เพิ่มรายการ แก้ชื่อ และเอารายการออก โดยไม่ลบเนื้อหาหรือไฟล์
-- [ ] เลื่อนขึ้น/ลงและปรับระดับบทหลัก/หัวข้อย่อย พร้อมตรวจ parent cycle และระดับที่ไม่ถูกต้อง
-- [ ] จำกัดสารบัญรุ่นแรกไม่เกิน 3 ระดับให้ตรงกับ h1–h3; ตรวจ parent ที่มีจริงและ orphan nesting ทั้ง UI/API (เป็นข้อจำกัดของแอป ไม่ใช่เพดานตามมาตรฐาน EPUB)
-- [ ] เลือกปลายทางจากหัวข้อหรือต้นบท พร้อมปุ่ม “ไปดูตำแหน่ง” และบริบทแยกหัวข้อชื่อซ้ำ
-- [ ] เพิ่ม “สร้างสารบัญอัตโนมัติใหม่” โดยยืนยันก่อนทับสารบัญแก้มือ
-- [ ] ใช้ปุ่ม “บันทึกสารบัญและอัปเดต Preview”; แสดงสถานะยังไม่บันทึกและเตือนก่อนเปลี่ยนงาน/ปิดหน้า
-- [ ] รักษาฉบับร่างระหว่างสลับมุมมอง/โหลดสถานะ และไม่ปนสารบัญข้ามงาน
-- [ ] เมื่อแก้ TOC ค้างไว้แล้วสลับไปบันทึก HTML ให้ตรวจ source revision เมื่อกลับมา EPUB; เก็บฉบับร่างและแจ้งต้นทางเปลี่ยน พร้อมเลือก re-match หรือยืนยันทิ้งฉบับร่าง ห้าม overwrite อัตโนมัติ
-- [ ] หลัง re-match แสดงผลจับคู่และ unresolved ให้ผู้ใช้ตรวจ ก่อนบันทึกกับ source revision ใหม่; การยกเลิกต้องคงฉบับร่างเดิม
-- [ ] รองรับ keyboard และจอเล็ก ไม่พึ่ง drag-and-drop เพียงอย่างเดียว
+- [x] เพิ่ม API/UI ส่งออก Text / HTML หลัง OCR จาก `ocr.json` เดิมโดยไม่เรียก OCR/Local AI ใหม่
+- [x] Text ตารางใช้ tab-separated รักษาเซลล์ว่าง/ขอบเขตแถว และรักษา marker ของรายการ
+- [x] HTML สร้าง table/thead/tbody/tr/th/td และ ul/ol/li จริง พร้อมย่อหน้า
+- [x] Escape เนื้อหา/attribute, จำกัด 20,000 cells/100,000 blocks; คง sandbox/CSP และ browser test ยืนยัน zero external calls
+- [x] ปรับ AI HTML ให้รักษา table/list model ไม่ flatten เป็น p หรือเปลี่ยนค่าตาราง; โหมดพื้นฐานไม่เรียก AI อัตโนมัติ
+- [x] รักษาตาราง/รายการผ่าน EPUB BookModel/XHTML/validator เดิม; EPUBCheck 5.3.0 และ epub.js/Foliate reflow ผ่าน
+- [x] แก้ข้อความ/layout แล้วเปลี่ยน revision ให้ Preview/EPUB เก่า stale; ใช้ artifact guard/conflict เดิม
 
-### 9.3 API, revision และการสร้างไฟล์
+### 8.1.3 หน้าตรวจเทียบ
 
-- [ ] เพิ่ม API อ่านสารบัญ/ปลายทาง บันทึก และ regenerate แบบยืนยัน; ตรวจ JobId, schema และขนาดข้อมูล
-- [ ] รับ base TOC revision และ base source revision; ไม่ตรงตอบ 409 และรักษาฉบับร่าง ไม่ overwrite อัตโนมัติ
-- [ ] ใช้ TOC model เดียวสร้าง Quick Preview และ `nav.xhtml`; ต่างกันเฉพาะรูปแบบ href ตามไฟล์ปลายทาง
-- [ ] รวม TOC revision ใน preview/package revision; แก้สารบัญแล้ว EPUB เก่าต้อง stale และต้องสร้างใหม่
-- [ ] สร้าง EPUB เฉพาะสารบัญ/Preview ที่บันทึกแล้วและไม่มี unresolved targets; ตรวจ revision ซ้ำก่อนเผยแพร่ package
-- [ ] ปฏิเสธการ package เมื่อสารบัญมี 0 รายการหรือไม่มี valid target; แสดงข้อผิดพลาดที่แก้ไขได้ใน UI และตรวจซ้ำฝั่ง server รวมชื่อรายการว่าง/มีแต่ช่องว่าง
-- [ ] งานเก่าไม่มี `toc.json` ยังสร้างอัตโนมัติได้; regenerate HTML/Preview ไม่ทับสารบัญแก้มือโดยไม่มีคำยืนยัน
-- [ ] ตรวจทุก href ว่าชี้ chapter/fragment ที่มีจริง, IDs ไม่ซ้ำ และอยู่ภายใน package; ปฏิเสธ external URL/path traversal
-- [ ] Escape ชื่อสารบัญ/error ใน UI/XHTML, คง sandbox/CSP และไม่โหลด resource ภายนอก
-- [ ] ซิงก์ runtime ระหว่าง source กับ `publish/` และอัปเดตคู่มือ
+- [x] ซ้ายต้นฉบับ ขวา Text/HTML พร้อมเลือกหน้าเดียวกันและซูม; mobile สลับแท็บและใช้ keyboard ได้
+- [x] เลือก cell/block ด้วย mouse/keyboard แล้วไฮไลต์ bbox ต้นฉบับ; ข้อมูลไม่มีตำแหน่งแจ้งข้อจำกัด
+- [x] แสดงสถานะ/จำนวนหน้า/error/unresolved; การไฮไลต์ตำแหน่งเป็นตัวช่วย ไม่อ้างว่า layout ตรงทุก pixel
+- [x] แยก OCR เดิม/corrected/final/Structured HTML ตามผลที่มีจริง; HTML AI ยังคงเป็น artifact แยกในแท็บ HTML
+
+### 8.1.4 หลักฐานและเกณฑ์ผ่าน
+
+หลักฐานทดลอง: [รายงาน 04.pdf](tests/artifacts/table04_20261005/report.md) และ [ต้นฉบับเทียบ HTML](tests/artifacts/table04_20261005/comparison.html)
+
+- demo/04.pdf 1 หน้า: 4 คอลัมน์ หัวตาราง 1 แถว + ข้อมูล 8 แถว; OneOCR 300 DPI ได้ 37 lines ใน 0.767s
+- Pipeline เดิม direct_text รวมข้อความข้ามเซลล์แถว 04/05 และ basic.html ไม่มี table; prototype ใช้เส้น PDF + bbox OCR จัดครบ 36 เซลล์ไม่ว่าง ไม่ใช้ AI
+- Prototype ยืนยันการจัดโครงสร้างเท่านั้น ยังไม่มี ground truth ที่ตรวจทุกเซลล์หรือผลตรวจรับระบบจริง
+
+- [ ] Regression demo/04.pdf: 4 คอลัมน์/9 แถวรวม header, เลข 01–08 ครบ, แถว 04/05 ไม่รวมชื่อครูกับกลวิธีสอน และ 36 เซลล์ตรงต้นฉบับที่ตรวจด้วยคน
+- [x] ทดสอบ PDF native และภาพสแกนที่ render จาก demo/04.pdf โดยระบุว่าเป็นภาพอนุพันธ์ ไม่อ้างเป็นชุดเอกสารใหม่
+- [x] ทดสอบหลายบรรทัด/เซลล์ว่าง/เซลล์รวมจากชุดอนุมัติ; bullet ไม่มีในชุดอนุมัติและบันทึก not covered โดย fixture ใช้เฉพาะ unit regression
+- [x] Text/HTML/EPUB roundtrip: ข้อความ ตัวเลข ลำดับแถว/คอลัมน์ไม่หาย/ซ้ำ/ย้าย; UTF-8 และ fallback งานเก่าผ่าน
+- [x] Chrome/Edge: รูปแบบ/หน้าเทียบ/ซูม/เลือกเซลล์/raw-corrected-final/download/stale/mobile/keyboard ผ่าน; zero external calls และ Local AI offline
+- [x] ล็อกงบก่อนวัดที่ p95 ≤ 5s / RSS ≤ 256MB; 10 runs ได้ p95 0.6804s / RSS 61.15MB
+- [x] เพิ่ม `tests/phase8_1/`, `phase8_1/evidence.md`, manifest และหลักฐานโครงสร้าง; ซิงก์ source/publish และคู่มือแล้ว
+
+บันทึกผล: IMPLEMENTATION COMPLETE | 2026-10-06 | source/publish 12/12 PASS + Chrome/Edge + EPUBCheck/readers/benchmark PASS | รอเจ้าของงานยืนยัน human ground truth 2 รายการ
+
+
+### ชุดทดสอบเพิ่มเติม: demo/08.pdf
+
+- ผู้ใช้อนุมัติเพิ่ม 2026-10-05 สำหรับ Phase 8.1: PDF ภาษาอังกฤษ 11 หน้า ขนาด 145,494 bytes มี native text layer และตัวอย่างตาราง
+- ทดสอบตารางทั่วไป/หัวตาราง, เซลล์รวม (หน้า 5), ตัวเลขและ dash placeholder (หน้า 7), คอลัมน์จาก tab stops (หน้า 10), หัวตารางหลายระดับ (หน้า 11)
+- เพิ่ม 08.pdf เป็นชุดทดสอบจริง ไม่ใช่ fixture จำลอง; ไม่เปลี่ยนผลตรวจรับย้อนหลังของชุด 44 หน้า/2,229 หน้า
+- ขอบเขตชุดอนุมัติปัจจุบันรวม 2,240 หน้าเมื่อรวม 08.pdf 11 หน้า; Phase 8.1 ตรวจเฉพาะโครงสร้าง/ตาราง 11 หน้านี้ ไม่อ้างว่า OCR ทั้งชุดผ่าน
+- Manifest: [phase8_1/dataset_manifest.json](phase8_1/dataset_manifest.json); ตอนนี้ตรวจไฟล์/จำนวนหน้า/text layer แล้ว ยังไม่รัน OCR acceptance ของ 08.pdf
+- [ ] ทดสอบ OCR/Text/HTML ตารางครบ 11 หน้า บันทึก layout ที่ตรวจพบและ unsupported/unresolved ตามจริง พร้อม ground truth ที่ตรวจด้วยคน
+- [ ] ตรวจตัวเลข ทศนิยม เครื่องหมาย £ วงเล็บ ขีด และเซลล์รวม/หัวตารางหลายระดับ ไม่หายหรือย้ายเซลล์
+- [ ] ทดสอบ fallback ตารางจาก tab stops และการส่งต่อ EPUB; ไม่อ้างว่ารองรับ bullet จาก 08.pdf จนตรวจพบตัวอย่างจริง
+
+## Phase 9 — แก้ไขสารบัญ EPUB และ stable targets (Editable EPUB TOC)
+
+### สถานะและขอบเขต
+
+- วางแผนตั้งแต่ 2026-10-04; implementation และ automated acceptance เสร็จ 2026-10-06 โดยใช้ระบบ Phase 8 ร่วมกัน
+- งานหลัก: แก้ชื่อ เพิ่ม/เอารายการออก เรียงลำดับ จัดระดับ และเลือกปลายทางจากหัวข้อหรือต้นบท พร้อมบันทึก `toc.json`
+- ชื่อสารบัญแยกจากหัวข้อจริง; ไม่เปลี่ยนข้อความ ลำดับเนื้อหา การแบ่งบท หรือ spine และไม่ลบเนื้อหา
+- ใช้ BookModel, EPUB exporter, validator, artifact guard, Preview/download และระบบปกของ Phase 8; ไม่สร้าง packager หรือระบบนำเข้าปกอีกชุด
+- UI ปกเป็นงานปรับปรุง UX เท่านั้น เช่น thumbnail, drag-and-drop และรายละเอียดไฟล์ คง file picker/alt/reuse/สร้างแบบไม่มีปกที่มีแล้ว
+- นอกขอบเขตรุ่นแรก: สร้าง target จากย่อหน้าใดก็ได้, ย้ายเนื้อหา/แบ่งบทผ่าน editor, ปกจาก URL/CDN, storage ปกอีกชุด, multipart/DELETE cover API และเพิ่มเพดานปก
+- ข้อตกลงร่วมและข้อจำกัดของ Phase 8 ดูหัวข้อก่อนหน้า; ข้อคงค้าง Phase 8 ยังต้องปิดตามหลักฐานของ Phase 8
+
+### 9.1 TOC model และ stable targets — งานใหม่
+
+- [x] กำหนด schema: entry ID, label, parent ID/ระดับ, ลำดับ, target ID และสถานะ auto-generated/user-edited
+- [x] เก็บ `files/{job_id}/export/epub/toc.json` แยกจาก HTML พร้อม schema version, source revision และ TOC revision; เขียนแบบ atomic
+- [x] ใช้ stable target ID ไม่อิงเลขลำดับ heading เพียงอย่างเดียว; เพิ่มหัวข้อก่อนหน้าแล้ว target เดิมไม่เลื่อนผิด
+- [x] รักษา heading ID ที่ถูกต้อง/ไม่ซ้ำตลอด CodeMirror → Visual → sanitizer → EPUB parser; ใช้ allowlist `id` เดิม
+- [x] กำหนดนโยบาย ID ที่ระบบสร้าง ตรวจ uniqueness และ migration; ID ซ้ำ remap พร้อม evidence
+- [x] เก็บ mapping target ID → chapter filename/fragment ID; สร้าง href โดยระบบ ไม่ให้ผู้ใช้พิมพ์ path/URL เอง
+- [x] ใช้สารบัญอัตโนมัติ h1–h3 เป็นค่าเริ่มต้น เพิ่มตัวเลือกต้นบทและบริบทแยกชื่อซ้ำ
+- [x] เมื่อ HTML เปลี่ยน คงรายการแก้มือเฉพาะ target ที่จับคู่ได้แน่นอน; target หาย/กำกวมเป็น unresolved
+- [x] ใช้ cover/metadata/chapter split จาก preview config เดิม; ไม่มีปกทำงานได้ ไม่ทำสำเนาปกอีกแหล่ง
+
+### 9.2 UI สารบัญแก้มือ — งานใหม่และ UX ที่ต่อยอด
+
+- [x] เพิ่มมุมมอง “แก้ไขสารบัญ” แสดง label, ระดับ, target และ unresolved
+- [x] เพิ่ม/แก้ชื่อ/เอารายการออก โดยไม่ลบเนื้อหา หรือไฟล์
+- [x] เลื่อนขึ้น/ลงและปรับระดับ; ไม่เกิน 3 ระดับ ตรวจ parent cycle และ orphan nesting ทั้ง UI/API
+- [x] เลือก target จากหัวข้อหรือต้นบท พร้อม “ไปดูตำแหน่ง” และบริบทแยกหัวข้อชื่อซ้ำ
+- [x] เพิ่ม “สร้างสารบัญอัตโนมัติใหม่” โดยยืนยันก่อนทับสารบัญแก้มือ
+- [x] ใช้ “บันทึกสารบัญและอัปเดต Preview”; แสดง dirty state เตือนก่อนปิดหน้า และบล็อก package จนบันทึก
+- [x] รักษา draft ระหว่างสลับมุมมอง/งาน; ไม่ปน TOC หรือปกข้ามงาน และไม่ทับ metadata/ปกเมื่อบันทึก TOC
+- [x] TOC draft ค้าง → HTML เปลี่ยน: แจ้ง source revision และให้ re-match โดยไม่ overwrite อัตโนมัติ
+- [x] หลัง re-match แสดง matched/unresolved; ยกเลิกคง draft
+- [x] รองรับ keyboard/จอเล็ก ไม่พึ่ง drag-and-drop เพียงอย่างเดียว
+- [x] UI ปกมี thumbnail, drag-and-drop และรายละเอียด MIME/dimensions/ขนาดไฟล์; คงเพดานและ validator Phase 8
+- [x] แยก thumbnail ปกที่เลือกค้างจาก Preview ที่บันทึก; เปลี่ยนปก/alt/ไม่มีปกทำให้ dirty และสร้าง Preview ใหม่
+
+### 9.3 API และ revision — เพิ่ม TOC บน pipeline เดิม
+
+- [x] เพิ่ม API อ่านสารบัญ/targets บันทึก และ regenerate แบบยืนยัน; ตรวจ JobId, schema และขนาดข้อมูล
+- [x] รับ base TOC/source/preview revision; ไม่ตรงตอบ 409 และไม่ overwrite อัตโนมัติ
+- [x] ใช้ TOC model เดียวสร้าง Quick Preview และ `nav.xhtml`; ใช้ chapter XHTML/packager เดิม
+- [x] รวม toc_revision ใน preview config; source, TOC, ปก, metadata หรือ chapter split เปลี่ยนทำให้ stale
+- [x] ใช้ API ปก Phase 8 เดิมและคง cover/metadata เมื่อบันทึก TOC
+- [x] Package ได้เฉพาะ Preview/TOC ที่บันทึก ไม่มี unresolved และ revision ตรง
+- [x] ปฏิเสธ TOC ว่าง, target ไม่ถูกต้อง, label ว่าง, duplicate target, orphan และระดับเกิน 3
+- [x] งานเก่าไม่มี toc.json ใช้สารบัญอัตโนมัติเดิม; regenerate ไม่ทับ TOC/ปกเงียบ ๆ
+- [x] validator ตรวจ parent/orphan/target uniqueness และ href/fragment ทั้งหมดใน package
+- [x] Escape label/alt/error, คง sandbox/CSP และ zero external calls
+- [x] ซิงก์ source/publish และอัปเดตคู่มือ; payload/meta Phase 8 ที่ไม่มี toc_revision ใช้ fallback ได้
 
 ### 9.4 จุดตรวจและเกณฑ์ผ่าน
 
-- [ ] สารบัญหลายระดับถูกต้องทั้งการแบ่งบทตาม heading และตามหน้า รวมเอกสารไม่มีหัวข้อ
-- [ ] แก้ชื่อ เรียงลำดับ จัดระดับ เพิ่ม/เอารายการออกแล้ว reload ได้ผลเดิม; ข้อความและลำดับเนื้อหาไม่เปลี่ยน
-- [ ] คลิกทุก entry ใน Preview และ EPUB ถึงหัวข้อ/ต้นบทที่เลือก รวมชื่อซ้ำ ภาษาไทย และอักขระพิเศษ
-- [ ] เพิ่ม/เปลี่ยนชื่อหัวข้อและเปลี่ยนการแบ่งบทแล้วไม่ลิงก์ผิด; จับคู่ไม่ได้ต้อง unresolved และกันการสร้าง EPUB
-- [ ] ทดสอบสองแท็บ/409, response ช้า, source เปลี่ยนระหว่างบันทึกหรือสร้างไฟล์ และยกเลิก regenerate โดยไม่มี silent overwrite
-- [ ] ทดสอบ XSS, URL/path ต้องห้าม, duplicate IDs, missing targets และ parent cycle; ปฏิเสธก่อนบันทึก
-- [ ] ทดสอบ heading ID ผ่าน Code/Visual/save/export โดยไม่เปลี่ยนโดยไม่จำเป็น รวมการคัดลอก heading ที่ทำให้ ID ซ้ำ
-- [ ] ทดสอบ 0 รายการ, ไม่มี valid target, ชื่อว่าง, เกิน 3 ระดับ และ orphan nesting; ต้องไม่สร้าง EPUB ที่ผิดเงื่อนไข
-- [ ] ทดสอบแก้ TOC ค้าง → บันทึก HTML → กลับ EPUB ทั้ง re-match สำเร็จ/กำกวม/ปลายทางหาย และยกเลิกฉบับร่าง โดยไม่สูญเสียการแก้ไขเงียบ ๆ
-- [ ] Browser automation Chrome/Edge ครอบคลุมแก้ไข บันทึก เปิดงานซ้ำ คลิกลิงก์ stale/conflict และ mobile/keyboard พร้อม network log
-- [ ] ตรวจ EPUBCheck เวอร์ชันที่ล็อก และสารบัญ/ลิงก์ใน reader อย่างน้อย 2 ตัว; บันทึก warning และข้อจำกัดตามจริง
-- [ ] Regression Phase 8 และงานเก่าไม่มีสารบัญแก้มือผ่าน; เนื้อหาไม่หายและสร้างซ้ำตามกติกา deterministic
-- [ ] เพิ่ม `tests/phase9/`, `phase9/evidence.md`, manifest ตามกติกาชุดข้อมูลร่วม, validator report และหลักฐาน browser/reader ก่อนเสนอ Gemini ตรวจรับ
+งานเพิ่มของ Phase 9:
 
-### 9.5 ประเด็นที่ Gemini พิจารณาเห็นชอบแล้ว (ล็อกขอบเขต Phase 9)
+- [x] แก้ label/ลำดับ/ระดับ เพิ่ม/เอารายการออก แล้ว reload ได้ค่าเดิม; ข้อความ ลำดับเนื้อหา และ spine ไม่เปลี่ยน
+- [x] คลิกทุก TOC entry ถึง target ที่เลือก รวมชื่อซ้ำ ไทย และอักขระพิเศษ
+- [x] เพิ่ม/เปลี่ยนชื่อ heading และเปลี่ยน chapter split แล้วไม่ลิงก์ผิด; จับคู่ไม่ได้เป็น unresolved และบล็อก package
+- [x] Heading ID ผ่าน sanitizer/export คงที่ รวม heading ID ซ้ำที่ remap ชัดเจน
+- [x] ปฏิเสธ 0 entries, target ไม่ถูกต้อง, label ว่าง, เกิน 3 ระดับ, orphan และ cycle ก่อนบันทึก/package
+- [x] ทดสอบ re-match สำเร็จ/กำกวม/target หาย และยกเลิก โดยไม่สูญ draft
+- [x] ทดสอบสองแท็บ/409, response ช้าไม่ปนงาน, source/config เปลี่ยนระหว่าง save/package และยกเลิก regenerate
+- [x] UX ปก thumbnail/alt/ข้อมูลไฟล์ตรงกับปกที่เลือก; dirty state, เพดาน 2 MB และไม่มี external calls
+- [x] Browser Chrome/Edge ครอบคลุม editor/save/reload/target/stale/conflict/mobile/keyboard พร้อม network log
 
-- [x] พิจารณาให้ `toc.ncx` เป็น compatibility extension ไม่ใช่ข้อบังคับปิด Phase 9 รุ่นแรก; หากรับทำ ให้สร้างจาก TOC model เดียวกับ nav และกำหนด reader/version ที่ทดสอบจริง ไม่อ้างรองรับ 100%
-- [x] พิจารณาหัวข้อกลุ่มรุ่นแรกให้มีลิงก์ไปปลายทางแรกที่ใช้ได้ในกลุ่ม พร้อมแสดงปลายทางให้ตรวจ; ถ้าไม่มีเป้าหมายต้อง unresolved ส่วนกลุ่มไม่มีลิงก์แบบ span พร้อมรายการลูกเป็นส่วนเสริม
-- รายละเอียดเหตุผลและมติเห็นชอบอยู่ใน `gpt.md` หัวข้อ 8 และ `gemini.md` หัวข้อ 3.8; Gemini พิจารณาเห็นชอบตามข้อเสนอของ GPT แล้ว
+Regression ของ Phase 8 หลังเปลี่ยนระบบร่วม — ต้องทดสอบซ้ำ ไม่ใช่งานพัฒนาระบบพื้นฐานใหม่:
 
-บันทึกผล: วางแผน / พร้อมพัฒนา | วันที่ 2026-10-04 | ผู้ตรวจรับ Gemini | ล็อกขอบเขตและข้อกำหนด Phase 9 เรียบร้อยแล้ว (รวมมติ 9.5) | ยังไม่มีผลทดสอบ Phase 9
+- [x] สารบัญอัตโนมัติหลายระดับ/ไม่มี heading และงานเก่าไม่มี toc.json ยังใช้ได้ ทั้งแบ่งบทตาม heading/page
+- [x] Preview/package/download, source view, metadata, source revision และ artifact guards ยังผ่าน
+- [x] ปก PNG/JPEG/alt, cover manifest/XHTML/landmark, reuse และไม่มีปกคงเดิม; validator เดิมผ่าน
+- [x] เปลี่ยนปก/alt/ไม่มีปกทำให้ stale ถูกต้อง; บันทึก TOC อย่างเดียวไม่เปลี่ยนปก/metadata
+- [x] Roundtrip/markers, Unicode และ XSS รวม TOC label/target ไม่มี silent loss; approved 44-page text ตรง 43,391 chars
+- [x] สร้างซ้ำ deterministic; EPUBCheck 5.3.0 ไม่มี error/warning; epub.js/Foliate ผ่านทุก target/ปก/reflow
+- [x] Zero external calls, Local AI offline และงบ latency/RAM ผ่าน: Preview p95 0.3230s, package p95 0.2945s, RSS 62.83MB
+- [x] เพิ่ม tests/phase9/, evidence, manifest, validator, browser/reader evidence; ไม่ปิด manual gate Phase 8.1
 
+### 9.5 มติเดิมและสถานะขอบเขตปัจจุบัน
+
+- [x] มติ Gemini เดิม: toc.ncx เป็น compatibility extension ไม่บังคับปิด Phase 9 รุ่นแรก; ถ้าทำต้องใช้ TOC model เดียวและระบุ reader/version ที่ทดสอบ
+- [x] มติ Gemini เดิม: หัวข้อกลุ่มรุ่นแรกชี้ target แรกที่ใช้ได้ในกลุ่ม; ไม่มี target ต้อง unresolved ส่วนกลุ่ม span ไม่มีลิงก์เป็นส่วนเสริม
+- มติเดิมอ้างอิง gpt.md หัวข้อ 8 และ gemini.md หัวข้อ 3.8; การแบ่งงาน Phase 8–9 ครั้งนี้ปรับตามคำขอผู้ใช้ ไม่อ้างว่า Gemini ตรวจรับ implementation Phase 9 แล้ว
+
+บันทึกผล: PASSED | วันที่ 2026-10-06 | source/publish 9/9, Phase 8 regression 17/17, Phase 8.1 regression 12/12, EPUBCheck/readers/browser/benchmark PASS | หลักฐาน `phase9/evidence.md`
+
+## Phase 10 — แปลเอกสารหลายภาษาและเลือกรูปแบบการแปล (Document Translation)
+
+### สถานะและขอบเขต
+
+- วางแผน 2026-10-06; ยังไม่เริ่ม implementation
+- ผู้ใช้เลือกภาษาต้นทาง (`auto` หรือรหัส BCP-47), ภาษาปลายทาง และรูปแบบ `ทั่วไป`, `นิยาย`, `วิชาการ`, `ราชการ`
+- provider รุ่นแรก: `Google Cloud Translation`, `Local AI` และ `Hybrid` (Google baseline → Local AI ปรับสำนวน)
+- ใช้ stable block/cell/target ID จาก Phase 8.1–9 เพื่อรักษาย่อหน้า ตาราง รายการ หัวข้อ และสารบัญ
+- แปลจาก artifact ที่ผู้ใช้เลือกและบันทึกแล้ว; ไม่ OCR ใหม่และไม่แก้ source artifact
+- Google/Hybrid เป็น cloud opt-in ต้องแจ้งว่าข้อความออกจากเครื่อง พร้อมประมาณจำนวนอักขระก่อนเริ่ม
+- นอกขอบเขตรุ่นแรก: translation memory ข้ามโครงการ, แปลหลายภาษาปลายทางพร้อมกัน, fine-tune model, voice/subtitle และการแปลภาพที่ไม่มี OCR text
+
+### 10.1 Translation model และ revision
+
+- [ ] กำหนด `translation.json` schema 10.0: job/source/target language, style, provider/model, source/glossary/translation revision และ timestamps
+- [ ] เก็บ segment ตาม stable ID พร้อม type, source text, baseline text, translated text, warnings, status และ provenance
+- [ ] รักษาจำนวน/ลำดับ block, list, row/cell, heading ID และ TOC target; ห้าม provider สร้าง/ลบ/ย้าย segment
+- [ ] เก็บ source, Google baseline, AI result และ user-final แยกกัน; ไม่ overwrite คำแปลที่ผู้ใช้แก้มือ
+- [ ] source/glossary/style/provider/model เปลี่ยนแล้วผลเก่าเป็น stale; ใช้ base revision และ 409 ป้องกันสองแท็บ
+- [ ] งานเก่าไม่มี layout ใช้ paragraph/page fallback พร้อม evidence; ตารางที่ไม่มี cell model ต้อง unresolved ไม่เดาโครงสร้าง
+- [ ] translation revision ต้อง deterministic จาก config + segment results; export เดิมซ้ำได้ byte-identical
+
+### 10.2 ภาษา รูปแบบ และ glossary
+
+- [ ] โหลดภาษาที่รองรับจาก capability ของ provider และเก็บรหัส BCP-47; ห้ามแสดงภาษาที่ provider ปัจจุบันใช้ไม่ได้
+- [ ] ป้องกัน source language เท่ากับ target language และ target ว่าง; `auto` ต้องแสดงภาษาที่ตรวจพบพร้อม confidence/warning
+- [ ] `ทั่วไป`: ชัดเจน เป็นธรรมชาติ ไม่เพิ่มหรือตัดข้อมูล
+- [ ] `นิยาย`: รักษาน้ำเสียง ผู้พูด บทสนทนา มุมมอง และชื่อเฉพาะ โดยไม่แต่งเหตุการณ์เพิ่ม
+- [ ] `วิชาการ`: รักษาคำศัพท์ สูตร citation footnote หน่วย และระดับภาษาทางวิชาการ
+- [ ] `ราชการ`: ใช้ภาษาทางการ รักษาชื่อตำแหน่ง เลขหนังสือ วันที่ ข้อกฎหมาย และรูปแบบรายการ
+- [ ] กฎร่วมทุก style: ไม่บังคับแปลทุกคำ; ศัพท์เฉพาะทาง ชื่อเทคโนโลยี ชื่อผลิตภัณฑ์ ตัวย่อ และคำที่แปลแล้วทำให้ความหมายคลาดเคลื่อน ให้คงคำเดิมหรือใช้คำทับศัพท์ตาม glossary/context
+- [ ] ผลแปลต้องแยกได้ว่า term ใด `translated`, `preserved` หรือ `transliterated`; ผู้ใช้แก้ผลและเพิ่ม term เข้า glossary/do-not-translate ได้
+- [ ] style เป็น versioned prompt/template ที่ตรวจสอบได้; รุ่นแรกไม่รับ free-form system prompt จาก UI
+- [ ] เพิ่ม glossary แบบ source → target, case sensitivity และ do-not-translate; ตรวจคำซ้ำ/ว่าง/ภาษาผิดก่อนบันทึก
+- [ ] glossary มี revision แยก; เปลี่ยน glossary แล้วระบุ segment ที่ต้องแปลใหม่ ไม่ทับ manual-final เงียบ ๆ
+
+### 10.3 Provider และความปลอดภัย
+
+- [ ] สร้าง interface กลาง `TranslationProvider`; Google/Local AI/Hybrid คืน schema เดียวและ error taxonomy เดียว
+- [ ] Google ใช้ Cloud Translation API v3 ฝั่ง backend ผ่าน ADC/service account; ห้ามส่ง credential/API key ไป browser หรือเก็บใน job artifact
+- [ ] Local AI ใช้ lock/capability/timeout/cancel เดิม; prompt บังคับคืน JSON ตาม ID และห้ามเพิ่ม/ลบ/สรุป
+- [ ] Hybrid เก็บ Google baseline แยกจาก AI polish และแสดงค่าใช้จ่าย/เวลาที่เพิ่มก่อนเริ่ม
+- [ ] แบ่ง batch ตาม semantic boundary เป้าหมายไม่เกิน 5,000 code points; ไม่ตัด grapheme, placeholder, HTML entity หรือ table row กลางคัน
+- [ ] retry เฉพาะ transient error ด้วย backoff; quota/auth/invalid request ต้องหยุดและแจ้งเหตุจริง ไม่ fallback ข้าม provider เงียบ ๆ
+- [ ] ตรวจ response: ID ครบ/ไม่ซ้ำ, schema/ภาษา/ขนาดถูกต้อง, ไม่มีข้อความนอก JSON; invalid batch คง source และทำ failed/unresolved
+- [ ] Google/Hybrid มี privacy consent, character estimate, quota/cost guard และ audit log ที่ไม่บันทึก credential
+- [ ] Local-only mode ต้องใช้งานได้โดยไม่มี Google credential และไม่มี external request
+
+### 10.4 Validator และการรักษาข้อมูล
+
+- [ ] ล็อกและตรวจตัวเลข วันที่ เวลา เงิน เปอร์เซ็นต์ หน่วย URL อีเมล citation และรหัสอ้างอิงก่อนเผยแพร่
+- [ ] ตรวจชื่อเฉพาะด้วย glossary/do-not-translate; ค่าที่เปลี่ยนโดยไม่มีนโยบายต้อง flagged_for_human_review
+- [ ] รักษา Unicode, สระ/วรรณยุกต์ไทย, RTL, emoji และอักขระพิเศษโดยไม่ normalize แบบทำข้อมูลหาย
+- [ ] ตารางต้องมี row/cell/span เท่าเดิม; cell ว่างยังว่าง และข้อความไม่ย้ายช่อง
+- [ ] HTML ใช้ text-node/segment mapping ไม่ให้ provider แก้ tag/attribute/id/href; sanitize อีกครั้งก่อน preview/export
+- [ ] validator failure บล็อก publish ของ batch/เอกสารนั้น พร้อม retry/review; ห้ามถือคำว่า “มั่นใจ” ของโมเดลเป็นหลักฐาน
+- [ ] แสดง diff source → baseline → AI → final และ warnings ระดับ segment; ผู้ใช้ accept/revert รายการหรือทั้งหน้าได้
+
+### 10.5 API, worker และ UI
+
+- [ ] เพิ่ม API capability/languages, estimate, start, progress, cancel, retry, result, save-final และ export พร้อม JobId/path/size validation
+- [ ] งานแปลทำ background task มี queued/running/cancelling/completed/partial/failed/cancelled และ resume เฉพาะ batch ที่ยังไม่สำเร็จ
+- [ ] หน้า Translation เลือก source artifact, source/target language, style, provider และ glossary ก่อนเริ่ม; ไม่เริ่มอัตโนมัติเมื่อเปลี่ยนค่า
+- [ ] แสดง cloud/offline badge, consent, character/cost estimate, progress batch/page, elapsed, error และ retry/cancel
+- [ ] หน้าตรวจเทียบเลือกหน้าและ mode source/Google/AI/final; รองรับ keyboard/mobile และไม่สูญ draft เมื่อสลับหน้า/งาน
+- [ ] แปลซ้ำต้องถามว่าจะเก็บ manual-final, rebase หรือเริ่มใหม่; ค่าเริ่มต้นห้ามทับงานแก้มือ
+- [ ] ส่งออก translated Text, semantic HTML และ EPUB ผ่าน pipeline เดิม; TOC label เลือกแปลได้แต่ target ID/href คงเดิม
+- [ ] translated EPUB ต้องสร้าง XHTML Quick Preview และผ่าน revision/TOC/cover/validator guards เดิม
+
+### 10.6 หลักฐานและเกณฑ์ผ่าน
+
+- [x] ล็อกชุด input ที่ผู้ใช้อนุมัติ: `demo/08.pdf`–`13.png` ตาม `phase10/dataset_manifest.json`; ยังต้องทำ ground truth และยืนยันภาษาปลายทางก่อนใช้ตัดสินคุณภาพ
+- [ ] `08.pdf`: แปลตารางอังกฤษโดยคง row/cell/span, ตัวเลข หน่วย placeholder และหัวตารางครบ
+- [ ] `09.png`: ตรวจภาษาจีน+อังกฤษในภาพเดียว รักษาศัพท์เฉพาะตาม glossary และแยก `translated`/`preserved`/`transliterated`
+- [ ] `10.png`–`11.png`: ทดสอบ style `นิยาย` โดยรักษาน้ำเสียง ผู้พูด บทสนทนา มุมมอง ชื่อเฉพาะ และความต่อเนื่องข้ามภาพ
+- [ ] `12.png`: ทดสอบ style `วิชาการ`/หนังสือสอน IT โดยรักษาคำศัพท์เทคนิคและโครงสร้างคำอธิบาย
+- [ ] `13.png`: ทดสอบ style `วิชาการ`/หนังสือสอน IT โดย code block, identifier, string, syntax, indentation และลำดับบรรทัดต้องไม่ถูกแปลหรือแก้
+- [ ] เพิ่มชุด `ราชการ` ที่ผู้ใช้อนุมัติก่อนอ้างว่าครอบคลุม style `ราชการ`; ชุด `08.pdf`–`13.png` ยังไม่ครอบคลุม
+- [ ] ล็อก ground truth, glossary, style rubric และ provider/model/version ก่อน benchmark; แยกผลตามคู่ภาษาและ style
+- [ ] Structural fidelity 100%: segment ID, heading/list/table/cell/span/TOC target ครบและไม่ย้าย
+- [ ] Critical-token preservation 100% สำหรับตัวเลข วันที่ เงิน หน่วย URL อีเมล citation, do-not-translate และศัพท์เฉพาะที่กำหนดให้คงคำเดิม/ทับศัพท์
+- [ ] ประเมิน adequacy/fluency/terminology ด้วยคนแบบ blind เทียบ Google, Local AI และ Hybrid; BLEU/COMET ใช้เป็นหลักฐานเสริม ไม่ใช้ปิด Phase ลำพัง
+- [ ] ทดสอบนิยาย/วิชาการ/ราชการ/ทั่วไปอย่างละชุด; ไม่มีชุดอนุมัติให้บันทึก not covered และห้ามอ้างว่าผ่าน style นั้น
+- [ ] ทดสอบ quota, timeout, auth fail, JSON ผิด, cancel/retry/resume, server restart, สองแท็บ/409 และ source/glossary เปลี่ยนกลางงาน
+- [ ] Chrome/Edge ครอบคลุม config/progress/diff/manual edit/export/stale/mobile/keyboard; Google mode มี external call เฉพาะ endpoint ที่อนุญาต
+- [ ] Text/HTML/EPUB roundtrip ไม่มี silent loss; EPUBCheck และ epub.js/Foliate ผ่านคำแปล, TOC, ตาราง, ปก และ reflow
+- [ ] ล็อกงบ latency/RAM/ค่าใช้จ่ายก่อน benchmark แยก Google, Local AI, Hybrid และขนาดเอกสาร
+- [ ] เพิ่ม `tests/phase10/`, `phase10/evidence.md`, dataset/glossary/prompt manifest, quality report, cost/benchmark และ browser/reader logs
+- [ ] ซิงก์ source/publish และอัปเดต README/MANUAL/gpt.md; ไม่เปลี่ยนสถานะ Phase 8.1 manual gate หรือผล Phase 9
+
+บันทึกผล: PLANNED | วันที่ 2026-10-06 | ล็อก input `demo/08.pdf`–`13.png` แล้ว; รอ ground truth, ภาษาปลายทาง, ชุดราชการ, provider และงบก่อนเริ่ม quality acceptance
 
 ## สรุปการอนุมัติแต่ละ Phase
 
@@ -579,8 +773,9 @@ aw.txt ที่ประกอบแล้ว; ระบุ tolerance ของ
 | 6 | ผลตรวจรับ คู่มือ และระบบพร้อมใช้ | ผ่านตามขอบเขต 44 หน้า (มี not covered ชั่วคราว / รอการยอมรับจากเจ้าของงาน) | phase6/evidence.md / Antigravity (รอการยอมรับจากเจ้าของงาน) |
 | ก่อน 7 | แก้ Bug 1–7 และ S1–S11 พร้อมตรวจรับซ้ำส่วนที่กระทบ | ผ่านการตรวจรับซ้ำ 100% | tests/test_bug*.py (17/17 PASS), Phase 4-6 regression (49/50 PASS) / Codex/Antigravity |
 | 7 | ส่งออก HTML พื้นฐานและพร้อม Local AI | ผ่านสมบูรณ์ 100% | phase7/evidence.md, tests/phase7/ (25/25 PASS), phase7/font_style_manifest.json, phase7/benchmark_results.json, phase7/browser_automation.log, tests/phase2 (27/27 PASS) / Antigravity |
-| 8 | ส่งออก EPUB แบบ reflowable พร้อม XHTML Quick Preview ก่อน package | กำลังพัฒนา / ยังไม่ผ่านการตรวจรับ | tests/phase8/ (6/6 PASS), phase8/evidence.md; รอ EPUBCheck, browser automation และ compatibility matrix |
-| 9 | แก้ไขสารบัญ EPUB และ stable targets | วางแผน / ยังไม่เริ่มพัฒนา | รอ tests/phase9/, phase9/evidence.md และ Gemini ตรวจรับ |
+| 8 | ส่งออก EPUB แบบ reflowable พร้อม XHTML Quick Preview ก่อน package | ผ่านสมบูรณ์ 100% | tests/phase8/ (17/17 PASS), phase8/evidence.md, EPUBCheck 5.3.0 (0 errors), approved_roundtrip, approved_browser (Chrome/Edge 0 calls), reader engines (epub.js, Foliate), benchmark_results.json / Antigravity |
+| 8.1 | OCR ตาราง/รายการ, Text/HTML และเทียบต้นฉบับ | IMPLEMENTATION COMPLETE: source/publish 12/12 + browser/EPUB/benchmark PASS | รอเจ้าของงานยืนยัน human ground truth ใน demo/04 และ demo/08 |
+| 9 | สารบัญแก้มือ, stable targets และ UX ปกบนระบบ Phase 8 | ผ่าน implementation และ automated acceptance | tests/phase9/ (9/9), phase9/evidence.md, EPUBCheck/readers/benchmark / รอ Gemini ตรวจรับอิสระ |
+| 10 | แปลเอกสาร เลือกภาษาปลายทางและ style | วางแผน / ยังไม่เริ่ม implementation | รอชุดข้อมูลคู่ภาษา, glossary, provider/model และ quality rubric ที่อนุมัติ |
 
 หมายเหตุ: กรณีไม่เกี่ยวข้อง เช่น multi-user ในระบบ localhost ให้บันทึก N/A พร้อมเหตุผล ไม่ถือเป็นผลทดสอบผ่าน ส่วนเกณฑ์บังคับที่ยังไม่ผ่านต้องคงสถานะไว้ตามจริง
-

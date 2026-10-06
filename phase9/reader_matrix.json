@@ -1,0 +1,800 @@
+[
+  {
+    "browser": "chrome",
+    "version": "154.0.8037.93",
+    "epubjs": {
+      "spine": 45,
+      "toc": [
+        {
+          "id": "text/chapter-022.xhtml#heading-7432d599dbe3",
+          "href": "text/chapter-022.xhtml#heading-7432d599dbe3",
+          "label": "สารบัญ Phase 9 — ฉบับตรวจรับ",
+          "subitems": [
+            {
+              "id": "text/chapter-022.xhtml#heading-c10aacad8e54",
+              "href": "text/chapter-022.xhtml#heading-c10aacad8e54",
+              "label": "สารบัญ",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-026.xhtml#heading-1ea389db9148",
+              "href": "text/chapter-026.xhtml#heading-1ea389db9148",
+              "label": "XAU SCALPER AI  v16.06 MATRIX",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-026.xhtml#heading-6b2fbe210822",
+              "href": "text/chapter-026.xhtml#heading-6b2fbe210822",
+              "label": "3. คำอธิบายพารามิเตอร์ทั้งหมด",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-026.xhtml#heading-a2f6cd3f9fec",
+              "href": "text/chapter-026.xhtml#heading-a2f6cd3f9fec",
+              "label": "3.1 Trading Basics (พื้นฐานการเทรด)",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-026.xhtml#heading-03944b0be474",
+              "href": "text/chapter-026.xhtml#heading-03944b0be474",
+              "label": "3.2 Decision Matrix (เครื่องยนต์จำแนก Regime)",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-026.xhtml#heading-b58977cbbe42",
+              "href": "text/chapter-026.xhtml#heading-b58977cbbe42",
+              "label": "3.3 Take Profit — ATR Dynamic",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-026.xhtml#heading-eefd1090f4ee",
+              "href": "text/chapter-026.xhtml#heading-eefd1090f4ee",
+              "label": "3.4 Recovery — Gap & Layer",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-026.xhtml#heading-99294e4dd211",
+              "href": "text/chapter-026.xhtml#heading-99294e4dd211",
+              "label": "3.5 Recovery — Lot Multiplier",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-028.xhtml#heading-ba9a35edf28e",
+              "href": "text/chapter-028.xhtml#heading-ba9a35edf28e",
+              "label": "XAU SCALPER AI  v16.06 MATRIX",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-028.xhtml#heading-e3aaa8e72add",
+              "href": "text/chapter-028.xhtml#heading-e3aaa8e72add",
+              "label": "3.10 Risk Guards (ตัวป้องกันความเสี่ยง)",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-028.xhtml#heading-81bab385f327",
+              "href": "text/chapter-028.xhtml#heading-81bab385f327",
+              "label": "3.11 Time Filter",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-028.xhtml#heading-b017729da9b5",
+              "href": "text/chapter-028.xhtml#heading-b017729da9b5",
+              "label": "3.12 Bars & Misc",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-028.xhtml#heading-4ef46bef5e1d",
+              "href": "text/chapter-028.xhtml#heading-4ef46bef5e1d",
+              "label": "3.13 Dashboard",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-029.xhtml#heading-e449af521c92",
+              "href": "text/chapter-029.xhtml#heading-e449af521c92",
+              "label": "XAU SCALPER AI  v16.06 MATRIX",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-030.xhtml#heading-b18bc80cfeb6",
+              "href": "text/chapter-030.xhtml#heading-b18bc80cfeb6",
+              "label": "XAU SCALPER AI  v16.06 MATRIX",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-030.xhtml#heading-89709e98703b",
+              "href": "text/chapter-030.xhtml#heading-89709e98703b",
+              "label": "4. Preset ค่าแนะนำตามประเภทบัญชี",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-030.xhtml#heading-daae181f3b9a",
+              "href": "text/chapter-030.xhtml#heading-daae181f3b9a",
+              "label": "4.1 Preset — บัญชี CENT (เงินทุน 100–1,000 cent)",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-031.xhtml#heading-8ecaa17ee377",
+              "href": "text/chapter-031.xhtml#heading-8ecaa17ee377",
+              "label": "XAU SCALPER AI  v16.06 MATRIX",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-031.xhtml#heading-6cfc9472360e",
+              "href": "text/chapter-031.xhtml#heading-6cfc9472360e",
+              "label": "4.2 Preset — บัญชี STANDARD (เงินทุน $500–$5,000)",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-032.xhtml#heading-a27fa7adda22",
+              "href": "text/chapter-032.xhtml#heading-a27fa7adda22",
+              "label": "XAU SCALPER AI  v16.06 MATRIX",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-037.xhtml#heading-9ad43dc37627",
+              "href": "text/chapter-037.xhtml#heading-9ad43dc37627",
+              "label": "XAU SCALPER AI  v16.06 MATRIX",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-037.xhtml#heading-11d0bb98afc0",
+              "href": "text/chapter-037.xhtml#heading-11d0bb98afc0",
+              "label": "9. Changelog และ Version History",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-038.xhtml#heading-3c70ec3684d9",
+              "href": "text/chapter-038.xhtml#heading-3c70ec3684d9",
+              "label": "แนะนำตัว",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-039.xhtml#heading-a457d382ac9d",
+              "href": "text/chapter-039.xhtml#heading-a457d382ac9d",
+              "label": "สื่อและอุปกรณ์",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-040.xhtml#heading-d03e4449ca05",
+              "href": "text/chapter-040.xhtml#heading-d03e4449ca05",
+              "label": "ขั้นตอนที่ 4 Applying  the Communication Skill สื่อสารและนำเสนอ",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-042.xhtml#heading-e7b797811ca2",
+              "href": "text/chapter-042.xhtml#heading-e7b797811ca2",
+              "label": "โรงเรียนบ้านห้วยผึ้ง จ.เชียงราย",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            }
+          ],
+          "parent": null
+        }
+      ],
+      "metadata": {
+        "title": "เอกสาร OCR 44 หน้า — Phase 9",
+        "creator": "",
+        "description": "",
+        "pubdate": "",
+        "publisher": "",
+        "identifier": "urn:sha256:c841145e910bab3242415cfc71adfbea0138b4404609341b4c4ed8a862190318",
+        "language": "th",
+        "rights": "",
+        "modified_date": "2026-10-06T08:39:37Z",
+        "layout": "",
+        "orientation": "",
+        "flow": "",
+        "viewport": "",
+        "media_active_class": "",
+        "spread": "",
+        "direction": null
+      },
+      "all_toc_targets_verified": true,
+      "cover_verified": true,
+      "reflow_resize_verified": true
+    },
+    "foliate": {
+      "sections": 45,
+      "toc": [
+        {
+          "label": "สารบัญ Phase 9 — ฉบับตรวจรับ",
+          "href": "EPUB/text/chapter-022.xhtml#heading-7432d599dbe3",
+          "subitems": [
+            {
+              "label": "สารบัญ",
+              "href": "EPUB/text/chapter-022.xhtml#heading-c10aacad8e54",
+              "subitems": null,
+              "id": 1
+            },
+            {
+              "label": "XAU SCALPER AI v16.06 MATRIX",
+              "href": "EPUB/text/chapter-026.xhtml#heading-1ea389db9148",
+              "subitems": null,
+              "id": 2
+            },
+            {
+              "label": "3. คำอธิบายพารามิเตอร์ทั้งหมด",
+              "href": "EPUB/text/chapter-026.xhtml#heading-6b2fbe210822",
+              "subitems": null,
+              "id": 3
+            },
+            {
+              "label": "3.1 Trading Basics (พื้นฐานการเทรด)",
+              "href": "EPUB/text/chapter-026.xhtml#heading-a2f6cd3f9fec",
+              "subitems": null,
+              "id": 4
+            },
+            {
+              "label": "3.2 Decision Matrix (เครื่องยนต์จำแนก Regime)",
+              "href": "EPUB/text/chapter-026.xhtml#heading-03944b0be474",
+              "subitems": null,
+              "id": 5
+            },
+            {
+              "label": "3.3 Take Profit — ATR Dynamic",
+              "href": "EPUB/text/chapter-026.xhtml#heading-b58977cbbe42",
+              "subitems": null,
+              "id": 6
+            },
+            {
+              "label": "3.4 Recovery — Gap & Layer",
+              "href": "EPUB/text/chapter-026.xhtml#heading-eefd1090f4ee",
+              "subitems": null,
+              "id": 7
+            },
+            {
+              "label": "3.5 Recovery — Lot Multiplier",
+              "href": "EPUB/text/chapter-026.xhtml#heading-99294e4dd211",
+              "subitems": null,
+              "id": 8
+            },
+            {
+              "label": "XAU SCALPER AI v16.06 MATRIX",
+              "href": "EPUB/text/chapter-028.xhtml#heading-ba9a35edf28e",
+              "subitems": null,
+              "id": 9
+            },
+            {
+              "label": "3.10 Risk Guards (ตัวป้องกันความเสี่ยง)",
+              "href": "EPUB/text/chapter-028.xhtml#heading-e3aaa8e72add",
+              "subitems": null,
+              "id": 10
+            },
+            {
+              "label": "3.11 Time Filter",
+              "href": "EPUB/text/chapter-028.xhtml#heading-81bab385f327",
+              "subitems": null,
+              "id": 11
+            },
+            {
+              "label": "3.12 Bars & Misc",
+              "href": "EPUB/text/chapter-028.xhtml#heading-b017729da9b5",
+              "subitems": null,
+              "id": 12
+            },
+            {
+              "label": "3.13 Dashboard",
+              "href": "EPUB/text/chapter-028.xhtml#heading-4ef46bef5e1d",
+              "subitems": null,
+              "id": 13
+            },
+            {
+              "label": "XAU SCALPER AI v16.06 MATRIX",
+              "href": "EPUB/text/chapter-029.xhtml#heading-e449af521c92",
+              "subitems": null,
+              "id": 14
+            },
+            {
+              "label": "XAU SCALPER AI v16.06 MATRIX",
+              "href": "EPUB/text/chapter-030.xhtml#heading-b18bc80cfeb6",
+              "subitems": null,
+              "id": 15
+            },
+            {
+              "label": "4. Preset ค่าแนะนำตามประเภทบัญชี",
+              "href": "EPUB/text/chapter-030.xhtml#heading-89709e98703b",
+              "subitems": null,
+              "id": 16
+            },
+            {
+              "label": "4.1 Preset — บัญชี CENT (เงินทุน 100–1,000 cent)",
+              "href": "EPUB/text/chapter-030.xhtml#heading-daae181f3b9a",
+              "subitems": null,
+              "id": 17
+            },
+            {
+              "label": "XAU SCALPER AI v16.06 MATRIX",
+              "href": "EPUB/text/chapter-031.xhtml#heading-8ecaa17ee377",
+              "subitems": null,
+              "id": 18
+            },
+            {
+              "label": "4.2 Preset — บัญชี STANDARD (เงินทุน $500–$5,000)",
+              "href": "EPUB/text/chapter-031.xhtml#heading-6cfc9472360e",
+              "subitems": null,
+              "id": 19
+            },
+            {
+              "label": "XAU SCALPER AI v16.06 MATRIX",
+              "href": "EPUB/text/chapter-032.xhtml#heading-a27fa7adda22",
+              "subitems": null,
+              "id": 20
+            },
+            {
+              "label": "XAU SCALPER AI v16.06 MATRIX",
+              "href": "EPUB/text/chapter-037.xhtml#heading-9ad43dc37627",
+              "subitems": null,
+              "id": 21
+            },
+            {
+              "label": "9. Changelog และ Version History",
+              "href": "EPUB/text/chapter-037.xhtml#heading-11d0bb98afc0",
+              "subitems": null,
+              "id": 22
+            },
+            {
+              "label": "แนะนำตัว",
+              "href": "EPUB/text/chapter-038.xhtml#heading-3c70ec3684d9",
+              "subitems": null,
+              "id": 23
+            },
+            {
+              "label": "สื่อและอุปกรณ์",
+              "href": "EPUB/text/chapter-039.xhtml#heading-a457d382ac9d",
+              "subitems": null,
+              "id": 24
+            },
+            {
+              "label": "ขั้นตอนที่ 4 Applying the Communication Skill สื่อสารและนำเสนอ",
+              "href": "EPUB/text/chapter-040.xhtml#heading-d03e4449ca05",
+              "subitems": null,
+              "id": 25
+            },
+            {
+              "label": "โรงเรียนบ้านห้วยผึ้ง จ.เชียงราย",
+              "href": "EPUB/text/chapter-042.xhtml#heading-e7b797811ca2",
+              "subitems": null,
+              "id": 26
+            }
+          ],
+          "id": 0
+        }
+      ],
+      "metadata": {
+        "identifier": "urn:sha256:c841145e910bab3242415cfc71adfbea0138b4404609341b4c4ed8a862190318",
+        "title": "เอกสาร OCR 44 หน้า — Phase 9",
+        "language": "th",
+        "modified": "2026-10-06T08:39:37Z"
+      },
+      "all_toc_targets_verified": true,
+      "cover_verified": true,
+      "reflow_resize_verified": true
+    },
+    "external_calls": [],
+    "page_errors": []
+  },
+  {
+    "browser": "msedge",
+    "version": "154.0.4258.53",
+    "epubjs": {
+      "spine": 45,
+      "toc": [
+        {
+          "id": "text/chapter-022.xhtml#heading-7432d599dbe3",
+          "href": "text/chapter-022.xhtml#heading-7432d599dbe3",
+          "label": "สารบัญ Phase 9 — ฉบับตรวจรับ",
+          "subitems": [
+            {
+              "id": "text/chapter-022.xhtml#heading-c10aacad8e54",
+              "href": "text/chapter-022.xhtml#heading-c10aacad8e54",
+              "label": "สารบัญ",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-026.xhtml#heading-1ea389db9148",
+              "href": "text/chapter-026.xhtml#heading-1ea389db9148",
+              "label": "XAU SCALPER AI  v16.06 MATRIX",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-026.xhtml#heading-6b2fbe210822",
+              "href": "text/chapter-026.xhtml#heading-6b2fbe210822",
+              "label": "3. คำอธิบายพารามิเตอร์ทั้งหมด",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-026.xhtml#heading-a2f6cd3f9fec",
+              "href": "text/chapter-026.xhtml#heading-a2f6cd3f9fec",
+              "label": "3.1 Trading Basics (พื้นฐานการเทรด)",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-026.xhtml#heading-03944b0be474",
+              "href": "text/chapter-026.xhtml#heading-03944b0be474",
+              "label": "3.2 Decision Matrix (เครื่องยนต์จำแนก Regime)",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-026.xhtml#heading-b58977cbbe42",
+              "href": "text/chapter-026.xhtml#heading-b58977cbbe42",
+              "label": "3.3 Take Profit — ATR Dynamic",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-026.xhtml#heading-eefd1090f4ee",
+              "href": "text/chapter-026.xhtml#heading-eefd1090f4ee",
+              "label": "3.4 Recovery — Gap & Layer",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-026.xhtml#heading-99294e4dd211",
+              "href": "text/chapter-026.xhtml#heading-99294e4dd211",
+              "label": "3.5 Recovery — Lot Multiplier",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-028.xhtml#heading-ba9a35edf28e",
+              "href": "text/chapter-028.xhtml#heading-ba9a35edf28e",
+              "label": "XAU SCALPER AI  v16.06 MATRIX",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-028.xhtml#heading-e3aaa8e72add",
+              "href": "text/chapter-028.xhtml#heading-e3aaa8e72add",
+              "label": "3.10 Risk Guards (ตัวป้องกันความเสี่ยง)",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-028.xhtml#heading-81bab385f327",
+              "href": "text/chapter-028.xhtml#heading-81bab385f327",
+              "label": "3.11 Time Filter",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-028.xhtml#heading-b017729da9b5",
+              "href": "text/chapter-028.xhtml#heading-b017729da9b5",
+              "label": "3.12 Bars & Misc",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-028.xhtml#heading-4ef46bef5e1d",
+              "href": "text/chapter-028.xhtml#heading-4ef46bef5e1d",
+              "label": "3.13 Dashboard",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-029.xhtml#heading-e449af521c92",
+              "href": "text/chapter-029.xhtml#heading-e449af521c92",
+              "label": "XAU SCALPER AI  v16.06 MATRIX",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-030.xhtml#heading-b18bc80cfeb6",
+              "href": "text/chapter-030.xhtml#heading-b18bc80cfeb6",
+              "label": "XAU SCALPER AI  v16.06 MATRIX",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-030.xhtml#heading-89709e98703b",
+              "href": "text/chapter-030.xhtml#heading-89709e98703b",
+              "label": "4. Preset ค่าแนะนำตามประเภทบัญชี",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-030.xhtml#heading-daae181f3b9a",
+              "href": "text/chapter-030.xhtml#heading-daae181f3b9a",
+              "label": "4.1 Preset — บัญชี CENT (เงินทุน 100–1,000 cent)",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-031.xhtml#heading-8ecaa17ee377",
+              "href": "text/chapter-031.xhtml#heading-8ecaa17ee377",
+              "label": "XAU SCALPER AI  v16.06 MATRIX",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-031.xhtml#heading-6cfc9472360e",
+              "href": "text/chapter-031.xhtml#heading-6cfc9472360e",
+              "label": "4.2 Preset — บัญชี STANDARD (เงินทุน $500–$5,000)",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-032.xhtml#heading-a27fa7adda22",
+              "href": "text/chapter-032.xhtml#heading-a27fa7adda22",
+              "label": "XAU SCALPER AI  v16.06 MATRIX",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-037.xhtml#heading-9ad43dc37627",
+              "href": "text/chapter-037.xhtml#heading-9ad43dc37627",
+              "label": "XAU SCALPER AI  v16.06 MATRIX",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-037.xhtml#heading-11d0bb98afc0",
+              "href": "text/chapter-037.xhtml#heading-11d0bb98afc0",
+              "label": "9. Changelog และ Version History",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-038.xhtml#heading-3c70ec3684d9",
+              "href": "text/chapter-038.xhtml#heading-3c70ec3684d9",
+              "label": "แนะนำตัว",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-039.xhtml#heading-a457d382ac9d",
+              "href": "text/chapter-039.xhtml#heading-a457d382ac9d",
+              "label": "สื่อและอุปกรณ์",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-040.xhtml#heading-d03e4449ca05",
+              "href": "text/chapter-040.xhtml#heading-d03e4449ca05",
+              "label": "ขั้นตอนที่ 4 Applying  the Communication Skill สื่อสารและนำเสนอ",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            },
+            {
+              "id": "text/chapter-042.xhtml#heading-e7b797811ca2",
+              "href": "text/chapter-042.xhtml#heading-e7b797811ca2",
+              "label": "โรงเรียนบ้านห้วยผึ้ง จ.เชียงราย",
+              "subitems": [],
+              "parent": "text/chapter-022.xhtml#heading-7432d599dbe3"
+            }
+          ],
+          "parent": null
+        }
+      ],
+      "metadata": {
+        "title": "เอกสาร OCR 44 หน้า — Phase 9",
+        "creator": "",
+        "description": "",
+        "pubdate": "",
+        "publisher": "",
+        "identifier": "urn:sha256:c841145e910bab3242415cfc71adfbea0138b4404609341b4c4ed8a862190318",
+        "language": "th",
+        "rights": "",
+        "modified_date": "2026-10-06T08:39:37Z",
+        "layout": "",
+        "orientation": "",
+        "flow": "",
+        "viewport": "",
+        "media_active_class": "",
+        "spread": "",
+        "direction": null
+      },
+      "all_toc_targets_verified": true,
+      "cover_verified": true,
+      "reflow_resize_verified": true
+    },
+    "foliate": {
+      "sections": 45,
+      "toc": [
+        {
+          "label": "สารบัญ Phase 9 — ฉบับตรวจรับ",
+          "href": "EPUB/text/chapter-022.xhtml#heading-7432d599dbe3",
+          "subitems": [
+            {
+              "label": "สารบัญ",
+              "href": "EPUB/text/chapter-022.xhtml#heading-c10aacad8e54",
+              "subitems": null,
+              "id": 1
+            },
+            {
+              "label": "XAU SCALPER AI v16.06 MATRIX",
+              "href": "EPUB/text/chapter-026.xhtml#heading-1ea389db9148",
+              "subitems": null,
+              "id": 2
+            },
+            {
+              "label": "3. คำอธิบายพารามิเตอร์ทั้งหมด",
+              "href": "EPUB/text/chapter-026.xhtml#heading-6b2fbe210822",
+              "subitems": null,
+              "id": 3
+            },
+            {
+              "label": "3.1 Trading Basics (พื้นฐานการเทรด)",
+              "href": "EPUB/text/chapter-026.xhtml#heading-a2f6cd3f9fec",
+              "subitems": null,
+              "id": 4
+            },
+            {
+              "label": "3.2 Decision Matrix (เครื่องยนต์จำแนก Regime)",
+              "href": "EPUB/text/chapter-026.xhtml#heading-03944b0be474",
+              "subitems": null,
+              "id": 5
+            },
+            {
+              "label": "3.3 Take Profit — ATR Dynamic",
+              "href": "EPUB/text/chapter-026.xhtml#heading-b58977cbbe42",
+              "subitems": null,
+              "id": 6
+            },
+            {
+              "label": "3.4 Recovery — Gap & Layer",
+              "href": "EPUB/text/chapter-026.xhtml#heading-eefd1090f4ee",
+              "subitems": null,
+              "id": 7
+            },
+            {
+              "label": "3.5 Recovery — Lot Multiplier",
+              "href": "EPUB/text/chapter-026.xhtml#heading-99294e4dd211",
+              "subitems": null,
+              "id": 8
+            },
+            {
+              "label": "XAU SCALPER AI v16.06 MATRIX",
+              "href": "EPUB/text/chapter-028.xhtml#heading-ba9a35edf28e",
+              "subitems": null,
+              "id": 9
+            },
+            {
+              "label": "3.10 Risk Guards (ตัวป้องกันความเสี่ยง)",
+              "href": "EPUB/text/chapter-028.xhtml#heading-e3aaa8e72add",
+              "subitems": null,
+              "id": 10
+            },
+            {
+              "label": "3.11 Time Filter",
+              "href": "EPUB/text/chapter-028.xhtml#heading-81bab385f327",
+              "subitems": null,
+              "id": 11
+            },
+            {
+              "label": "3.12 Bars & Misc",
+              "href": "EPUB/text/chapter-028.xhtml#heading-b017729da9b5",
+              "subitems": null,
+              "id": 12
+            },
+            {
+              "label": "3.13 Dashboard",
+              "href": "EPUB/text/chapter-028.xhtml#heading-4ef46bef5e1d",
+              "subitems": null,
+              "id": 13
+            },
+            {
+              "label": "XAU SCALPER AI v16.06 MATRIX",
+              "href": "EPUB/text/chapter-029.xhtml#heading-e449af521c92",
+              "subitems": null,
+              "id": 14
+            },
+            {
+              "label": "XAU SCALPER AI v16.06 MATRIX",
+              "href": "EPUB/text/chapter-030.xhtml#heading-b18bc80cfeb6",
+              "subitems": null,
+              "id": 15
+            },
+            {
+              "label": "4. Preset ค่าแนะนำตามประเภทบัญชี",
+              "href": "EPUB/text/chapter-030.xhtml#heading-89709e98703b",
+              "subitems": null,
+              "id": 16
+            },
+            {
+              "label": "4.1 Preset — บัญชี CENT (เงินทุน 100–1,000 cent)",
+              "href": "EPUB/text/chapter-030.xhtml#heading-daae181f3b9a",
+              "subitems": null,
+              "id": 17
+            },
+            {
+              "label": "XAU SCALPER AI v16.06 MATRIX",
+              "href": "EPUB/text/chapter-031.xhtml#heading-8ecaa17ee377",
+              "subitems": null,
+              "id": 18
+            },
+            {
+              "label": "4.2 Preset — บัญชี STANDARD (เงินทุน $500–$5,000)",
+              "href": "EPUB/text/chapter-031.xhtml#heading-6cfc9472360e",
+              "subitems": null,
+              "id": 19
+            },
+            {
+              "label": "XAU SCALPER AI v16.06 MATRIX",
+              "href": "EPUB/text/chapter-032.xhtml#heading-a27fa7adda22",
+              "subitems": null,
+              "id": 20
+            },
+            {
+              "label": "XAU SCALPER AI v16.06 MATRIX",
+              "href": "EPUB/text/chapter-037.xhtml#heading-9ad43dc37627",
+              "subitems": null,
+              "id": 21
+            },
+            {
+              "label": "9. Changelog และ Version History",
+              "href": "EPUB/text/chapter-037.xhtml#heading-11d0bb98afc0",
+              "subitems": null,
+              "id": 22
+            },
+            {
+              "label": "แนะนำตัว",
+              "href": "EPUB/text/chapter-038.xhtml#heading-3c70ec3684d9",
+              "subitems": null,
+              "id": 23
+            },
+            {
+              "label": "สื่อและอุปกรณ์",
+              "href": "EPUB/text/chapter-039.xhtml#heading-a457d382ac9d",
+              "subitems": null,
+              "id": 24
+            },
+            {
+              "label": "ขั้นตอนที่ 4 Applying the Communication Skill สื่อสารและนำเสนอ",
+              "href": "EPUB/text/chapter-040.xhtml#heading-d03e4449ca05",
+              "subitems": null,
+              "id": 25
+            },
+            {
+              "label": "โรงเรียนบ้านห้วยผึ้ง จ.เชียงราย",
+              "href": "EPUB/text/chapter-042.xhtml#heading-e7b797811ca2",
+              "subitems": null,
+              "id": 26
+            }
+          ],
+          "id": 0
+        }
+      ],
+      "metadata": {
+        "identifier": "urn:sha256:c841145e910bab3242415cfc71adfbea0138b4404609341b4c4ed8a862190318",
+        "title": "เอกสาร OCR 44 หน้า — Phase 9",
+        "language": "th",
+        "modified": "2026-10-06T08:39:37Z"
+      },
+      "all_toc_targets_verified": true,
+      "cover_verified": true,
+      "reflow_resize_verified": true
+    },
+    "external_calls": [],
+    "page_errors": []
+  }
+]

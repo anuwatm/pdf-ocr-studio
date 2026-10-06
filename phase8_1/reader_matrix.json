@@ -1,0 +1,64 @@
+[
+  {
+    "browser": "chrome",
+    "version": "154.0.8037.93",
+    "epubjs": {
+      "spine": 1,
+      "toc": [
+        {
+          "id": "text/chapter-001.xhtml",
+          "href": "text/chapter-001.xhtml",
+          "label": "หน้า 1",
+          "subitems": [],
+          "parent": null
+        }
+      ],
+      "table_reflow_verified": true
+    },
+    "foliate": {
+      "sections": 1,
+      "toc": [
+        {
+          "label": "หน้า 1",
+          "href": "EPUB/text/chapter-001.xhtml",
+          "subitems": null,
+          "id": 0
+        }
+      ],
+      "table_reflow_verified": true
+    },
+    "external_calls": [],
+    "page_errors": []
+  },
+  {
+    "browser": "msedge",
+    "version": "154.0.4258.53",
+    "epubjs": {
+      "spine": 1,
+      "toc": [
+        {
+          "id": "text/chapter-001.xhtml",
+          "href": "text/chapter-001.xhtml",
+          "label": "หน้า 1",
+          "subitems": [],
+          "parent": null
+        }
+      ],
+      "table_reflow_verified": true
+    },
+    "foliate": {
+      "sections": 1,
+      "toc": [
+        {
+          "label": "หน้า 1",
+          "href": "EPUB/text/chapter-001.xhtml",
+          "subitems": null,
+          "id": 0
+        }
+      ],
+      "table_reflow_verified": true
+    },
+    "external_calls": [],
+    "page_errors": []
+  }
+]

@@ -4,6 +4,9 @@ Supports http://127.0.0.1:1234 (e.g. LM Studio / vLLM / llama.cpp)
 """
 from typing import Dict, Any, List, Optional
 import logging
+import json
+import urllib.request
+import urllib.error
 from openai import OpenAI, APIError, APITimeoutError, APIConnectionError
 
 from src import config
@@ -22,17 +25,65 @@ class LocalLLMClient:
         model: Optional[str] = None,
         api_key: Optional[str] = None,
         timeout: Optional[float] = None,
+        max_retries: Optional[int] = None,
     ):
         settings = config.get_llm_config()
         self.base_url = (base_url or settings["base_url"]).rstrip("/")
         self.model = model or settings["model"]
         self.api_key = config.LLM_API_KEY if api_key is None else api_key
         self.timeout = settings["timeout"] if timeout is None else timeout
+        retry_options = {} if max_retries is None else {"max_retries": max_retries}
         self._client = OpenAI(
             base_url=self.base_url,
             api_key=self.api_key,
             timeout=self.timeout,
+            **retry_options,
         )
+        self._html_reasoning_checked = False
+        self._html_native_url = None
+
+    def generate_html_annotations(self, prompt: str, temperature: float = 0.0,
+                                  max_tokens: int = 1600) -> str:
+        """Disable thinking per HTML request only when LM Studio advertises support."""
+        headers = {"Authorization": f"Bearer {self.api_key}"}
+        root_url = self.base_url[:-3] if self.base_url.endswith("/v1") else self.base_url
+        if not self._html_reasoning_checked:
+            self._html_reasoning_checked = True
+            try:
+                request = urllib.request.Request(f"{root_url}/api/v1/models", headers=headers)
+                with urllib.request.urlopen(request, timeout=min(self.timeout, 5.0)) as response:
+                    for model in json.load(response).get("models", []):
+                        identifiers = [model.get("key")] + [
+                            instance.get("id") for instance in model.get("loaded_instances", [])]
+                        reasoning = model.get("capabilities", {}).get("reasoning", {})
+                        if self.model in identifiers and "off" in reasoning.get("allowed_options", []):
+                            self._html_native_url = f"{root_url}/api/v1/chat"
+                            break
+            except (urllib.error.URLError, TimeoutError, ValueError, TypeError, AttributeError):
+                # Other OpenAI-compatible servers need no LM Studio support.
+                pass
+        if not self._html_native_url:
+            return self.generate(prompt=prompt, temperature=temperature, max_tokens=max_tokens)
+        try:
+            body = {"model": self.model, "input": prompt, "temperature": temperature,
+                    "max_output_tokens": max_tokens, "reasoning": "off", "store": False}
+            request = urllib.request.Request(self._html_native_url,
+                data=json.dumps(body).encode("utf-8"),
+                headers={**headers, "Content-Type": "application/json"})
+            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                payload = json.load(response)
+            content = "\n".join(item.get("content", "") for item in payload.get("output", [])
+                                if item.get("type") == "message")
+            if not content.strip():
+                raise RuntimeError("Local AI returned no HTML annotations")
+            return content
+        except TimeoutError as exc:
+            raise RuntimeError(f"Timeout after {self.timeout}s") from exc
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"Local AI HTTP {exc.code}: {detail}") from exc
+        except urllib.error.URLError as exc:
+            raise RuntimeError(f"Local AI connection error: {exc.reason}") from exc
 
     def check_health(self) -> Dict[str, Any]:
         """
@@ -164,4 +215,3 @@ class LocalLLMClient:
             err_msg = res.get("error") or f"LLM generation failed ({res.get('status')})"
             raise RuntimeError(err_msg)
         return res.get("content", "")
-

@@ -1,0 +1,73 @@
+{
+  "review": "automated approved-dataset audit; special values inspected against native PDF text; private-use checkbox glyphs remain unresolved",
+  "demo04": {
+    "vector_equal_ground_truth": true,
+    "scan_derivative_equal_ground_truth": true,
+    "rows": 9,
+    "columns": 4,
+    "cells": 36
+  },
+  "demo08": {
+    "pages": 11,
+    "tables": 29,
+    "unresolved": [
+      {
+        "row_index": 1,
+        "column_index": 1,
+        "reason": "private_use_glyph_requires_review"
+      },
+      {
+        "row_index": 1,
+        "column_index": 2,
+        "reason": "private_use_glyph_requires_review"
+      },
+      {
+        "row_index": 1,
+        "column_index": 3,
+        "reason": "private_use_glyph_requires_review"
+      },
+      {
+        "row_index": 2,
+        "column_index": 1,
+        "reason": "private_use_glyph_requires_review"
+      },
+      {
+        "row_index": 2,
+        "column_index": 2,
+        "reason": "private_use_glyph_requires_review"
+      },
+      {
+        "row_index": 2,
+        "column_index": 3,
+        "reason": "private_use_glyph_requires_review"
+      },
+      {
+        "row_index": 3,
+        "column_index": 1,
+        "reason": "private_use_glyph_requires_review"
+      },
+      {
+        "row_index": 3,
+        "column_index": 2,
+        "reason": "private_use_glyph_requires_review"
+      },
+      {
+        "row_index": 3,
+        "column_index": 3,
+        "reason": "private_use_glyph_requires_review"
+      }
+    ],
+    "covered": [
+      "merged cells",
+      "multi-level headers",
+      "tab-stop columns",
+      "decimals",
+      "£",
+      "dash placeholders"
+    ]
+  },
+  "hashes": {
+    "04.pdf": "ef68c4558231c5d9860c1b85ef8adecc0ed0e7af15590ddbdc60229d48eef048",
+    "08.pdf": "5746428c7c3d6225ae6a043ed6f6566ccdd42d59471830ca9428faf2254a4220"
+  }
+}

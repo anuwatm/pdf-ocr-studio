@@ -3,6 +3,7 @@
                 <label>HTML ต้นทาง
                   <select id="epub-source-variant">
                     <option value="auto">อัตโนมัติ (Final → Basic)</option>
+                    <option value="structured">Structured HTML (รักษาตาราง/รายการ)</option>
                     <option value="final">final.html</option>
                     <option value="ai">ai.html</option>
                     <option value="basic">basic.html</option>
@@ -26,12 +27,47 @@
                 <label>ภาษา
                   <input id="epub-language" type="text" value="th" maxlength="20">
                 </label>
+                <label>รหัสหนังสือ (เว้นว่างให้ระบบสร้าง)
+                  <input id="epub-identifier" type="text" maxlength="200">
+                </label>
+                <label>วันที่เผยแพร่
+                  <input id="epub-date" type="date">
+                </label>
+                <label>คำอธิบายหนังสือ
+                  <textarea id="epub-description" maxlength="2000" rows="2"></textarea>
+                </label>
+                <label>รูปปก (PNG/JPEG ไม่เกิน 2 MB)
+                  <input id="epub-cover" type="file" accept="image/png,image/jpeg">
+                </label>
+                <label>ข้อความแทนรูปปก
+                  <input id="epub-cover-alt" type="text" maxlength="300" placeholder="ปกหนังสือ">
+                </label>
+                <label class="epub-cover-toggle"><input id="epub-remove-cover" type="checkbox">สร้างแบบไม่มีปก</label>
               </div>
+              <div id="epub-cover-drop" class="epub-cover-drop" tabindex="0" role="button" aria-label="วางหรือเลือกรูปปก">
+                <img id="epub-cover-thumbnail" class="hidden" alt="ตัวอย่างรูปปกที่เลือก">
+                <div><strong>ลากรูปปกมาวาง หรือกดเพื่อเลือก</strong><br><span id="epub-cover-details" class="text-muted text-xs">ยังไม่ได้เลือกรูปปกใหม่</span></div>
+              </div>
+              <p id="epub-preview-details" class="text-muted text-xs" aria-live="polite"></p>
+
+              <section class="toc-editor" aria-labelledby="epub-toc-title">
+                <div class="toc-editor-header">
+                  <div><h3 id="epub-toc-title">แก้ไขสารบัญ</h3><p id="epub-toc-status" class="text-muted text-xs" aria-live="polite">กดโหลดสารบัญเพื่อเริ่มแก้ไข</p></div>
+                  <div class="html-action-buttons">
+                    <button id="btn-load-epub-toc" class="btn btn-outline btn-xs" type="button">โหลดสารบัญ</button>
+                    <button id="btn-add-epub-toc" class="btn btn-outline btn-xs" type="button">เพิ่มรายการ</button>
+                    <button id="btn-regenerate-epub-toc" class="btn btn-outline btn-xs" type="button">สร้างอัตโนมัติใหม่</button>
+                    <button id="btn-save-epub-toc" class="btn btn-primary btn-xs" type="button" disabled>บันทึกสารบัญและอัปเดต Preview</button>
+                  </div>
+                </div>
+                <div id="epub-toc-conflict" class="alert alert-warning hidden" role="alert"></div>
+                <div id="epub-toc-list" class="toc-editor-list" aria-label="รายการสารบัญ"></div>
+              </section>
 
               <div class="html-export-toolbar">
                 <div class="html-action-buttons">
                   <button id="btn-generate-epub-preview" class="btn btn-outline btn-xs" type="button">สร้าง XHTML Quick Preview</button>
-                  <button id="btn-build-epub" class="btn btn-primary btn-xs" type="button" disabled>สร้างไฟล์ EPUB</button>
+                  <button id="btn-build-epub" class="btn btn-primary btn-xs" type="button" disabled title="สร้างไฟล์แล้วดาวน์โหลด EPUB ทันที">สร้างไฟล์ EPUB</button>
                   <span id="epub-export-status-badge" class="badge badge-neutral">ยังไม่ได้ Preview</span>
                 </div>
                 <div class="html-subtabs">
@@ -54,7 +90,7 @@
                 <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
                 <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
               </svg>
-              <span>ดาวน์โหลด EPUB (Phase 8)</span>
+              <span>ดาวน์โหลด EPUB</span>
             </a>
                 <span class="text-muted text-xs">Quick Preview เป็น XHTML ก่อน package และอาจต่างจาก EPUB reader บางโปรแกรม</span>
                 <a id="btn-dl-epub" class="btn btn-success btn-xs hidden" href="#" download>ดาวน์โหลด EPUB</a>

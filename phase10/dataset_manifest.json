@@ -1,0 +1,94 @@
+{
+  "schema_version": "10.0",
+  "approved_by_user_on": "2026-10-06",
+  "purpose": "Phase 10 translation input and quality acceptance after ground truth approval",
+  "status": "input_locked_ground_truth_pending",
+  "default_target_language": null,
+  "files": [
+    {
+      "file": "demo/08.pdf",
+      "bytes": 145494,
+      "sha256": "5746428c7c3d6225ae6a043ed6f6566ccdd42d59471830ca9428faf2254a4220",
+      "input_type": "pdf",
+      "pages": 11,
+      "source_languages": ["en"],
+      "content": "English tables",
+      "styles": ["general", "academic"],
+      "must_preserve": ["table rows", "table cells", "rowspan", "colspan", "numbers", "units", "placeholders", "headers"]
+    },
+    {
+      "file": "demo/09.png",
+      "bytes": 175659,
+      "sha256": "a2650980a7533e6b6e9d99eaaab59ed70f38b6ed45d03a873f6e43d98ff1c389",
+      "input_type": "png",
+      "width": 888,
+      "height": 1163,
+      "source_languages": ["zh", "en"],
+      "content": "Chinese and English with domain-specific terms",
+      "styles": ["general", "academic"],
+      "must_preserve": ["domain terms", "product names", "acronyms", "mixed-language boundaries"],
+      "term_policy": ["translated", "preserved", "transliterated"]
+    },
+    {
+      "file": "demo/10.png",
+      "bytes": 634577,
+      "sha256": "1ff5d3784391340d31d874f24c69463a301d2eba7bf8bb46df04c86ae421e706",
+      "input_type": "png",
+      "width": 730,
+      "height": 1089,
+      "source_languages": ["en"],
+      "content": "English novel",
+      "styles": ["novel"],
+      "must_preserve": ["narrative voice", "speaker", "dialogue", "point of view", "proper names"]
+    },
+    {
+      "file": "demo/11.png",
+      "bytes": 167934,
+      "sha256": "71df2940736489b5af046703f33bc414e3430b7362b6b72aa6bc131173dc9801",
+      "input_type": "png",
+      "width": 652,
+      "height": 1134,
+      "source_languages": ["en"],
+      "content": "English novel",
+      "styles": ["novel"],
+      "must_preserve": ["narrative voice", "speaker", "dialogue", "point of view", "proper names", "continuity with demo/10.png"]
+    },
+    {
+      "file": "demo/12.png",
+      "bytes": 403285,
+      "sha256": "27050f2bd2416b5070e7b286b84bbb4e86c44e515d520d22425977530100744d",
+      "input_type": "png",
+      "width": 755,
+      "height": 1052,
+      "source_languages": ["en"],
+      "content": "English IT instructional book",
+      "styles": ["academic"],
+      "must_preserve": ["technical terms", "product names", "acronyms", "instruction order", "references"]
+    },
+    {
+      "file": "demo/13.png",
+      "bytes": 207286,
+      "sha256": "30672b997b30ae4b679965a4b7528a241c366a7b02174180cab1907fa1d3efcc",
+      "input_type": "png",
+      "width": 765,
+      "height": 1046,
+      "source_languages": ["en"],
+      "content": "English IT instructional book with program code",
+      "styles": ["academic"],
+      "must_preserve": ["code block", "identifiers", "strings", "syntax", "indentation", "line order", "technical terms"],
+      "code_translation_policy": "preserve_exactly"
+    }
+  ],
+  "coverage": {
+    "general": ["demo/08.pdf", "demo/09.png"],
+    "novel": ["demo/10.png", "demo/11.png"],
+    "academic": ["demo/08.pdf", "demo/09.png", "demo/12.png", "demo/13.png"],
+    "official": []
+  },
+  "acceptance_blockers": [
+    "target languages are not approved",
+    "human ground truth is not approved",
+    "glossary and do-not-translate terms are not locked",
+    "official/government style has no approved input"
+  ]
+}

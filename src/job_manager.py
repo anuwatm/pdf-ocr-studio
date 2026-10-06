@@ -219,6 +219,44 @@ class JobManager:
                 "max_concurrency": self.max_concurrent_workers,
             }
 
+    def delete_all_jobs(self) -> Dict[str, Any]:
+        """Stop workers before deleting every recorded job, without a list limit."""
+        from src.cleanup_service import delete_single_job
+
+        # Exclude AI exports writing into a job while it is being removed.
+        if not self._ai_lock.acquire(blocking=False):
+            raise ValueError("กำลังส่งออกด้วย AI กรุณารอให้เสร็จแล้วลบอีกครั้ง")
+        try:
+            with self._lock:
+                jobs = self.db.list_jobs(limit=-1)
+                deleted, failed = [], []
+                for job in jobs:
+                    jid = job["job_id"]
+                    try:
+                        self.cancel_job(jid)
+                        proc = self._active_processes.get(jid)
+                        if proc is not None:
+                            if proc.poll() is None:
+                                try:
+                                    proc.wait(timeout=5)
+                                except subprocess.TimeoutExpired:
+                                    proc.kill()
+                                    proc.wait(timeout=5)
+                            self._active_processes.pop(jid, None)
+                            self._active_attempts.pop(jid, None)
+                        current = self.db.get_job_status(jid)
+                        if current and current.status in (JobStatus.RUNNING, JobStatus.QUEUED):
+                            self.db.mark_job_cancelled(jid, error_message="Cancelled for bulk deletion")
+                        result = delete_single_job(jid, self.db, self.output_dir, strict=True)
+                        if result.get("deleted"):
+                            deleted.append(jid)
+                    except Exception as exc:
+                        failed.append({"job_id": jid, "detail": str(exc)})
+                return {"deleted_count": len(deleted), "deleted_jobs": deleted,
+                        "failed_jobs": failed}
+        finally:
+            self._ai_lock.release()
+
     def _spawn_worker_subprocess(self, task: Dict[str, Any]):
         job_id = task["job_id"]
         job = self.db.get_job_status(job_id)

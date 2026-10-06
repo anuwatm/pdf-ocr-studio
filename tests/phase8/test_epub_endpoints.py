@@ -98,4 +98,3 @@ class TestPhase8EpubEndpoints(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

@@ -9,6 +9,18 @@ window.createHtmlWorkspace = ({state, el, loadEpubExportStatus}) => {
   let saving = false;
   let generating = false;
   let requestVersion = 0;
+  let aiPollTimer;
+  let aiTaskActive = false;
+  let handledAiTask = null;
+  const aiUi = {
+    panel: document.getElementById("html-ai-progress"),
+    title: document.getElementById("html-ai-progress-title"),
+    detail: document.getElementById("html-ai-progress-detail"),
+    error: document.getElementById("html-ai-progress-error"),
+    bar: document.getElementById("html-ai-progress-bar"),
+    cancel: document.getElementById("btn-cancel-html-ai"),
+    retry: document.getElementById("btn-retry-html-ai"),
+  };
   const dirty = () => Boolean(editor && editor.getValue() !== savedText);
   function updateDirty() {
     state.htmlDirty = dirty();
@@ -55,6 +67,8 @@ window.createHtmlWorkspace = ({state, el, loadEpubExportStatus}) => {
     window.addEventListener("beforeunload", event => {
       if (dirty()) { event.preventDefault(); event.returnValue = ""; }
     });
+    aiUi.cancel.addEventListener("click", cancelAiExport);
+    aiUi.retry.addEventListener("click", () => startAiExport());
     switchHtmlSubtab("source"); updateDirty();
   }
   function switchEditorMode(mode) {
@@ -72,13 +86,22 @@ window.createHtmlWorkspace = ({state, el, loadEpubExportStatus}) => {
   function refresh() { requestAnimationFrame(() => editor.refresh()); }
   function confirmJobChange(jobId) {
     if (jobId === state.currentJobId) return true;
-    if (saving || generating) { alert("กรุณารอการบันทึกหรือสร้าง HTML ให้เสร็จก่อนเปลี่ยนงาน"); return false; }
+    if (saving || (generating && !aiTaskActive)) { alert("กรุณารอการบันทึกหรือสร้าง HTML ให้เสร็จก่อนเปลี่ยนงาน"); return false; }
     if (dirty() && !confirm("HTML ยังไม่บันทึก ต้องการทิ้งการแก้ไขแล้วเปลี่ยนงานหรือไม่?")) return false;
     return true;
   }
   function syncJob() {
     if (loadedJob === state.currentJobId) return;
     loadedJob = state.currentJobId;
+    clearTimeout(aiPollTimer);
+    generating = false;
+    aiTaskActive = false;
+    handledAiTask = null;
+    aiUi.panel.classList.add("hidden");
+    el.btnGenerateHtmlAi.disabled = false;
+    el.btnGenerateHtmlAi.textContent = "สร้าง HTML พร้อม AI";
+    el.btnGenerateHtmlBasic.disabled = false;
+    if (loadedJob) pollAiProgress(loadedJob);
     editor.setOption("readOnly", !loadedJob);
     requestVersion++;
     setContent("");
@@ -92,7 +115,7 @@ window.createHtmlWorkspace = ({state, el, loadEpubExportStatus}) => {
     refresh();
   }
 
-  async function loadHtmlExportStatus() {
+  async function loadHtmlExportStatus(preferredVariant = null) {
     if (!state.currentJobId) return;
     syncJob();
     const jobId = state.currentJobId;
@@ -155,7 +178,9 @@ window.createHtmlWorkspace = ({state, el, loadEpubExportStatus}) => {
       }
 
       // Determine preferred variant to display in preview and source editor
-      const displayVariant = hasFinal ? "final" : (hasAi ? "ai" : (hasBasic ? "basic" : null));
+      const displayVariant = preferredVariant && variants.includes(preferredVariant)
+        ? preferredVariant
+        : (hasFinal ? "final" : (hasAi ? "ai" : (hasBasic ? "basic" : null)));
       if (dirty() || saving) return;
       if (displayVariant) {
         state.currentHtmlVariant = displayVariant;
@@ -179,7 +204,116 @@ window.createHtmlWorkspace = ({state, el, loadEpubExportStatus}) => {
     if (content !== savedText) setContent(content);
   }
 
+  function duration(seconds) {
+    const total = Math.max(0, Math.floor(seconds || 0));
+    return `${Math.floor(total / 60).toString().padStart(2, "0")}:${(total % 60).toString().padStart(2, "0")}`;
+  }
+  function renderAiProgress(task) {
+    aiUi.panel.classList.remove("hidden");
+    aiTaskActive = ["running", "cancelling"].includes(task.status);
+    generating = aiTaskActive;
+    el.btnGenerateHtmlAi.disabled = aiTaskActive;
+    el.btnGenerateHtmlBasic.disabled = aiTaskActive;
+    el.btnGenerateHtmlAi.textContent = aiTaskActive ? "กำลังสร้าง HTML ด้วย AI…" : "สร้าง HTML พร้อม AI";
+    const total = task.chunk_count || 0;
+    const completed = task.completed_chunks || 0;
+    const current = task.current_chunk || 0;
+    if (total) { aiUi.bar.max = total; aiUi.bar.value = completed; }
+    else aiUi.bar.removeAttribute("value");
+    let title;
+    if (task.status === "completed") title = `สร้าง HTML สำเร็จ · ครบ ${completed}/${total} ชุด`;
+    else if (task.status === "failed") title = "สร้าง HTML ด้วย AI ไม่สำเร็จ";
+    else if (task.status === "cancelled") title = "ยกเลิกการสร้าง HTML ด้วย AI แล้ว";
+    else if (task.status === "cancelling") title = "กำลังยกเลิก · รอคำตอบชุดปัจจุบันแล้วหยุด";
+    else if (task.stage === "waiting_ai") title = `รอ AI ตอบกลับ · ชุด ${current}/${total} · สำเร็จ ${completed} ชุด`;
+    else if (task.stage === "validating") title = "ประมวลผลครบแล้ว · กำลังตรวจโครงสร้าง HTML";
+    else if (task.stage === "publishing") title = "กำลังบันทึกไฟล์ HTML";
+    else if (task.stage === "checking_ai") title = "กำลังตรวจการเชื่อมต่อ Local AI";
+    else if (task.stage === "preparing") title = "กำลังเตรียมและแบ่งข้อความ";
+    else title = `กำลังประมวลผล · สำเร็จ ${completed}/${total} ชุด`;
+    if (aiUi.title.textContent !== title) aiUi.title.textContent = title;
+    aiUi.detail.textContent = `ใช้เวลา ${duration(task.elapsed_seconds)} · ได้รับสถานะล่าสุดเมื่อ ${Math.floor(task.last_update_seconds || 0)} วินาทีก่อน`
+      + (task.stage === "waiting_ai" ? ` · รอ ${duration(task.waiting_seconds)} / timeout ${task.timeout_seconds} วินาทีต่อชุด` : "");
+    const error = task.status === "failed" ? (task.error || "ไม่ทราบสาเหตุ") : "";
+    aiUi.error.textContent = error + (error && task.meta?.failed_chunk ? ` (ชุดที่ ${task.meta.failed_chunk}/${total})` : "");
+    aiUi.error.classList.toggle("hidden", !error);
+    aiUi.cancel.classList.toggle("hidden", !aiTaskActive);
+    aiUi.cancel.disabled = task.status === "cancelling";
+    aiUi.retry.classList.toggle("hidden", !["failed", "cancelled"].includes(task.status));
+  }
+  async function pollAiProgress(jobId) {
+    clearTimeout(aiPollTimer);
+    if (jobId !== state.currentJobId) return;
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/export/html/ai/progress`, {cache: "no-store"});
+      if (!res.ok) throw new Error(`อ่านสถานะไม่สำเร็จ (HTTP ${res.status})`);
+      const task = await res.json();
+      if (jobId !== state.currentJobId) return;
+      if (!task.status || task.status === "idle") return;
+      const wasActive = aiTaskActive;
+      renderAiProgress(task);
+      if (aiTaskActive) {
+        sessionStorage.setItem("htmlAiJobId", jobId);
+        aiPollTimer = setTimeout(() => pollAiProgress(jobId), 2000);
+      } else {
+        if (sessionStorage.getItem("htmlAiJobId") === jobId) sessionStorage.removeItem("htmlAiJobId");
+        if (wasActive && handledAiTask !== task.task_id) {
+          handledAiTask = task.task_id;
+          await loadHtmlExportStatus(task.status === "completed" ? "ai" : "basic");
+          switchHtmlSubtab("preview");
+        }
+      }
+    } catch (error) {
+      if (jobId !== state.currentJobId) return;
+      aiUi.panel.classList.remove("hidden");
+      aiUi.detail.textContent = `${error.message} · กำลังลองเชื่อมต่อสถานะใหม่ งานอาจยังประมวลผลอยู่`;
+      aiPollTimer = setTimeout(() => pollAiProgress(jobId), 3000);
+    }
+  }
+  async function startAiExport() {
+    if (!state.currentJobId || saving || generating) return;
+    if (dirty()) { alert("กรุณาบันทึก HTML ที่แก้ไขก่อนสร้างใหม่"); return; }
+    const jobId = state.currentJobId;
+    generating = true;
+    el.btnGenerateHtmlAi.disabled = true;
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/export/html/ai/start`, {method: "POST"});
+      const task = await res.json();
+      if (!res.ok) throw new Error(task.detail || "เริ่มงาน AI ไม่สำเร็จ");
+      if (jobId !== state.currentJobId) return;
+      renderAiProgress(task);
+      sessionStorage.setItem("htmlAiJobId", jobId);
+      pollAiProgress(jobId);
+    } catch (error) {
+      if (jobId !== state.currentJobId) return;
+      generating = false;
+      el.btnGenerateHtmlAi.disabled = false;
+      aiUi.panel.classList.remove("hidden");
+      aiUi.title.textContent = "เริ่มงาน AI ไม่สำเร็จ";
+      aiUi.error.textContent = error.message;
+      aiUi.error.classList.remove("hidden");
+      aiUi.retry.classList.remove("hidden");
+    }
+  }
+  async function cancelAiExport() {
+    const jobId = state.currentJobId;
+    if (!jobId || !aiTaskActive) return;
+    aiUi.cancel.disabled = true;
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/export/html/ai/cancel`, {method: "POST"});
+      const task = await res.json();
+      if (!res.ok) throw new Error(task.detail || "ยกเลิกงานไม่สำเร็จ");
+      if (jobId !== state.currentJobId) return;
+      renderAiProgress(task);
+      pollAiProgress(jobId);
+    } catch (error) {
+      aiUi.error.textContent = error.message;
+      aiUi.error.classList.remove("hidden");
+      aiUi.cancel.disabled = false;
+    }
+  }
   async function generateHtmlExport(mode = "basic") {
+    if (mode === "ai") return startAiExport();
     if (!state.currentJobId || saving || generating) return;
     if (dirty()) { alert("กรุณาบันทึก HTML ที่แก้ไขก่อนสร้างใหม่"); return; }
     generating = true;
@@ -201,13 +335,16 @@ window.createHtmlWorkspace = ({state, el, loadEpubExportStatus}) => {
         throw new Error(err.detail || "Export HTML failed");
       }
       const data = await res.json();
+      const aiApplied = data.ai_applied === true || data.status === "passed";
 
       // Refresh status and load preview
-      await loadHtmlExportStatus();
+      await loadHtmlExportStatus(mode === "ai" && aiApplied ? "ai" : "basic");
       switchHtmlSubtab("preview");
 
-      if (mode === "ai" && !data.ai_applied) {
-        alert("Local AI ออฟไลน์หรือตอบสนองไม่ถูกต้อง ระบบจึงถอยกลับไปใช้ basic.html อย่างปลอดภัย");
+      if (mode === "ai" && !aiApplied) {
+        const reason = data.meta?.error || data.meta?.validator_reason || data.detail || data.meta?.message || data.status;
+        const batch = data.meta?.failed_chunk ? ` (ชุดที่ ${data.meta.failed_chunk}/${data.meta.chunk_count})` : "";
+        alert(`สร้าง HTML ด้วย AI ไม่สำเร็จ${batch}: ${reason}\nแสดง basic.html แทน`);
       }
     } catch (err) {
       alert(`สร้าง HTML ไม่สำเร็จ: ${err.message}`);

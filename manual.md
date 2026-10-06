@@ -1,7 +1,7 @@
 # คู่มือการติดตั้ง เริ่ม/หยุดระบบ ตรวจสอบข้อผิดพลาด และข้อจำกัด (System Operations Manual)
 
 **โครงการ:** Local Thai OCR Web  
-**เวอร์ชัน:** Phase 6 Final Delivery  
+**อัปเดต:** 2026-10-04 — OCR, HTML AI background tasks และ EPUB Studio  
 **สถาปัตยกรรม:** Localhost Single-User Web Application (Loopback 127.0.0.1)
 
 ---
@@ -109,7 +109,7 @@ INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
 
 ### การหยุดระบบ (Stop):
 - กด `Ctrl + C` ในหน้าต่าง Terminal ที่รันเซิร์ฟเวอร์
-- หรือเปิด Command Prompt ในโฟลเดอร์ `publish/` แล้วรัน:
+- หรือเปิด Command Prompt ในโฟลเดอร์โครงการแล้วรัน:
   ```cmd
   .\stop_server.cmd
   ```
@@ -126,11 +126,12 @@ INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
 2. **ระยะเวลาจัดเก็บ (TTL):**
    - ค่าเริ่มต้นคือ 24 ชั่วโมง (`86400` วินาที) สามารถปรับแต่งได้ผ่านตัวแปร `RETENTION_SECONDS` ใน `.env`
 3. **การปกป้องงานที่กำลังทำ (Active In-Progress Protection):**
-   - งานที่อยู่ในสถานะ `running` หรือ `queued` จะได้รับการยกเว้นจากการลบเสมอ แม้อายุจะเกินเวลา
+   - งานที่อยู่ในสถานะ `running` หรือ `queued` จะได้รับการยกเว้นจาก retention cleanup แม้อายุจะเกินเวลา รวมถึงงานที่ HTML AI ยัง active; ปุ่มลบงานทั้งหมดใช้กฎแยกต่างหาก
 4. **การประสานงานกับ Worker (Worker Coordination & Anti-Resurrection):**
    - Worker จะตรวจสอบสถานะก่อนประมวลผลแต่ละหน้าและก่อนประกอบไฟล์สรุป หากงานถูกลบไประหว่างทำงาน Worker จะยุติทันที และ**ไม่สร้างไดเรกทอรีหรือไฟล์กลับคืนมา (No resurrection)**
 5. **การเรียกสั่งล้างข้อมูลด้วยตนเอง:**
    - สั่งล้างงานที่หมดอายุ: `POST /api/admin/cleanup` (สามารถระบุ `?max_age_seconds=3600` ได้)
+   - สั่งลบทุกงาน: `DELETE /api/admin/jobs` ยกเลิก queued/running OCR ก่อนลบ ไม่จำกัดจำนวนงาน; หาก AI lock ไม่ว่างคืน 409 และรายงาน `failed_jobs` เมื่อไฟล์บางงานลบไม่ได้
    - สั่งลบงานเจาะจง: `DELETE /api/jobs/{job_id}`
 
 ---
@@ -156,3 +157,86 @@ INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
 3. **การจัดรูปแบบตาราง:** ข้อความตารางที่ส่งออกเป็น `.txt` ใช้เครื่องหมาย Tab (`\t`) คั่นคอลัมน์ ไม่รับประกันการจัดวางหน้าตาเสมือน PDF ต้นฉบับ
 4. **PDF มีรหัสผ่าน:** ไม่รองรับในรุ่นแรก ระบบจะปฏิเสธไฟล์และแจ้งเตือนทันทีโดยไม่เก็บไฟล์
 5. **รูปแบบไฟล์ JPG:** ในชุดข้อมูลที่อนุมัติไม่มีไฟล์นามสกุล `.jpg` จึงถือว่าการรองรับ JPG เป็นงานเชิงฟังก์ชัน ยังไม่มีผลทดสอบคุณภาพ OCR บน JPG จริง
+
+
+## 7. HTML AI, EPUB และ UI ปัจจุบัน
+
+- UI minimal ใช้ Light เป็นค่าเริ่มต้น มี Dark theme และ icon ปุ่ม; ปุ่มลบไฟล์ตัวอักษรสีขาว
+- HTML AI ทำงานใน background thread มี progress ทุก 2 วินาที: batch, stage, เวลา, timeout และ error พร้อมยกเลิก/ลองใหม่
+- Refresh เบราว์เซอร์ดูงานเดิมต่อได้; restart server ไม่ resume งาน AI ต้องเริ่มใหม่ การยกเลิกรอ request ปัจจุบันจบ
+- HTML AI แบ่งไม่เกิน 25 units ต่อ batch; LM Studio ที่รองรับจะปิด reasoning เฉพาะงานนี้เพื่อหลีกเลี่ยง timeout และใช้ basic.html เมื่อไม่สำเร็จ
+- EPUB ต้องสร้าง XHTML preview ปัจจุบันก่อน กดสร้างไฟล์แล้วดาวน์โหลด `.epub` อัตโนมัติ พร้อมลิงก์ดาวน์โหลดซ้ำ
+- `304 Not Modified` ของ static assets หมายถึง cache ใช้งานได้ ไม่ใช่ error การลบงาน
+- แก้ Backend ให้ stop/start server; แก้ Frontend ให้ Ctrl+F5
+- ดู architecture, workflow และ API ปัจจุบันใน [README](readme.md#สถาปัตยกรรมและแผนภาพการทำงาน-architecture--diagrams)
+
+## 8. การส่งออก EPUB พร้อมรูปปก
+
+1. เปิดงาน → HTML → สร้าง/บันทึก HTML ต้นทาง
+2. EPUB → เลือกต้นทางและแบ่งบท กรอก metadata/วันที่/รหัสหนังสือ; เว้นรหัสให้ระบบสร้างได้
+3. เลือก PNG/JPEG ไม่เกิน 2 MB ใส่ข้อความแทนรูป หรือเลือกสร้างแบบไม่มีปก
+4. สร้าง XHTML Quick Preview แล้วตรวจสารบัญ/บทและ source revision
+5. กดสร้างไฟล์ EPUB เพื่อดาวน์โหลดอัตโนมัติ; ถ้า source/config เปลี่ยนให้สร้าง Preview ใหม่
+
+ระบบเก็บปกเดิมหลัง refresh และใช้ซ้ำเมื่อ regenerate; ไม่จำเป็นต้องเลือกไฟล์ใหม่ หากต้องการเอาปกออกให้เลือกสร้างแบบไม่มีปก
+
+Generation ของ job เดียวกันชนกันคืน 409 และ cleanup/delete ข้ามหรือปฏิเสธงานที่กำลังอ่าน/เขียน EPUB ดาวน์โหลดใช้ snapshot จึงไม่ขาดกลางทางเมื่อ job ถูกลบภายหลัง รอบที่ validator ไม่ผ่านจะคง package พร้อมใช้เดิม
+
+ผลตรวจรับและขอบเขตชุดข้อมูลดู [Phase 8 evidence](phase8/evidence.md)
+
+
+## ขอบเขต Phase 8–9 ที่ใช้ร่วมกัน
+
+Phase 8 ดูแล EPUB pipeline, XHTML Preview และรูปปก ส่วน Phase 9 เพิ่มการแก้สารบัญด้วยมือ, `toc.json` และ stable targets โดยใช้ exporter/validator/ปกเดิม Implementation ผ่านแล้ว
+
+ปกคง input สูงสุด 2 MB / 16 megapixels และ canonical PNG สูงสุด 8 MB ใช้ preview payload และ API เดิม Phase 9 เพิ่ม thumbnail, drag-and-drop และรายละเอียดไฟล์ โดยไม่เพิ่ม storage/API ปกอีกชุด
+
+Phase 9 รวม `toc_revision` ใน preview config งานเก่าไม่มี `toc.json` ใช้สารบัญอัตโนมัติได้ ผลตรวจรับดู [checklist](checklist.md#phase-9--แก้ไขสารบัญ-epub-และ-stable-targets-editable-epub-toc) และ [หลักฐาน](phase9/evidence.md)
+
+## Phase 9 — แก้ไขสารบัญ EPUB
+
+1. เปิดงาน → แท็บ `EPUB` → กด `โหลดสารบัญ`
+2. แก้ชื่อ เลื่อนขึ้น/ลง ปรับระดับ 1–3 เพิ่ม/เอารายการออก หรือเลือก target จากหัวข้อ/ต้นบท
+3. กด `ดู` เพื่อตรวจตำแหน่งใน Quick Preview
+4. ถ้ามี unresolved ให้เลือก target ใหม่ก่อน
+5. กด `บันทึกสารบัญและอัปเดต Preview`
+6. ตรวจ Preview แล้วกด `สร้างไฟล์ EPUB`
+
+ถ้า HTML หรือ config เปลี่ยน ระบบให้ re-match และแสดง matched/unresolved โดยไม่ทับ draft เงียบ ๆ การยกเลิก re-match คง draft เดิม สองแท็บแก้พร้อมกันคืน 409 ให้โหลด revision ล่าสุดก่อนบันทึกใหม่
+
+รูปปกลากมาวางในพื้นที่ปกหรือใช้ file picker ได้ thumbnail ที่ระบุ `ยังไม่บันทึก` เป็น draft; ต้องสร้าง Preview ใหม่จึงจะเป็นปกของ package
+
+## Phase 10 — Document Translation (วางแผน)
+
+วางแผนรองรับการเลือกภาษาปลายทางและ style `ทั่วไป`, `นิยาย`, `วิชาการ`, `ราชการ` ผ่าน Google Cloud Translation, Local AI หรือ Hybrid ฟีเจอร์นี้ยังไม่เริ่ม implementation และยังไม่มีเมนูใช้งาน
+
+ทุก style ไม่บังคับแปลทุกคำ ศัพท์เฉพาะทาง ชื่อเทคโนโลยี ชื่อผลิตภัณฑ์ ตัวย่อ หรือคำที่แปลแล้วทำให้ความหมายคลาดเคลื่อน สามารถคงคำเดิมหรือใช้คำทับศัพท์ได้ โดยควรกำหนดใน glossary/do-not-translate เพื่อให้ใช้สม่ำเสมอทั้งเอกสาร
+
+ชุดทดสอบที่ล็อกไว้คือ `demo/08.pdf`–`13.png`: ตารางอังกฤษ, ภาพจีน+อังกฤษที่มีศัพท์เฉพาะ, นิยายอังกฤษสองภาพ, หนังสือสอน IT และหนังสือสอน IT ที่มี code program ชุดนี้ยังรอ ground truth และยังไม่ครอบคลุมเอกสารราชการ
+
+Google/Hybrid จะส่งข้อความออกจากเครื่องและต้องให้ผู้ใช้ยืนยันก่อนเริ่ม ส่วน Local AI จะคงโหมดไม่มี external request ผลแปลต้องผ่านหน้าตรวจ diff และ validator ก่อนส่งออก Text/HTML/EPUB ดูขอบเขตใน [Phase 10 checklist](checklist.md#phase-10--แปลเอกสารหลายภาษาและเลือกรูปแบบการแปล-document-translation)
+
+## Phase 8.1 — Structured OCR
+
+เปิดงาน OCR → แท็บ `Structured OCR` → `สร้าง Structured Text / HTML` ระบบใช้ artifact เดิมโดยไม่ OCR หรือเรียก Local AI ซ้ำ เลือกหน้า ซูม และคลิก cell/block เพื่อไฮไลต์ตำแหน่งบนต้นฉบับได้
+
+เมนูผลลัพธ์สลับ `Structured HTML`, `OCR ต้นฉบับ`, `ข้อความ AI แก้ไข` และ `ข้อความฉบับผู้ใช้` ได้ พร้อมดาวน์โหลด Text, HTML และ layout.json ถ้าข้อความต้นทางเปลี่ยน ระบบซ่อน download และขึ้นสถานะล้าสมัย ให้กดสร้าง Structured ใหม่ก่อน
+
+ต้องการ EPUB ที่รักษาตาราง: ไปแท็บ EPUB เลือกต้นทาง `Structured HTML` แล้วสร้าง XHTML Quick Preview ก่อน package ถ้า structured source เปลี่ยน ระบบจะบล็อก package เก่า
+
+ระบบรองรับ PDF vector table และภาพสแกนที่มีเส้นตาราง งานที่ไม่มี bbox หรือ private-use glyph ที่ตีความไม่ได้จะแสดง unresolved เพื่อให้ตรวจเอง ผล automated acceptance ผ่านแล้ว; ยังรอเจ้าของงานยืนยัน ground truth ด้วยคน ดู [checklist](checklist.md#phase8-1) และ [หลักฐาน](phase8_1/evidence.md)
+
+## 9. การแก้ไขสารบัญ EPUB และ Stable Targets (Phase 9)
+
+1. เปิดงาน → แท็บ `EPUB` → ส่วน **แก้ไขสารบัญ**
+2. กดปุ่ม **โหลดสารบัญ** เพื่อดึงโครงสร้างสารบัญปัจจุบันหรือสร้างอัตโนมัติจากหัวข้อ `h1`–`h3` และต้นบท
+3. ปรับแต่งสารบัญ:
+   - **แก้ไขชื่อ (Label):** พิมพ์ชื่อสารบัญที่ต้องการแสดง
+   - **ปรับระดับ (Level 1–3):** ใช้ปุ่มย่อหน้าเพื่อจัดระดับชั้นหัวข้อย่อย
+   - **ย้ายลำดับ (Reorder):** เลื่อนลำดับรายการขึ้นหรือลง
+   - **เลือกปลายทาง (Target):** เลือกตำแหน่งที่ต้องการให้คลิกลิงก์ไปถึง (ต้นบทหรือหัวข้อต่างๆ)
+   - **เพิ่ม/ลบรายการ:** เพิ่มหัวข้อสารบัญใหม่ หรือลบรายการที่ไม่ต้องการในสารบัญออก โดยไม่กระทบเนื้อหาหนังสือจริง
+4. กด **บันทึกสารบัญและอัปเดต Preview** เพื่อคำนวณ `toc_revision` และรีเฟรช XHTML Quick Preview
+5. หากเนื้อหา HTML ต้นทางมีการแก้ไข ระบบจะแจ้งเตือน Stale และทำการ Re-match หัวข้อให้อัตโนมัติ โดยรายการที่ไม่พบบนหน้าจะแสดงสถานะ `unresolved` ชัดเจน
+6. กด **สร้างไฟล์ EPUB** เพื่อแพ็กเกจหนังสือพร้อมสารบัญฉบับกำหนดเอง
+

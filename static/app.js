@@ -191,23 +191,32 @@
 
   const {activateTab, renderProposalsAndDiff, acceptAllCorrections, revertAllCorrections, saveManualEdit, updateSaveIndicator, updateReviewStatusBadge, markAsReviewed} = createTextWorkspace({state, el, loadPageData});
   const {switchEpubSubtab, loadEpubExportStatus, generateEpubPreview, buildEpubPackage} = createEpubWorkspace({state, el});
+  const structuredWorkspace = createStructuredWorkspace({state, el});
   const htmlWorkspace = createHtmlWorkspace({state, el, loadEpubExportStatus});
   const {switchHtmlSubtab, loadHtmlExportStatus, generateHtmlExport, saveFinalHtml} = htmlWorkspace;
 
   function init() {
     setupTheme();
     htmlWorkspace.init();
+    structuredWorkspace.init();
     setupDropzone();
     setupEventListeners();
     activateMainTab("upload");
     checkAiStatus();
     loadJobHistory();
+    const pendingHtmlAiJob = sessionStorage.getItem("htmlAiJobId");
+    if (pendingHtmlAiJob) {
+      openPreviousJob(pendingHtmlAiJob).then(() => {
+        if (state.currentJobId === pendingHtmlAiJob) activateMainTab("html");
+        else sessionStorage.removeItem("htmlAiJobId");
+      });
+    }
     setInterval(checkAiStatus, 10000);
   }
 
   // Theme Management
   function setupTheme() {
-    const savedTheme = localStorage.getItem("theme") || "theme-dark";
+    const savedTheme = localStorage.getItem("theme") || "theme-light";
     document.body.className = savedTheme;
 
     el.themeToggle.addEventListener("click", () => {
@@ -413,7 +422,7 @@
     });
     el.btnRefreshHistory.addEventListener("click", loadJobHistory);
     el.btnCleanupHistory.addEventListener("click", cleanupOldJobs);
-    el.btnDeleteAllHistory.addEventListener("click", deleteAllFinishedJobs);
+    el.btnDeleteAllHistory.addEventListener("click", deleteAllJobs);
     el.btnTestAiConnection.addEventListener("click", testAiConnection);
     [el.inputPageStart, el.inputPageEnd]
       .filter(Boolean)
@@ -512,7 +521,7 @@
   }
 
   function activateMainTab(tabName) {
-    const validTabs = new Set(["upload", "progress", "html", "epub", "history"]);
+    const validTabs = new Set(["upload", "progress", "html", "epub", "structured", "history"]);
     if (!validTabs.has(tabName)) return;
 
     state.activeMainTab = tabName;
@@ -531,6 +540,7 @@
       loadHtmlExportStatus();
     }
     if (tabName === "epub") loadEpubExportStatus();
+    if (tabName === "structured") structuredWorkspace.loadStatus();
     const hasJob = Boolean(state.currentJobId);
     el.tabProgressEmpty.classList.toggle("hidden", tabName !== "progress" || hasJob);
     if (tabName === "history") loadJobHistory();
@@ -852,27 +862,42 @@
       const res = await fetch(`/api/admin/cleanup?max_age_seconds=${days * 86400}`, { method: "POST" });
       if (!res.ok) throw new Error("ลบงานเก่าไม่สำเร็จ");
       const data = await res.json();
-      el.historyMessage.textContent = `ลบงานเก่าแล้ว ${data.cleaned_count} งาน${data.skipped_active_jobs.length ? ` · ข้ามงานที่กำลังทำ ${data.skipped_active_jobs.length} งาน` : ""}`;
       await loadJobHistory();
+      el.historyMessage.textContent = `ลบงานเก่าแล้ว ${data.cleaned_count} งาน${data.skipped_active_jobs.length ? ` · ข้ามงานที่กำลังทำ ${data.skipped_active_jobs.length} งาน` : ""}`;
     } catch (err) {
       alert(`ลบงานเก่าไม่สำเร็จ: ${err.message}`);
     }
   }
 
-  async function deleteAllFinishedJobs() {
-    if (!confirm("ลบงานที่จบแล้วทั้งหมด รวมไฟล์ต้นฉบับ ผล OCR และประวัติแบบถาวรหรือไม่? งานที่กำลังรอคิวหรือกำลังประมวลผลจะไม่ถูกลบ")) return;
+  async function deleteAllJobs() {
+    if (!confirm("ลบงานทั้งหมดถาวรหรือไม่? รวมไฟล์ต้นฉบับ ผล OCR และประวัติของทุกงาน งานรอคิวและงานกำลังประมวลผลจะถูกยกเลิกก่อนลบ การลบนี้ย้อนกลับไม่ได้")) return;
+    el.btnDeleteAllHistory.disabled = true;
     try {
-      const res = await fetch("/api/admin/cleanup?max_age_seconds=0", { method: "POST" });
-      if (!res.ok) throw new Error("ลบงานทั้งหมดไม่สำเร็จ");
+      const res = await fetch("/api/admin/jobs", { method: "DELETE" });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.detail || "ลบงานทั้งหมดไม่สำเร็จ");
+      }
       const data = await res.json();
-      if (data.cleaned_jobs.includes(state.currentJobId)) {
+      if (data.deleted_jobs.includes(state.uploadedJob?.job_id)) resetFileSelection();
+      if (data.deleted_jobs.includes(state.currentJobId)) {
+        clearInterval(state.pollTimer);
+        state.pollTimer = null;
         state.currentJobId = null;
         state.jobStatus = null;
+        state.currentPageData = null;
+        state.hasUnsavedChanges = false;
+        el.sectionProgress.classList.add("hidden");
+        el.sectionWorkspace.classList.add("hidden");
+        htmlWorkspace.syncJob();
+        refreshExportContext();
       }
-      el.historyMessage.textContent = `ลบงานที่จบแล้วทั้งหมด ${data.cleaned_count} งาน${data.skipped_active_jobs.length ? ` · ข้ามงานที่กำลังทำ ${data.skipped_active_jobs.length} งาน` : ""}`;
       await loadJobHistory();
+      el.historyMessage.textContent = `ลบแล้ว ${data.deleted_count} งาน${data.failed_jobs.length ? ` · ลบไม่สำเร็จ ${data.failed_jobs.length} งาน: ${data.failed_jobs.map(job => `${job.job_id}: ${job.detail}`).join("; ")}` : " · ลบงานทั้งหมดแล้ว"}`;
     } catch (err) {
       alert(`ลบงานทั้งหมดไม่สำเร็จ: ${err.message}`);
+    } finally {
+      el.btnDeleteAllHistory.disabled = false;
     }
   }
 
@@ -1051,6 +1076,7 @@
     // Also refresh HTML export links/badge
     loadHtmlExportStatus();
     loadEpubExportStatus();
+    structuredWorkspace.syncJob();
 
     // Warning banner if failed or partial
     const hasFailures = job.failed_pages > 0 || job.status === "partial" || job.status === "failed" || job.status === "cancelled";

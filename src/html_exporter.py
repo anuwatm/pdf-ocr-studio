@@ -22,8 +22,8 @@ from src.file_utils import atomic_write_text, atomic_write_json
 from src.thai_ocr_normalizer import normalize_ocr_line
 
 
-ALLOWED_TAGS = {"p", "h1", "h2", "h3", "b", "i", "span"}
-ALLOWED_ATTRIBUTES = {"lang", "charset", "id", "class", "data-page", "data-src", "data-edited"}
+ALLOWED_TAGS = {"p", "h1", "h2", "h3", "b", "i", "span", "table", "thead", "tbody", "tfoot", "tr", "th", "td", "caption", "ul", "ol", "li"}
+ALLOWED_ATTRIBUTES = {"lang", "charset", "id", "class", "data-page", "data-src", "data-edited", "rowspan", "colspan"}
 
 # Regex for illegal control characters (retain \t, \n; strip NUL, C0 controls)
 ILLEGAL_CTRL_REGEX = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
@@ -128,6 +128,9 @@ def get_html_document_shell(title: str, body_content: str) -> str:
     p.pre-wrap {{
       white-space: pre-wrap;
     }}
+    table {{ border-collapse: collapse; width: 100%; margin: 1rem 0; }}
+    th, td {{ border: 1px solid #999; padding: 0.4rem; vertical-align: top; }}
+    th {{ background: #eee; font-weight: 700; }}
     .page-marker {{
       color: #6c757d;
       font-style: italic;
@@ -644,15 +647,46 @@ class AIAnnotationValidator:
         return True, "valid", sanitized_list
 
 
+def _parse_ai_annotation_response(response_text: str, unit_ids: List[str]) -> Any:
+    """Decode a JSON array without merging examples and output into one array."""
+    decoder = json.JSONDecoder()
+    candidates = []
+    expected = set(unit_ids)
+    for match in re.finditer(r"\[", response_text):
+        try:
+            value, _ = decoder.raw_decode(response_text[match.start():])
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(value, list):
+            continue
+        candidates.append(value)
+        # Models may include an example array before the actual answer.
+        # Selecting the expected units still leaves tag/schema validation intact.
+        if all(isinstance(item, dict) and isinstance(item.get("unit"), str) for item in value):
+            if {item["unit"] for item in value} == expected:
+                return value
+    if candidates:
+        return candidates[-1]
+    raise ValueError("No valid JSON array returned by AI")
+
+
 def generate_ai_html(
     job_id: str,
     files_dir: str = "files",
     llm_client: Optional[Any] = None,
+    progress_callback: Optional[Any] = None,
+    cancel_requested: Optional[Any] = None,
 ) -> Tuple[str, Dict[str, Any]]:
-    """
-    Generates ai.html using Local LLM semantic annotations.
-    If LLM is offline, times out, or validator rejects, preserves basic.html and returns error status.
-    """
+    """Generate ai.html; retain basic HTML if AI fails or is cancelled."""
+    def check_cancelled():
+        if cancel_requested and cancel_requested():
+            raise InterruptedError("AI HTML export cancelled by user")
+
+    def report(stage, **details):
+        check_cancelled()
+        if progress_callback:
+            progress_callback(stage=stage, **details)
+
     job_dir = os.path.abspath(os.path.join(files_dir, job_id))
     export_dir = os.path.join(job_dir, "export")
     basic_path = os.path.join(export_dir, "basic.html")
@@ -701,71 +735,111 @@ def generate_ai_html(
             "text": raw_text[:120],
             "deterministic_tag": tag,
         })
-    chunk_count = max(1, (len(units_data) + 24) // 25)
+    # Limit both unit count and UTF-8 bytes. Byte count is a conservative
+    # upper bound for byte-based tokenizers, including Thai and JSON overhead.
+    # 5,500 prompt bytes + 1,600 output tokens leaves room within 8,192 tokens.
+    prompt_rules = (
+        "Classify Thai OCR units as p, h1, h2, or h3. Return ONLY valid JSON.\n"
+        "Return exactly one object per supplied unit, in the same order, with "
+        'keys "unit" and "tag", e.g. [{"unit":"u0","tag":"p"}].\n'
+        "Do not change, translate, or summarize text. Existing table/list markup is immutable and must remain unchanged. Body text uses p.\n"
+        "At most one h1 across the whole document, only a main title in the first batch.\n"
+        "Do not skip heading levels. Respect heading context from previous batches.\n"
+    )
 
-    # If no LLM client provided, check offline condition
-    if llm_client is None:
-        meta = {
-            "mode": "ai",
-            "model": "none",
-            "prompt_version": prompt_version,
-            "temperature": temperature,
-            "generated_at": generated_at,
-            "chunk_count": chunk_count,
-            "validator_status": "locked_ai_offline",
-            "source_revision": src_rev,
-            "message": "Local AI is offline or not configured",
+    def batch_prompt(batch, heading_context):
+        return (prompt_rules + heading_context + "\nUnits to classify:\n"
+                + json.dumps(batch, ensure_ascii=False, separators=(",", ":")))
+
+    # Reserve space for heading context while planning the batches.
+    context_reserve = "h1 already used: true. Last heading level: h3. This is not the first batch."
+    batches = []
+    batch = []
+    for unit in units_data:
+        candidate = batch + [unit]
+        if batch and (len(candidate) > 25
+                      or len(batch_prompt(candidate, context_reserve).encode("utf-8")) > 5500):
+            batches.append(batch)
+            batch = []
+        batch.append(unit)
+    if batch:
+        batches.append(batch)
+    chunk_count = len(batches)
+    completed_chunks = 0
+    chunk_index = 0
+
+    def metadata(status, **details):
+        return {
+            "mode": "ai", "model": model_name, "prompt_version": "v1.1-batched",
+            "temperature": temperature, "generated_at": generated_at,
+            "chunk_count": chunk_count, "completed_chunks": completed_chunks,
+            "validator_status": status, "source_revision": src_rev, **details,
         }
+
+    if llm_client is None:
+        meta = metadata("locked_ai_offline", message="Local AI is offline or not configured")
         _update_export_meta(job_dir, "ai", meta)
         return basic_html_content, meta
 
-    # Prepare prompt for LLM
-    prompt = (
-        "You are an expert document structural tagger for Thai OCR.\n"
-        "Your task is to assign the best semantic tag (p, h1, h2, h3) for each unit.\n"
-        "STRICT RULES:\n"
-        "1. At most one 'h1' in the entire document (only for the main title on the first page).\n"
-        "2. Do not skip heading levels (e.g. do not jump from h1 directly to h3).\n"
-        "3. Regular body paragraphs, sentences, and table rows must be 'p'.\n"
-        "4. DO NOT translate, summarize, or alter text. Return ONLY a JSON list of objects: [{'unit': '...', 'tag': '...'}]\n\n"
-        f"Units to classify:\n{json.dumps(units_data, ensure_ascii=False, indent=1)}"
-    )
-
     try:
-        if hasattr(llm_client, "generate"):
-            response_text = llm_client.generate(prompt=prompt, max_tokens=1200, temperature=0.0)
-        elif hasattr(llm_client, "chat_completion"):
-            res = llm_client.chat_completion(
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=1200,
-                temperature=0.0,
+        report("processing", chunk_count=chunk_count, completed_chunks=0, current_chunk=0)
+        clean_annotations = []
+        h1_used = False
+        last_heading = 0
+        for chunk_index, batch in enumerate(batches, 1):
+            report("waiting_ai", chunk_count=chunk_count, completed_chunks=completed_chunks,
+                   current_chunk=chunk_index)
+            heading_context = (
+                f"h1 already used: {str(h1_used).lower()}. "
+                f"Last heading level: h{last_heading}. "
+                + ("This is the first batch." if chunk_index == 1 else "This is not the first batch.")
             )
-            if not res.get("success"):
-                raise RuntimeError(res.get("error") or "LLM chat completion failed")
-            response_text = res.get("content", "")
-        else:
-            raise AttributeError("LLM client does not provide generate or chat_completion")
-        # Parse JSON
-        m_json = re.search(r"\[.*\]", response_text, re.DOTALL)
-        if not m_json:
-            raise ValueError("No JSON array returned by AI")
+            prompt = batch_prompt(batch, heading_context)
+            if callable(getattr(type(llm_client), "generate_html_annotations", None)):
+                response_text = llm_client.generate_html_annotations(prompt=prompt, max_tokens=1600, temperature=0.0)
+            elif hasattr(llm_client, "generate"):
+                response_text = llm_client.generate(prompt=prompt, max_tokens=1600, temperature=0.0)
+            elif hasattr(llm_client, "chat_completion"):
+                res = llm_client.chat_completion(
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=1600, temperature=0.0,
+                )
+                if not res.get("success"):
+                    raise RuntimeError(res.get("error") or "LLM chat completion failed")
+                response_text = res.get("content", "")
+            else:
+                raise AttributeError("LLM client does not provide generate or chat_completion")
+            check_cancelled()
+            unit_ids = [u["unit"] for u in batch]
+            raw_annotations = _parse_ai_annotation_response(response_text, unit_ids)
+            valid, reason, annotations = AIAnnotationValidator(unit_ids).validate(raw_annotations)
+            if valid and {a["unit"] for a in annotations} != set(unit_ids):
+                valid, reason = False, "AI did not annotate every unit in the batch"
+            if not valid:
+                meta = metadata("rejected", validator_reason=reason, failed_chunk=chunk_index)
+                _update_export_meta(job_dir, "ai", meta)
+                return basic_html_content, meta
+            # Validate in document order, independent of AI response ordering.
+            by_unit = {a["unit"]: a for a in annotations}
+            clean_annotations.extend(by_unit[uid] for uid in unit_ids)
+            completed_chunks += 1
+            report("processing", chunk_count=chunk_count, completed_chunks=completed_chunks,
+                   current_chunk=chunk_index)
+            for uid in unit_ids:
+                tag = by_unit[uid]["tag"]
+                if tag.startswith("h"):
+                    last_heading = int(tag[1])
+                    h1_used = h1_used or tag == "h1"
 
-        raw_annotations = json.loads(m_json.group(0))
-        validator = AIAnnotationValidator([u["unit"] for u in units_data])
-        valid, reason, clean_annotations = validator.validate(raw_annotations)
-
+        # Per-batch validation cannot catch repeated h1 or heading jumps across
+        # boundaries. Validate the entire document before publishing any ai.html.
+        report("validating", chunk_count=chunk_count, completed_chunks=completed_chunks,
+               current_chunk=chunk_index)
+        valid, reason, clean_annotations = AIAnnotationValidator(
+            [u["unit"] for u in units_data]
+        ).validate(clean_annotations)
         if not valid:
-            meta = {
-                "mode": "ai",
-                "model": model_name,
-                "prompt_version": prompt_version,
-                "temperature": temperature,
-                "generated_at": generated_at,
-                "chunk_count": chunk_count,
-                "validator_status": "rejected",
-                "source_revision": src_rev,
-                "validator_reason": reason,
-            }
+            meta = metadata("rejected", validator_reason=reason)
             _update_export_meta(job_dir, "ai", meta)
             return basic_html_content, meta
 
@@ -773,9 +847,9 @@ def generate_ai_html(
         tag_by_unit = {a["unit"]: a["tag"] for a in clean_annotations}
         
         # Re-render HTML replacing tags cleanly
+        match_indices = {match.start(): idx for idx, match in enumerate(matches)}
         def replacer(match):
-            nonlocal matches
-            m_idx = next((i for i, m in enumerate(matches) if m.start() == match.start()), None)
+            m_idx = match_indices.get(match.start())
             if m_idx is None:
                 return match.group(0)
             u_id = f"u{m_idx}"
@@ -791,42 +865,31 @@ def generate_ai_html(
 
         ai_html_content = unit_pattern.sub(replacer, basic_html_content)
         ai_path = os.path.join(export_dir, "ai.html")
+        report("publishing", chunk_count=chunk_count, completed_chunks=completed_chunks,
+               current_chunk=chunk_index)
         atomic_write_text(ai_path, ai_html_content)
 
-        meta = {
-            "mode": "ai",
-            "model": model_name,
-            "prompt_version": prompt_version,
-            "temperature": temperature,
-            "generated_at": generated_at,
-            "chunk_count": chunk_count,
-            "validator_status": "passed",
-            "source_revision": src_rev,
-            "annotations_applied": len(clean_annotations),
-            "hash": hashlib.sha256(ai_html_content.encode("utf-8")).hexdigest(),
-        }
+        meta = metadata(
+            "passed", annotations_applied=len(clean_annotations),
+            hash=hashlib.sha256(ai_html_content.encode("utf-8")).hexdigest(),
+        )
         _update_export_meta(job_dir, "ai", meta)
         return ai_html_content, meta
 
+    except InterruptedError as e:
+        meta = metadata("cancelled", error=str(e), failed_chunk=chunk_index)
+        _update_export_meta(job_dir, "ai", meta)
+        return basic_html_content, meta
     except Exception as e:
-        meta = {
-            "mode": "ai",
-            "model": model_name,
-            "prompt_version": prompt_version,
-            "temperature": temperature,
-            "generated_at": generated_at,
-            "chunk_count": chunk_count,
-            "validator_status": "error",
-            "source_revision": src_rev,
-            "error": str(e),
-        }
+        meta = metadata("error", error=str(e), failed_chunk=chunk_index)
         _update_export_meta(job_dir, "ai", meta)
         return basic_html_content, meta
 
 
+
 class StrictHtmlSanitizer(HTMLParser):
-    ALLOWED_TAGS = {"p", "h1", "h2", "h3", "b", "i", "strong", "em", "u", "s", "span", "br", "section", "main", "div", "ul", "ol", "li", "a", "blockquote"}
-    ALLOWED_ATTRS = {"id", "class", "data-page", "data-src", "data-edited", "lang"}
+    ALLOWED_TAGS = {"p", "h1", "h2", "h3", "b", "i", "strong", "em", "u", "s", "span", "br", "section", "main", "div", "ul", "ol", "li", "a", "blockquote", "table", "thead", "tbody", "tfoot", "tr", "th", "td", "caption"}
+    ALLOWED_ATTRS = {"id", "class", "data-page", "data-src", "data-edited", "lang", "rowspan", "colspan"}
     # Tags that have closing tags and whose inner text must be completely discarded
     DISCARD_CONTENT_TAGS = {"head", "title", "script", "style", "iframe", "object", "svg", "math", "applet", "form", "button", "textarea", "select"}
     # Void/self-closing tags that must simply be dropped without affecting discard depth
@@ -862,6 +925,10 @@ class StrictHtmlSanitizer(HTMLParser):
                             clean_attrs.append(("href", href))
                     except ValueError:
                         pass
+                continue
+            if name_lower in {"rowspan", "colspan"}:
+                if tag_lower in {"th", "td"} and value and value.isdigit() and 1 <= int(value) <= 1000:
+                    clean_attrs.append((name_lower, str(int(value))))
                 continue
             if name_lower not in self.ALLOWED_ATTRS:
                 continue

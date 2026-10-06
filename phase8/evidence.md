@@ -1,60 +1,65 @@
 # Phase 8 Evidence — EPUB Export & XHTML Quick Preview
 
-สถานะ: **กำลังพัฒนา / ยังไม่ผ่านการตรวจรับ**  
-วันที่: 2026-10-03
+สถานะ: **พัฒนาเสร็จและผ่านการตรวจชุดอนุมัติ 44 หน้า; รอข้อยกเว้น fixture เพื่อปิดเกณฑ์ edge cases ทั้งหมด**
+อัปเดต: 2026-10-04
 
-## ผลที่ทำแล้ว
+## สิ่งที่ส่งมอบ
 
-- เพิ่ม `src/epub_exporter.py` และสำเนาใน `publish/src/`
-- สร้าง XHTML Quick Preview จาก `basic.html`, `ai.html` หรือ `final.html`
-- ใช้ canonical block model ชุดเดียวกันสร้าง Preview และ chapter XHTML
-- รองรับแบ่งบทตาม `h1` หรือหน้า
-- สร้าง `mimetype`, `META-INF/container.xml`, `package.opf`, `nav.xhtml`, CSS และ chapter XHTML
-- วาง `mimetype` เป็น ZIP entry แรกและไม่บีบอัด
-- ตรวจ XML, manifest, spine, path และขนาด package ก่อนเผยแพร่ `book.epub`
-- ตรวจ `base_preview_revision` และ source revision; ตอบ HTTP 409 เมื่อข้อมูลเปลี่ยนหลัง Preview
-- เพิ่ม API สำหรับ Preview, package, status และ download
-- เพิ่มหน้า Phase 8 ใน Web Studio พร้อม Metadata, XHTML Preview, Source view และปุ่มดาวน์โหลด
-- Preview ใช้ sandbox และ CSP; ไม่มี CDN, external font หรือ EPUB renderer
-- อัปเดต Source และชุด `publish/` ให้ตรงกัน
+- Canonical BookModel จาก HTML parser: metadata, sections, headings, paragraphs, page provenance และ assets ใช้ชุดเดียวกันสร้าง XHTML Quick Preview กับ EPUB
+- HTML ต้นทาง auto/basic/ai/final; auto เลือก final ที่ revision ปัจจุบันก่อน basic ไม่เรียก Local LLM เพิ่ม
+- Metadata: title, language, identifier, creator, publisher, description และ date แบบ ISO 8601
+- รูปปก PNG/JPEG แบบเลือกได้ ตรวจขนาดสูงสุด 2 MB/16 megapixels; re-encode PNG ตัด metadata; ใส่ dimensions, alt, manifest cover-image, spine และ cover landmark
+- เลือกไม่มีปกหรือนำปกเดิมกลับมาใช้หลัง refresh ได้; ปก preview ส่งผ่าน loopback endpoint เท่านั้น
+- สารบัญซ้อน h1–h3 และ IDs deterministic; Preview แก้ปัญหาลิงก์ fragment ใน srcdoc เพื่อไม่โหลดหน้าแอปแทนหัวข้อ
+- Revision checks ก่อนและหลัง generation; package และ preview ซ้อนกันใน job เดียวตอบ 409
+- สถานะ not_generated/preview_ready/generating/ready/failed/invalid/stale พร้อม last_error; รอบที่ล้มเหลวเก็บ EPUB พร้อมใช้เดิม
+- Guard ร่วมกับ cleanup/delete; ดาวน์โหลดอ่าน snapshot ก่อนปล่อย lock จึงไม่ขาดกลางทางเมื่อมีการลบภายหลัง
+- ZIP timestamp และ OPF modified date คงที่สำหรับ preview เดิม เพื่อสร้างซ้ำได้ deterministic
+- Internal validator ตรวจ XML, container, manifest/spine, orphan resources, IDs, fragments, local references, CSS, active content, ZIP paths และขนาด
+- UI มี source view, source/revision/จำนวนบท, stale warnings, ปก/metadata, keyboard และ mobile; สร้าง EPUB แล้วดาวน์โหลดอัตโนมัติ
+- Source กับ publish runtime ซิงก์กัน ไม่มีการเพิ่ม EPUB renderer ลง product frontend
 
-## ผลทดสอบปัจจุบัน
+## หลักฐานชุดอนุมัติจริง
 
-คำสั่ง:
+ใช้ผล OCR ที่มี provenance ของ demo/01.pdf–04.pdf, demo/01.png–02.png รวม 44 หน้า ตรวจ hash ของ demo ทั้ง 6 ไฟล์ตรง manifest เดิม ไม่ใช้ synthetic document แทน
 
-```cmd
-publish\venv\Scripts\python.exe -m unittest discover -s tests\phase8 -p "test_*.py" -v
+- `fixture_manifest.json`: roundtrip visible text **43,391 ตัวอักษรตรงกัน** หลัง collapse layout whitespace; คงสระ/วรรณยุกต์และลำดับข้อความ ไม่ทำ NFC/ตัดอักขระไทย
+- `epubcheck-approved-44.json` และ `epubcheck-approved-cover.json`: EPUBCheck **5.3.0**, **0 fatal / 0 error / 0 warning** ตรวจ EPUB จริงทั้งไม่มีปกและปกจาก demo/01.png
+- `approved_browser_network_log.json`: Chrome 154.0.8037.93 และ Edge 154.0.4258.53 ผ่าน Preview, source, คลิกสารบัญ, package, download, keyboard และ mobile; **external calls = 0**, page errors = 0
+- `compatibility_matrix.json`: epub.js 0.3.93 และ Foliate commit ใน tool_versions.json เปิด EPUB จริงแบบ local ตรวจลิงก์สารบัญทุกจุด, ไทย, CSS, รูปปกและ resize/reflow ทั้งสอง browser
+- `benchmark_budget.json`: ล็อกก่อนวัด preview/package p95 ไม่เกิน 5 วินาที, peak process RSS ไม่เกิน 256 MB; 10 รอบบนชุดจริง 44 หน้า
+- `benchmark_results.json`: Preview p50/p90/p95 = 0.0803/0.0844/0.0846 วินาที; Package = 0.0586/0.0629/0.073 วินาที; peak RSS **59.29 MB**, 44 บท, 59,396 bytes ผ่านงบ
+- Guard smoke check ใช้ approved_44pages_job: generation และ deletion ถูกปฏิเสธก่อนแก้ไฟล์/DB เมื่อ job busy ไม่ได้ลบข้อมูลจริง
+
+## Regression และข้อจำกัดการปิดเกณฑ์
+
+ก่อนพบกติกาชุดข้อมูล ได้รัน regression **17/17 PASS** และ browser flow สำหรับ invalid, stale/409, regenerate, Unicode, XSS, รูปปกเสีย, deterministic และ failed generation แต่มี fixture จำลอง จึง **แยกออกจากผลตรวจรับชุดอนุมัติ** และยังไม่ใช้ปิด checkbox edge cases
+
+checklist.md บรรทัด 46 ห้าม fixture จำลอง ขณะที่ Phase 8 ต้องตรวจ RTL/zero-width/Unicode/XSS/ไฟล์เสีย ซึ่งไม่มีครบใน demo จึงรอคำตอบผู้ใช้เรื่องข้อยกเว้นสำหรับ regression เฉพาะความถูกต้อง/ความปลอดภัย Benchmark และตรวจรับเนื้อหาใช้ demo จริงต่อไป
+
+ยังไม่อ้างการรับรอง desktop reader, JPEG คุณภาพจริง หรือชุดขยาย 2,229 หน้า ผล reader ที่บันทึกเป็น external browser engines 2 ตัว ทดสอบอัตโนมัติใน local harness
+
+## รันทวน
+
+```powershell
+& .\publish\venv\Scripts\python.exe -m tests.phase8.benchmark
+& .\publish\venv\Scripts\python.exe -m tests.phase8.approved_roundtrip
+& .\publish\venv\Scripts\python.exe -m tests.phase8.approved_browser
+java -jar .\tools\epubcheck\epubcheck-5.3.0\epubcheck.jar .\phase8\approved_reader_fixture.epub --json .\phase8\epubcheck-approved-cover.json
 ```
 
-ผล: **6/6 PASS**
+Regression ที่ใช้ fixture จำลองรอข้อยกเว้นก่อนรันทวนและปิดเกณฑ์:
 
-ครอบคลุม:
+```powershell
+& .\publish\venv\Scripts\python.exe -m unittest discover -s tests\phase8 -p "test_*.py" -v
+& .\publish\venv\Scripts\python.exe -m tests.phase8.browser_acceptance
+```
 
-- Quick Preview เป็น XHTML ที่ parse ได้
-- ตัด `<script>` ออกจาก Preview และ EPUB
-- Preview และ package รักษาข้อความภาษาไทยตัวอย่าง
-- EPUB มี `mimetype` ถูกตำแหน่งและไม่บีบอัด
-- internal package validator ผ่าน
-- source เปลี่ยนหลัง Preview ถูกปฏิเสธ
-- preview revision ผิดถูกปฏิเสธ
-- สร้าง Preview ใหม่แล้ว EPUB package รุ่นก่อนถูกทำเครื่องหมาย stale และซ่อนจากการดาวน์โหลด
-- API CSP sandbox, status, download, RFC 5987 และ nosniff
 
-Smoke test ชุดอนุมัติ 44 หน้า:
+## ขอบเขต Phase 8–9 ที่ใช้ร่วมกัน
 
-- สร้าง Quick Preview สำเร็จ 44 บทเมื่อแบ่งตามหน้า
-- สร้าง `book.epub` ขนาด 58,949 bytes
-- internal validator: `valid=true`, errors 0
-- status: `ready`, `stale=false`
+Phase 8 ดูแลการสร้าง EPUB, XHTML Preview, สารบัญอัตโนมัติและรูปปก ส่วน Phase 9 ที่ยังเป็นแผนเพิ่มการแก้สารบัญด้วยมือ, toc.json และ stable targets โดยใช้ exporter/validator/ปกเดิม
 
-## รายการที่ยังไม่ผ่านเกณฑ์ปิด Phase
+ปกคง input สูงสุด 2 MB / 16 megapixels และ canonical PNG สูงสุด 8 MB ใช้ preview_payload.json.cover และ API preview/GET cover เดิม Phase 9 ไม่เพิ่ม storage ปกหรือ upload/delete API อีกชุด; thumbnail/drag-and-drop เป็นงาน UX เพิ่มเติม
 
-- ยังไม่ได้ตรวจด้วย EPUBCheck เวอร์ชันที่ล็อก
-- ยังไม่ได้ทดสอบเปิดใน EPUB reader ภายนอก 2 ตัว
-- ยังไม่มี browser automation Chrome/Edge และ network log
-- ยังไม่มี benchmark p50/p90/p95 และ peak memory
-- ยังไม่มี fixture manifest/roundtrip ครบทุก Unicode edge case
-- ยังไม่รองรับรูปปก
-- สารบัญระดับย่อยและ accessibility audit ยังต้องตรวจเพิ่ม
-
-ห้ามใช้เอกสารนี้อ้างว่า Phase 8 ผ่านสมบูรณ์จนกว่ารายการข้างต้นจะปิดครบ
+Phase 9 จะเพิ่ม toc_revision ใน preview config เดิมที่รวม source/metadata/chapter split/cover hash งานเก่าไม่มี toc.json ใช้สารบัญอัตโนมัติได้ การทดสอบ EPUB/ปก/reader/CSP/offline ซ้ำเป็น regression และไม่ปิดข้อคงค้าง Phase 8 อัตโนมัติ ดู [ข้อตกลงร่วมและแผน](../checklist.md#ข้อตกลงร่วมระหว่าง-phase-8-และ-phase-9-2026-10-05)

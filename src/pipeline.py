@@ -30,6 +30,10 @@ from .text_assembler import (
 )
 from .oneocr_wrapper import OneOcrEngine
 from .thai_ocr_normalizer import normalize_ocr_line
+from .structured_layout import (
+    apply_ocr_to_tables, build_page_layout, detect_image_table_grid,
+    extract_pdf_vector_tables,
+)
 
 SCHEMA_VERSION = "2.0.0"
 PAGE_SEPARATOR_TEMPLATE = "\n\n--- Page {page_number} ---\n\n"
@@ -266,6 +270,13 @@ class ProcessingPipeline:
                     "char_mapping": [m.to_dict() for m in mappings],
                     "raw_text": page_text,
                 }
+                tables = extract_pdf_vector_tables(page, dpi=dpi)
+                if tables and callable(getattr(self.engine, "recognize_pil", None)):
+                    table_ocr = self.engine.recognize_pil(ref_image)
+                    table_lines = table_ocr.get("lines", [])
+                    self._normalize_ocr_lines(table_lines)
+                    apply_ocr_to_tables(tables, table_lines)
+                page_record["layout"] = build_page_layout(page_record, tables)
                 pages_data.append(page_record)
                 raw_text_parts.append(PAGE_SEPARATOR_TEMPLATE.format(page_number=page_id) + page_text)
 
@@ -317,6 +328,9 @@ class ProcessingPipeline:
                     "char_mapping": [m.to_dict() for m in mappings],
                     "raw_text": page_text,
                 }
+                page_record["layout"] = build_page_layout(
+                    page_record, detect_image_table_grid(ref_image, raw_lines, page_id)
+                )
                 pages_data.append(page_record)
                 raw_text_parts.append(PAGE_SEPARATOR_TEMPLATE.format(page_number=page_id) + page_text)
 
@@ -359,6 +373,7 @@ class ProcessingPipeline:
                     "char_mapping": [m.to_dict() for m in mappings],
                     "raw_text": page_text,
                 }
+                page_record["layout"] = build_page_layout(page_record)
                 pages_data.append(page_record)
                 raw_text_parts.append(PAGE_SEPARATOR_TEMPLATE.format(page_number=page_id) + page_text)
 
@@ -549,6 +564,9 @@ class ProcessingPipeline:
             "char_mapping": [m.to_dict() for m in mappings],
             "raw_text": page_text,
         }
+        page_record["layout"] = build_page_layout(
+            page_record, detect_image_table_grid(ref_image, raw_lines, page_id)
+        )
 
         full_raw = PAGE_SEPARATOR_TEMPLATE.format(page_number=page_id) + page_text
         return {

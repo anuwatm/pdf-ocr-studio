@@ -15,6 +15,17 @@
                 </div>
               </div>
 
+              <div id="html-ai-progress" class="html-ai-progress hidden" aria-label="ความคืบหน้าการสร้าง HTML ด้วย AI">
+                <div class="html-ai-progress-heading">
+                  <strong id="html-ai-progress-title" role="status" aria-live="polite">กำลังเตรียมงาน AI</strong>
+                  <button id="btn-cancel-html-ai" class="btn btn-outline btn-danger btn-xs" type="button">ยกเลิก</button>
+                </div>
+                <progress id="html-ai-progress-bar" max="100" aria-label="ชุดที่ประมวลผลสำเร็จ"></progress>
+                <p id="html-ai-progress-detail"></p>
+                <p id="html-ai-progress-error" class="hidden" role="alert"></p>
+                <button id="btn-retry-html-ai" class="btn btn-outline btn-xs hidden" type="button">ลองสร้างใหม่</button>
+              </div>
+
               <div class="html-split" id="html-split"><div id="html-source-view" class="html-view-container"><div class="html-editor-modes" role="group" aria-label="รูปแบบการแก้ไข HTML">
 <button id="html-mode-code" class="html-subtab-btn active" type="button" aria-pressed="true">HTML Code</button>
 <button id="html-mode-visual" class="html-subtab-btn" type="button" aria-pressed="false">Visual — แก้ไขแบบ Word</button>

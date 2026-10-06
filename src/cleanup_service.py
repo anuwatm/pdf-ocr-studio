@@ -7,6 +7,7 @@ Strictly coordinates retention lifecycle with Worker and JobManager:
 4. Coordinated deletion: cleans filesystem artifacts first, then purges DB rows (CASCADE).
 5. Prevents late-arriving results from resurrecting deleted jobs (coordinating with worker checks).
 """
+from src.job_artifact_guard import guard_artifacts, is_artifact_busy
 import os
 import shutil
 import time
@@ -49,21 +50,28 @@ class RetentionPolicy:
         """
         Determines if a job is actively executing or queued, and must NOT be deleted.
         """
+        if is_artifact_busy(job_id, getattr(job_manager, "output_dir", "files")):
+            return True
         if job_status in (JobStatus.RUNNING.value, JobStatus.QUEUED.value):
             return True
         if job_manager:
             q_info = job_manager.get_queue_info()
             if job_id in q_info.get("active_job_ids", []) or job_id in q_info.get("queued_job_ids", []):
                 return True
+            tasks = getattr(job_manager, "html_ai_tasks", None)
+            if tasks is not None and tasks.is_active(job_id):
+                return True
         return False
 
 
+@guard_artifacts
 def delete_single_job(
     job_id: str,
     db: JobDatabase,
     output_base_dir: str = "data/jobs",
     job_manager: Optional[Any] = None,
     force: bool = False,
+    strict: bool = False,
 ) -> Dict[str, Any]:
     """
     Explicitly deletes a single job and its artifacts from disk and database.
@@ -76,7 +84,7 @@ def delete_single_job(
     if not job:
         # Check if orphaned folder exists on disk
         if os.path.exists(job_dir):
-            shutil.rmtree(job_dir, ignore_errors=True)
+            shutil.rmtree(job_dir, ignore_errors=not strict)
             return {"job_id": job_id, "deleted": True, "details": "Removed orphaned directory"}
         return {"job_id": job_id, "deleted": False, "details": "Job not found"}
 
@@ -93,7 +101,7 @@ def delete_single_job(
 
     # 1. Remove disk directory and all artifacts (source, images, results, logs)
     if os.path.exists(job_dir):
-        shutil.rmtree(job_dir, ignore_errors=True)
+        shutil.rmtree(job_dir, ignore_errors=not strict)
 
     # 2. Purge from database
     db.delete_job(job_id)
@@ -125,6 +133,14 @@ def cleanup_expired_jobs(
     expired_ids = db.get_expired_jobs(max_age_seconds=ttl)
     cleaned_jobs: List[str] = []
     skipped_jobs: List[str] = []
+    # The candidate query excludes these jobs. Report them explicitly so a
+    # zero-result cleanup is distinguishable from a failed deletion.
+    if ttl == 0:
+        with db.read_connection() as conn:
+            skipped_jobs = [row["job_id"] for row in conn.execute(
+                "SELECT job_id FROM jobs WHERE status IN (?, ?)",
+                (JobStatus.RUNNING.value, JobStatus.QUEUED.value),
+            ).fetchall()]
 
     for jid in expired_ids:
         job = db.get_job_status(jid)
@@ -132,7 +148,7 @@ def cleanup_expired_jobs(
             continue
 
         # Double check active protection
-        if policy.is_job_active(job.status.value, jid, job_manager):
+        if is_artifact_busy(jid, output_base_dir) or policy.is_job_active(job.status.value, jid, job_manager):
             skipped_jobs.append(jid)
             continue
 

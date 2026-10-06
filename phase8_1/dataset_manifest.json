@@ -1,0 +1,27 @@
+{
+  "file": "demo/08.pdf",
+  "language": "en",
+  "pages": 11,
+  "bytes": 145494,
+  "sha256": "5746428c7c3d6225ae6a043ed6f6566ccdd42d59471830ca9428faf2254a4220",
+  "approved_scope": "Phase 8.1 English and table tests; user request 2026-10-05",
+  "status": "structured audit passed: 11 pages / 29 tables; human ground-truth confirmation pending; 9 private-use glyphs unresolved",
+  "examples": [
+    {
+      "page": 5,
+      "case": "Table 12 merged data cells"
+    },
+    {
+      "page": 7,
+      "case": "Table 19 numbers and dash placeholders"
+    },
+    {
+      "page": 10,
+      "case": "Table 27 columns simulated by tab stops"
+    },
+    {
+      "page": 11,
+      "case": "Table 29 multiple headers"
+    }
+  ]
+}

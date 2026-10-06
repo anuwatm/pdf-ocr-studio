@@ -1,0 +1,43 @@
+<section id="section-structured" class="card main-tab-hidden" data-main-panel="structured">
+  <div class="card-header">
+    <div>
+      <h2 class="card-title">Structured OCR — Phase 8.1</h2>
+      <p class="history-subtitle">สร้าง Text และ HTML จากผล OCR เดิม พร้อมเทียบตำแหน่งกับต้นฉบับ</p>
+    </div>
+    <span id="structured-status-badge" class="badge badge-neutral">ยังไม่ได้สร้าง</span>
+  </div>
+  <p class="export-job-context" data-export-job>ยังไม่ได้เลือกงาน</p>
+  <div data-export-empty class="tab-empty-state">
+    <strong>เลือกงาน OCR ก่อน</strong><span>เปิดงานจากผลข้อความหรืองาน OCR ก่อนหน้า</span>
+  </div>
+  <div class="structured-toolbar">
+    <button id="btn-generate-structured" class="btn btn-primary" type="button" data-export-controls disabled>สร้าง Structured Text / HTML</button>
+    <label>หน้า <select id="structured-page-select" data-export-controls disabled aria-label="เลือกหน้าสำหรับตรวจเทียบ"></select></label>
+    <label>ผลลัพธ์ <select id="structured-result-mode" data-export-controls disabled aria-label="เลือกผลลัพธ์ Text หรือ HTML">
+      <option value="html">Structured HTML</option><option value="raw">OCR ต้นฉบับ</option>
+      <option value="corrected">ข้อความ AI แก้ไข</option><option value="final">ข้อความฉบับผู้ใช้</option>
+    </select></label>
+    <button id="btn-structured-zoom-out" class="btn btn-outline btn-sm" type="button" data-export-controls disabled aria-label="ย่อภาพ">−</button>
+    <span id="structured-zoom-label">100%</span>
+    <button id="btn-structured-zoom-in" class="btn btn-outline btn-sm" type="button" data-export-controls disabled aria-label="ขยายภาพ">+</button>
+    <button id="btn-structured-mobile-source" class="btn btn-outline btn-sm structured-mobile-toggle" type="button">ต้นฉบับ</button>
+    <button id="btn-structured-mobile-result" class="btn btn-outline btn-sm structured-mobile-toggle" type="button">ผลลัพธ์</button>
+    <a id="btn-dl-structured-text" class="btn btn-outline btn-sm hidden" href="#">Text</a>
+    <a id="btn-dl-structured-html" class="btn btn-outline btn-sm hidden" href="#">HTML</a>
+    <a id="btn-dl-structured-layout" class="btn btn-outline btn-sm hidden" href="#">layout.json</a>
+  </div>
+  <p id="structured-details" class="history-message" aria-live="polite">ยังไม่มีผล structured</p>
+  <div class="structured-compare">
+    <section id="structured-source-pane" class="structured-pane" aria-labelledby="structured-source-title">
+      <h3 id="structured-source-title">ต้นฉบับ</h3>
+      <div class="structured-source-viewport"><div id="structured-source-canvas" class="structured-source-canvas">
+        <img id="structured-source-image" alt="หน้าต้นฉบับที่เลือก">
+        <svg id="structured-bbox-overlay" aria-label="ตำแหน่ง block หรือ cell ที่เลือก"></svg>
+      </div></div>
+    </section>
+    <section id="structured-result-pane" class="structured-pane" aria-labelledby="structured-result-title">
+      <h3 id="structured-result-title">Structured HTML</h3>
+      <iframe id="structured-preview-frame" sandbox="allow-same-origin" title="Structured HTML preview"></iframe>
+    </section>
+  </div>
+</section>

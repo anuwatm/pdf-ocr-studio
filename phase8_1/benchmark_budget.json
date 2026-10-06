@@ -1,0 +1,9 @@
+{
+  "locked_at": "2026-10-06",
+  "dataset": "demo/08.pdf (11 approved pages)",
+  "runs": 10,
+  "limits": {
+    "structured_export_p95_seconds": 5.0,
+    "peak_process_rss_mb": 256.0
+  }
+}

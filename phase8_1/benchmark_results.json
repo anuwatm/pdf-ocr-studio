@@ -1,0 +1,26 @@
+{
+  "dataset": "demo/08.pdf",
+  "pages": 11,
+  "runs": 10,
+  "seconds": {
+    "p50": 0.1193,
+    "p90": 0.1642,
+    "p95": 0.2325,
+    "max": 0.2325
+  },
+  "peak_process_rss_mb": 61.7,
+  "tables_per_run": [
+    29,
+    29,
+    29,
+    29,
+    29,
+    29,
+    29,
+    29,
+    29,
+    29
+  ],
+  "budget_pass": true,
+  "notes": "Measures Phase 8.1 export from saved OCR/layout artifact; OCR is intentionally outside this no-rerun path."
+}
