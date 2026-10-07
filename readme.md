@@ -55,6 +55,7 @@
   - [7. EPUB preview, package และดาวน์โหลด](#7-epub-preview-package-และดาวน์โหลด)
   - [8. Structured OCR และหน้าตรวจเทียบ](#8-structured-ocr-และหน้าตรวจเทียบ)
   - [9. Editable TOC และ stable targets](#9-editable-toc-และ-stable-targets)
+  - [10. งานแปลเอกสารที่กำลังวางแผน](#10-งานแปลเอกสารที่กำลังวางแผน)
 - [การติดตั้งและเริ่มต้นใช้งาน (Getting Started)](#การติดตั้งและเริ่มต้นใช้งาน-getting-started)
   - [ความต้องการของระบบ](#ความต้องการของระบบ-prerequisites)
   - [วิธีที่ 1: รันด่วนด้วยชุดติดตั้งพร้อมแจกจ่าย (`publish/`)](#วิธีที่-1-รันด่วนด้วยชุดติดตั้งพร้อมแจกจ่าย-publish)
@@ -64,10 +65,7 @@
 - [รายละเอียด REST API (API Reference)](#รายละเอียด-rest-api-api-reference)
 - [โครงสร้างโฟลเดอร์ (Repository Structure)](#โครงสร้างโฟลเดอร์-repository-structure)
 - [ผลการทดสอบและเกณฑ์ตรวจรับ (Verification & Benchmarks)](#ผลการทดสอบและเกณฑ์ตรวจรับ-verification--benchmarks)
-- [ขอบเขต Phase 8–9 ที่ใช้ร่วมกัน](#phase8-phase9-boundary)
-- [แผน Phase 10 — Document Translation](#phase-10--document-translation)
-- [Phase 8.1 — Structured OCR](#phase-81--structured-ocr)
-- [Phase 9 — Editable EPUB TOC](#phase-9--editable-epub-toc)
+- [สถานะปัจจุบันและงานถัดไป](#สถานะปัจจุบันและงานถัดไป)
 - [การแก้ปัญหาล่าสุด](#การแก้ปัญหาล่าสุด)
 - [ข้อควรรู้ก่อนเผยแพร่บน GitHub](#ข้อควรรู้ก่อนเผยแพร่บน-github)
 - [สิทธิ์การใช้งานและข้อจำกัดความรับผิดชอบ (License & Disclaimer)](#สิทธิ์การใช้งานและข้อจำกัดความรับผิดชอบ-license--disclaimer)
@@ -98,32 +96,36 @@
 6. **Data Retention & Anti-Resurrection:**
    - หน้า **งาน OCR ก่อนหน้า** เปิดดู ดาวน์โหลด หรือลบงานทีละรายการได้ และลบงานที่เก่ากว่าจำนวนวันที่ผู้ใช้กำหนดได้; **ลบงานทั้งหมด** ยกเลิก OCR ที่ค้างแล้วลบทุกงาน พร้อมรายงานงานที่ลบไม่สำเร็จ
    - ป้องกันสภาวะ Race Condition: หากงานถูกลบไปแล้ว Worker จะยุติการเขียนไฟล์กลับคืนทันที (0 Resurrection)
-7. **ความเป็นส่วนตัวและ Offline 100%:**
+7. **ความเป็นส่วนตัวและ Offline 100% สำหรับฟีเจอร์ที่ใช้งานได้ปัจจุบัน:**
    - เซิร์ฟเวอร์ผูกเข้ากับ `127.0.0.1` (Loopback Only) ปฏิเสธการเข้าถึงจาก IP ภายนอกด้วย HTTP 403 Forbidden
    - ประมวลผลและเก็บข้อมูลบนเครื่องของผู้ใช้เท่านั้น ไม่ส่งข้อมูลใด ๆ ออกนอกเครือข่าย
 8. **ส่งออกผลลัพธ์และภาพ PDF:**
    - ดาวน์โหลด `raw.txt`, `corrected.txt`, `final.txt` และ ZIP ผลลัพธ์ได้ แม้งานถูกยกเลิก โดยระบบคงข้อความหน้าที่ทำสำเร็จแล้วไว้
    - สำหรับไฟล์ PDF สามารถกด **"ดาวน์โหลดภาพแต่ละหน้า (ZIP)"** ได้ทันทีในแท็บอัปโหลดเอกสาร (PNG 200 DPI ตามช่วงหน้าที่เลือก) โดยไม่ต้องสั่งเริ่มทำ OCR
-9. **EPUB 3 Export, XHTML Quick Preview และ Editable TOC Editor (Phase 8 & Phase 9):**
+9. **EPUB 3 Export, XHTML Quick Preview และ Editable TOC Editor:**
    - เลือก `basic.html`, `ai.html`, `final.html` หรือ `structured.html` เป็นฐาน แล้วตรวจ XHTML Quick Preview พร้อมโครงสร้างสารบัญก่อนสร้างไฟล์ `.epub`; เมื่อสร้างสำเร็จเบราว์เซอร์ดาวน์โหลดอัตโนมัติ
    - EPUB 3 แบบ reflowable มีสารบัญ, metadata, CSS ภาษาไทยภายในไฟล์, ระบบตรวจจับ stale revision และ internal package validator (สอดคล้องกับ EPUBCheck 5.3.0) ตรวจสอบความถูกต้อง
-   - **Cover Drag-and-Drop & Thumbnail (Phase 9):** ลากวางไฟล์รูปปก (PNG/JPEG สูงสุด 2 MB) แสดงภาพตัวอย่าง Thumbnail พร้อมขนาดไฟล์และมิติรูปภาพ รองรับการสร้างแบบไม่มีปก หรือนำรูปปกเดิมมาใช้ซ้ำ (Reuse)
-   - **Editable TOC & Stable Targets (Phase 9):** สตูดิโอแก้ไขสารบัญ EPUB ปรับแต่งชื่อ (Label), สลับลำดับ (Reorder), จัดโครงสร้างชั้นลำดับ (Level 1–3), เลือกลิงก์ปลายทาง (Target) จากต้นบทหรือหัวข้อ h1–h3 พร้อม stable target ID ป้องกันลิงก์เลื่อนหลุด และระบบ Re-match อัตโนมัติเมื่อเนื้อหา HTML เปลี่ยนแปลง
+   - **Cover Drag-and-Drop & Thumbnail:** ลากวางไฟล์รูปปก (PNG/JPEG สูงสุด 2 MB) แสดงภาพตัวอย่าง Thumbnail พร้อมขนาดไฟล์และมิติรูปภาพ รองรับการสร้างแบบไม่มีปก หรือนำรูปปกเดิมมาใช้ซ้ำ (Reuse)
+   - **Editable TOC & Stable Targets:** สตูดิโอแก้ไขสารบัญ EPUB ปรับแต่งชื่อ (Label), สลับลำดับ (Reorder), จัดโครงสร้างชั้นลำดับ (Level 1–3), เลือกลิงก์ปลายทาง (Target) จากต้นบทหรือหัวข้อ h1–h3 พร้อม stable target ID ป้องกันลิงก์เลื่อนหลุด และระบบ Re-match อัตโนมัติเมื่อเนื้อหา HTML เปลี่ยนแปลง
 10. **Minimal Web Studio และ Visual Editor แบบ Word:**
     - Light theme เป็นค่าเริ่มต้น สลับ Dark ได้ พร้อม icon ปุ่ม, focus state และ responsive layout
     - แยกพื้นที่ทำงานเป็น 6 แท็บอิสระ: **อัปโหลดเอกสาร**, **ผลข้อความ**, **HTML**, **ส่งออก EPUB**, **Structured OCR**, และ **งาน OCR ก่อนหน้า**
     - ในแท็บ HTML มีระบบแก้ไขสองโหมด: **CodeMirror 5.65.21** สำหรับแก้ไขโค้ด HTML โดยตรง และ **Visual Editor แบบ Word** (WYSIWYG: ตัวหนา, ตัวเอียง, ขีดเส้นใต้, หัวข้อ H1–H3, รายการจุด/ตัวเลข, ลิงก์, Undo/Redo) พร้อมซิงก์สองฝั่งอัตโนมัติ
     - ระบบบันทึกแบบแมนนวล (Ctrl+S / ปุ่มบันทึก ปราศจาก Autosave) ป้องกันข้อผิดพลาด draft สูญหาย รองรับ Revision Conflict (HTTP 409) และแก้ปัญหา Title leak (`OCR Document - ...`) ไม่ให้ปนเปื้อนลงใน `<body>`
-11. **Structured OCR และการตรวจเทียบตำแหน่งต้นฉบับ (Phase 8.1):**
+11. **Structured OCR และการตรวจเทียบตำแหน่งต้นฉบับ:**
     - ตรวจจับโครงสร้างตาราง (Vector Geometry ตรวจเส้นจริงจาก PDF และ Scanned Projection ตรวจตารางสแกน) และรายการ (List bullet/numbered)
     - ส่งออกเป็น Structured Text (tab-separated) และ Semantic HTML (table/thead/tbody/tr/th/td, ul/ol/li) จาก `ocr.json` เดิมโดยไม่ต้องรัน OCR หรือ AI ซ้ำ
     - หน้าตรวจเทียบต้นฉบับแบบแยก 2 ฝั่ง (Original vs Text/HTML) พร้อมระบบซูม 50%–200%, ไฮไลต์ Bounding Box อัตโนมัติเมื่อคลิกเซลล์หรือบล็อกข้อความ รองรับทั้งเมาส์ คีย์บอร์ด และอุปกรณ์มือถือ
+12. **Document Translation (กำลังวางแผน):**
+    - วางแผนให้เลือกภาษาต้นทาง/ปลายทาง, style `ทั่วไป`/`นิยาย`/`วิชาการ`/`ราชการ` และ provider Google/Local AI/Hybrid
+    - รักษา segment, ตาราง, TOC, ศัพท์เฉพาะ และ code program พร้อม diff และ human review ก่อนส่งออก Text/HTML/EPUB
+    - ยังไม่มี Translation tab/API/worker ในระบบปัจจุบัน และยังไม่ถือเป็นฟีเจอร์พร้อมใช้งาน
 
 ---
 
 ## สถาปัตยกรรมและแผนภาพการทำงาน (Architecture & Diagrams)
 
-อัปเดตตามโค้ดวันที่ 2026-10-06: OCR ใช้ subprocess; HTML AI ใช้ background thread; Phase 8.1 สร้าง structured layout/Text/HTML จาก artifact เดิมโดยไม่รัน OCR หรือ AI ซ้ำ; Phase 9 รองรับ Editable EPUB TOC (ปรับแต่งสารบัญ, stable targets, ลากวางปก และตรวจจับความขัดแย้ง)
+อัปเดตวันที่ 2026-10-07: OCR ใช้ subprocess, HTML AI ใช้ background thread, Structured OCR สร้าง layout/Text/HTML จาก artifact เดิม และ EPUB รองรับ XHTML Quick Preview กับ Editable TOC งานที่กำลังวางแผนคือ Document Translation ซึ่งยังไม่มี tab/API/worker ใช้งานจริง
 
 ### 1. สถาปัตยกรรมระบบ
 
@@ -143,7 +145,8 @@ flowchart LR
     API --> Editor["Sanitizer / revision conflict checks"]
     API --> EPUB["XHTML preview / EPUB package validator"]
     API --> TOC["TOC Editor / stable targets validator"]
-    API --> Structured["Phase 8.1 layout schema / Text-HTML renderer"]
+    API --> Structured["Layout schema / Text-HTML renderer"]
+    API --> Translation["PLANNED / translation provider-validator-review"]
     API --> Cleanup["Retention / single delete / delete all"]
     Manager --> DB[("data/jobs.db / SQLite WAL")]
     Worker --> DB
@@ -154,6 +157,7 @@ flowchart LR
     TOC --> Books[("export/epub: preview / payload / toc.json / metadata / book.epub")]
     EPUB --> Books
     Structured --> Layouts[("export/structured: layout.json / structured.txt / structured.html")]
+    Translation --> Translated[("PLANNED: translation.json / translated Text-HTML-EPUB")]
 ```
 
 ### 2. OCR และการจัดเส้นทางเอกสาร
@@ -211,6 +215,8 @@ flowchart TD
     Sanitize --> Final["export/final.html"]
     Final --> EPUB["EPUB Studio; see diagram 7 & 9"]
     Structured --> EPUB
+    TextSave --> Translation["Planned translation; see diagram 10"]
+    Structured --> Translation
 ```
 
 ไม่มี Autosave; การสลับ Code/Visual รักษาฉบับร่าง การตรวจคำผิด AI และการจัดหัวข้อ HTML AI เป็นคนละงาน: HTML AI เปลี่ยนเฉพาะ tag ไม่แก้หรือสรุปข้อความ
@@ -256,45 +262,35 @@ flowchart LR
     Structured --> EPUB
     Open --> History["Tab 6: previous jobs / retention / delete all"]
     History --> Text
+    Open --> Translation["Planned Translation tab; not implemented"]
 ```
 
 ### 6. HTML AI เบื้องหลังและ progress
 
 ```mermaid
-sequenceDiagram
-    participant UI as Browser
-    participant API as FastAPI
-    participant Task as HtmlAiTasks thread
-    participant LLM as Local LLM
-    participant Disk as export files
-    UI->>API: POST html/ai/start
-    API->>API: Acquire shared AI lock; duplicate job reuses task
-    API-->>UI: 202 with task status
-    API->>Task: Start background thread
-    Task->>LLM: Check availability / model capability
-    Task->>Disk: Save ai_progress.json
-    loop Each annotation batch
-        Task->>LLM: Classify unit tags; reasoning off when supported
-        LLM-->>Task: JSON unit/tag annotations
-        Task->>Task: Validate batch; preserve heading context
-        Task->>Disk: Update completed_chunks / stage / timestamps
-        UI->>API: GET html/ai/progress every 2 seconds
-        API-->>UI: Counts / elapsed / waiting / timeout / error
-    end
-    alt All annotations valid
-        Task->>Task: Validate whole document
-        Task->>Disk: Publish ai.html and export_meta.json
-        Task-->>UI: completed via polling
-    else Offline / timeout / invalid response
-        Task->>Disk: Record failed status; preserve basic.html
-        Task-->>UI: failed with reason via polling
-    end
-    opt User cancels while running
-        UI->>API: POST html/ai/cancel
-        API-->>UI: cancelling
-        Task->>Task: Stop at next cancellation checkpoint
-        Task->>Disk: cancelled; no partial AI publication
-    end
+flowchart TD
+    Start["Browser POST html/ai/start"] --> Lock{"Shared AI lock available?"}
+    Lock -->|No| Busy["Return current task or busy status"]
+    Lock -->|Yes| Task["Start HtmlAiTasks background thread"]
+    Task --> Capability{"Local LLM and model available?"}
+    Capability -->|Yes| Batch["Send next annotation batch"]
+    Batch --> Validate{"Batch JSON and tags valid?"}
+    Validate -->|Yes| Persist["Update ai_progress.json: stage, counts, timestamps"]
+    Persist --> More{"More batches?"}
+    More -->|Yes| Batch
+    More -->|No| Whole["Validate whole document"]
+    Whole --> Publish["Publish ai.html and export_meta.json"]
+    Publish --> Completed["Status completed"]
+    Capability -->|No, offline or timeout| Failed["Status failed; preserve basic.html"]
+    Validate -->|No| Failed
+    Poll["Browser GET html/ai/progress every 2 seconds"] --> Status["Show counts, elapsed, waiting, timeout or error"]
+    Persist --> Status
+    Completed --> Status
+    Failed --> Status
+    Cancel["Browser POST html/ai/cancel"] --> Cancelling["Status cancelling"]
+    Cancelling --> Checkpoint["Stop at cancellation checkpoint"]
+    Checkpoint --> Cancelled["Status cancelled; do not publish partial AI HTML"]
+    Cancelled --> Status
 ```
 
 แบ่งไม่เกิน **25 units / prompt เป้าหมาย 5,500 UTF-8 bytes** ต่อ batch โดยใช้ข้อความตัวอย่างไม่เกิน 120 ตัวอักษรต่อ unit และ `max_tokens=1600`, `temperature=0` คืน tag `p`, `h1`, `h2`, `h3`; ข้อความเต็มยังใช้จากต้นฉบับ ตรวจจำนวน/ID ครบ มี `h1` ได้ไม่เกินหนึ่ง และไม่ข้ามระดับหัวข้อก่อนเผยแพร่
@@ -308,7 +304,7 @@ LM Studio ที่แจ้ง capability รองรับ `reasoning: off` �
 ```mermaid
 flowchart TD
     Source["Choose source: basic / ai / final / structured"] --> Config["Metadata / chapter split / cover drop & thumbnail"]
-    Config --> TOCEdit{"Edit TOC? (Phase 9)"}
+    Config --> TOCEdit{"Edit TOC?"}
     TOCEdit -->|Yes| TOC["Edit label / reorder / level 1-3 / targets; see diagram 9"]
     TOCEdit -->|No| AutoTOC["Default automatic h1-h3 TOC"]
     TOC --> Preview["Generate XHTML preview & canonical payload"]
@@ -379,6 +375,28 @@ flowchart TD
 ```
 
 TOC editor รองรับจัดลำดับและย่อหน้าได้สูงสุด 3 ระดับ เลือกลิงก์ปลายทางจากหัวข้อหรือต้นบท และสร้าง href อัตโนมัติจาก BookModel งานเก่าที่ไม่มี `toc.json` ยังใช้สารบัญอัตโนมัติได้ตามปกติ รูปปกยังคงใช้ storage/API เดิมพร้อม UX ลากวางไฟล์ (Drag-and-drop), แสดง Thumbnail และข้อมูลขนาดไฟล์
+
+### 10. งานแปลเอกสารที่กำลังวางแผน
+
+```mermaid
+flowchart TD
+    Source["Saved final or structured artifact"] --> Segment["Stable block, cell and target segments"]
+    Segment --> Config["Source-target language, style and glossary"]
+    Config --> Provider{"Choose provider"}
+    Provider --> Google["Google Cloud Translation baseline"]
+    Provider --> Local["Local AI translation"]
+    Google --> Hybrid{"Use Hybrid polish?"}
+    Hybrid -->|Yes| Polish["Local AI style polish"]
+    Hybrid -->|No| Validate["Structure and critical-token validator"]
+    Local --> Validate
+    Polish --> Validate
+    Validate --> Terms["Classify terms: translated, preserved or transliterated"]
+    Terms --> Review["Compare source, baseline, AI and manual final"]
+    Review --> Preview["Translated XHTML Quick Preview"]
+    Preview --> Export["Translated Text, HTML and EPUB"]
+```
+
+diagram นี้เป็นแบบออกแบบของงานถัดไปเท่านั้น ยังไม่มี Translation tab/API/worker ในระบบปัจจุบัน
 
 ---
 
@@ -631,7 +649,7 @@ Correct only OCR spelling mistakes in this text. original_text must be copied ex
 
 HTML export ใช้ฟอนต์ระบบในเครื่องและไม่โหลด Google Fonts หรือทรัพยากรภายนอก. โหมด `basic` เป็น deterministic; โหมด `ai` ใช้ได้เมื่อ Local LLM พร้อมและถูกจำกัดให้ทำงานพร้อมกับ OCR+AI ได้ครั้งละหนึ่งงาน. การวัดเวลา/VRAM ของ AI และ precision/recall ของ semantic tags จะรายงานต่อเมื่อมีผลวัด Local LLM จริงและเฉลยระดับ element ที่ผู้ตรวจรับรองแล้วเท่านั้น.
 
-### 6.1 หมวดส่งออกโครงสร้างตารางและรายการ (Structured OCR Export — Phase 8.1)
+### 6.1 หมวดส่งออกโครงสร้างตารางและรายการ (Structured OCR Export)
 
 | Method | Endpoint | พารามิเตอร์ / Body | คำอธิบาย |
 |---|---|---|---|
@@ -639,7 +657,7 @@ HTML export ใช้ฟอนต์ระบบในเครื่องแ�
 | `GET` | `/api/jobs/{job_id}/export/structured/status` | Path: `job_id` | ตรวจสอบสถานะ structured export, ความล้าสมัย (stale) และสถิติโครงสร้าง (ตาราง/เซลล์/รายการ) |
 | `GET` | `/api/jobs/{job_id}/export/structured/{variant}` | Path: `variant` = `text` | `html` | `layout` | ดาวน์โหลดไฟล์ `structured.txt`, `structured.html` หรือ `layout.json` |
 
-### 7. หมวดส่งออก EPUB, XHTML Quick Preview และ TOC Editor (Phase 8 & Phase 9)
+### 7. หมวดส่งออก EPUB, XHTML Quick Preview และ TOC Editor
 
 | Method | Endpoint | พารามิเตอร์ / Body | คำอธิบาย |
 |---|---|---|---|
@@ -655,7 +673,7 @@ HTML export ใช้ฟอนต์ระบบในเครื่องแ�
 
 รูปปกใช้ `cover: {data_base64, alt}` (PNG/JPEG สูงสุด 2 MB) หรือ `{reuse: true, alt}` เพื่อใช้ปกเดิม; metadata รองรับ identifier, description และ date ISO 8601 เพิ่มเติม
 
-Quick Preview ใช้ XHTML ชุดข้อมูลเดียวกับ chapter XHTML ใน EPUB และไม่ใช้ EPUB renderer. Phase 8 ไม่เรียก Local LLM เพิ่มเอง; ถ้าต้องการ semantic structure จาก AI ให้เลือก `ai.html` ที่ผ่าน Phase 7 validator แล้ว.
+Quick Preview ใช้ XHTML ชุดข้อมูลเดียวกับ chapter XHTML ใน EPUB และไม่ใช้ EPUB renderer ระหว่างสร้าง EPUB ระบบไม่เรียก Local LLM เพิ่มเอง; ถ้าต้องการ semantic structure จาก AI ให้เลือก `ai.html` ที่ผ่าน validator แล้ว
 
 ### 8. หมวดบริหารจัดการและล้างข้อมูล (Admin & Retention Cleanup)
 
@@ -701,8 +719,8 @@ OCR/
 │   ├── llm_client.py       # Local LLM client / capability-based HTML reasoning off
 │   ├── html_ai_tasks.py    # Background thread, progress persistence และ cancellation
 │   ├── html_exporter.py    # Structured HTML Export & Strict Allowlist Sanitizer
-│   ├── structured_layout.py # Phase 8.1 Layout Schema 1.0.0, ตาราง (Vector/Scan) และรายการ
-│   ├── toc_editor.py       # Phase 9 Editable TOC Model, Stable Targets และ Revision Conflict
+│   ├── structured_layout.py # Layout Schema 1.0.0, ตาราง (Vector/Scan) และรายการ
+│   ├── toc_editor.py       # Editable TOC Model, Stable Targets และ Revision Conflict
 │   ├── epub_exporter.py    # XHTML Quick Preview, EPUB 3 Packaging & Validator
 │   ├── job_artifact_guard.py # Guard ตรวจสอบความถูกต้องของ artifact และ revision
 │   └── cleanup_service.py  # ลบงานตามคำสั่งจากหน้า History / API
@@ -726,16 +744,12 @@ OCR/
 ├── publish/                # ชุดติดตั้งสำเร็จรูปสำหรับ Deploy บนเครื่องอื่น (ขนาด ~145 MB)
 ├── demo/                   # ชุดเอกสารทดสอบที่ได้รับอนุมัติ (01.pdf–08.pdf, 01.png–02.png, 09.png–13.png)
 ├── tests/                  # ชุดทดสอบอัตโนมัติ (Unit / Regression / Benchmarks)
-│   ├── phase1/ - phase8/   # ชุดทดสอบแยกตาม Phase การพัฒนา
-│   ├── phase8_1/           # ชุดทดสอบ Structured Layout, Table/List, Browser Automation & Readers
-│   ├── phase9/             # ชุดทดสอบ Editable TOC Model, Stable Targets & Stale Guard
 │   ├── test_gemini_acceptance_09.py       # ชุดทดสอบตรวจรับ UI, Visual Editor และ EPUB
 │   ├── test_studio_workspace.py           # Playwright UI & Cross-Browser Automation
 │   ├── test_visual_html.py                # ทดสอบความปลอดภัยและการแปลง Visual HTML
 │   ├── test_clean_installation.py          # สคริปต์ตรวจรับ Clean Environment
 │   └── test_browser_automation_chrome_edge.py # Playwright Cross-browser Automation
-├── phase1/ - phase8_1/     # รายงานผลและหลักฐานการตรวจรับ (Evidence Reports)
-├── checklist.md            # จุดตรวจบังคับและเกณฑ์การตรวจรับราย Phase
+├── checklist.md            # จุดตรวจบังคับและเกณฑ์การตรวจรับ
 ├── manual.md               # คู่มือการติดตั้ง เริ่ม/หยุดระบบ และการบำรุงรักษา
 ├── gemini.md               # บันทึกความเห็นและการออกแบบสถาปัตยกรรม (Read-only)
 ├── gpt.md                  # บันทึกข้อเสนอ ประเด็นคงค้าง และการตรวจรับ
@@ -746,26 +760,26 @@ OCR/
 
 ## ผลการทดสอบและเกณฑ์ตรวจรับ (Verification & Benchmarks)
 
-เอกสารอัปเดต 2026-10-04; ตารางตรวจรับเดิมด้านล่างอ้างอิงหลักฐาน ณ วันที่ 2026-10-03 เพื่อไม่ให้ผลที่ยังไม่มีหลักฐานถูกแสดงเป็นผ่าน
+เอกสารอัปเดต 2026-10-07; ตารางตรวจรับคงผลตามหลักฐานจริง และงานแปลเอกสารยังไม่ถือว่าผ่านก่อนมี implementation กับ quality acceptance
 
-### การตรวจล่าสุด 2026-10-06
+### การตรวจล่าสุด 2026-10-07
 
-- **Phase 8.1 (Structured OCR):** Implementation สมบูรณ์ครบถ้วน Layout Schema 1.0.0, ตรวจจับตารางจาก PDF Vector Geometry และภาพสแกน (Scanned Projection Grid), ตรวจจับรายการ (List Bullet/Numbered), ส่งออก Structured Text/HTML จาก artifact เดิมโดยไม่ต้องรัน OCR/AI ซ้ำ, หน้าจอตรวจเทียบ Dual-Pane พร้อมระบบซูม 50%–200% และไฮไลต์ Bounding Box อัตโนมัติ:
+- **Structured OCR:** ใช้งานได้แล้ว รองรับ Layout Schema 1.0.0, ตารางจาก PDF Vector Geometry และภาพสแกน, รายการ, Structured Text/HTML และหน้าตรวจเทียบต้นฉบับ:
   - Source/publish automated tests ผ่าน 12/12 PASS
   - Browser Automation บน Chrome และ Edge: ผ่าน 100%, reflow ตารางบนหน้าจอมือถือ (430x720) ผ่าน 100%, zero external calls
   - EPUBCheck 5.3.0 ตรวจสอบไฟล์ `.epub` โครงสร้างตาราง: 0 errors, 0 warnings
   - Reader engines (epub.js และ Foliate): แสดงผลตาราง 32 เซลล์และ reflow ถูกต้อง 100%
   - Performance Benchmark: 10 runs ได้ latency p95 = 0.6804s (เกณฑ์ ≤ 5.0s), RSS Memory = 61.15 MB (เกณฑ์ ≤ 256 MB) ผ่านงบอย่างมีประสิทธิภาพ
-- **Phase 9 (Editable EPUB TOC & Stable Targets):**
+- **Editable EPUB TOC & Stable Targets:**
   - Schema 9.0 พร้อม stable target ID (ต้นบท และ heading h1–h3) ป้องกันลิงก์เลื่อนหลุด
   - บันทึก `export/epub/toc.json`, คำนวณ `toc_revision`, ตรวจจับความขัดแย้ง (Conflict HTTP 409), Stale Guard เมื่อ HTML ต้นทางเปลี่ยน และ Auto Re-match
-  - Unit & Integration tests (`tests/phase9/test_toc_editor.py`): 5/5 PASS (0.69s)
-- **HTML AI & Local LLM:** มี regression tests สำหรับ reasoning off, HTML AI batches/progress, ลบทุกงานและ cleanup selection, EPUB automatic download; ผลตรวจรับแต่ละ Phase เดิมยังคงตามหลักฐานด้านล่าง
+  - Source/publish ผ่านฝั่งละ 9/9; EPUB regression ผ่าน 17/17 พร้อม EPUBCheck 5.3.0, epub.js/Foliate และ benchmark
+- **HTML AI & Local LLM:** มี regression tests สำหรับ reasoning off, HTML AI batches/progress, ลบทุกงาน, cleanup selection และ EPUB automatic download
+- **งานปัจจุบัน:** กำลังออกแบบระบบแปลเอกสาร ล็อก input `demo/08.pdf`–`13.png` แล้ว แต่ยังไม่มี implementation, ground truth, ชุดราชการ หรือ quality acceptance
 - ตัวอย่างรันจาก root ด้วย PowerShell (ใช้ environment ที่ติดตั้ง dependencies แล้ว):
 
 ```powershell
-& .\publish\venv\Scripts\python.exe -m unittest tests.phase8_1.test_structured_layout
-& .\publish\venv\Scripts\python.exe -m unittest tests.phase9.test_toc_editor
+& .\publish\venv\Scripts\python.exe -m unittest discover -s tests -p "test_*.py"
 & .\publish\venv\Scripts\python.exe -m tests.test_epub_download_ui
 ```
 
@@ -795,8 +809,8 @@ OCR/
 
 | รายการ | สถานะ | เหตุผลหรือขอบเขตที่เหลือ |
 |---|:---:|---|
-| ชุดเอกสารขยาย 2,185 หน้า | **NOT TESTED** | ต้องประมวลผลครบ ตรวจ disk mapping และจัดทำ ground truth ก่อนรับรอง Phase 2–3 ครอบคลุมไฟล์ขยาย |
-| Benchmark AI สำหรับเอกสารขยาย | **NOT TESTED** | รอ Phase 2 และ ground truth ที่ล็อกแล้ว |
+| ชุดเอกสารขยาย 2,185 หน้า | **NOT TESTED** | ต้องประมวลผลครบ ตรวจ disk mapping และจัดทำ ground truth ก่อนรับรองขอบเขตไฟล์ขยาย |
+| Benchmark AI สำหรับเอกสารขยาย | **NOT TESTED** | รอผล OCR และ ground truth ที่ล็อกแล้ว |
 | งานจริง 100 หน้า: เวลา/RAM/VRAM | **NOT TESTED** | ไม่มีเอกสารทดสอบที่ตรงเงื่อนไขเดิม; ผลเสถียรภาพ 200 หน้าไม่ทดแทนเกณฑ์นี้ |
 | Accept/Revert จากข้อเสนอ AI จริง 10 จุด | **NOT TESTED** | ยังไม่มีเอกสารจริงที่สร้างข้อเสนอได้ครบ 10 จุด |
 | ภาพหมุน 90° / 180° / 270° | **NOT TESTED** | ไม่มีตัวอย่างเอกสารจริงสำหรับตรวจรับ |
@@ -804,9 +818,21 @@ OCR/
 | ติดตั้งบน clean target machine จากศูนย์ | **NOT TESTED** | รอทดสอบบนเครื่องปลายทางจริงหรือจัดเตรียม wheelhouse แบบ offline |
 | HTML Export AI latency / VRAM | **NOT TESTED** | ยังไม่มีผลวัดซ้ำได้จาก Local LLM และตัววัด VRAM; ไม่ใช้ค่าประมาณแทนผลจริง |
 | HTML Export precision / recall | **NOT TESTED** | manifest ปัจจุบันมีเพียงยอดรวม ต้องมีเฉลยระดับ element ที่ผู้ตรวจรับรองก่อนคำนวณ |
-| Browser automation Phase 7 หลังปรับ offline/XSS/download/409 | **PENDING** | โค้ดและ syntax ตรวจแล้ว; รอรัน integration suite ใน workspace แยกเพื่อเก็บหลักฐานใหม่ |
-| Phase 8 EPUB Export & XHTML Quick Preview | **PASSED: 44-PAGE SCOPE** | ผ่านชุดจริง 44 หน้า: roundtrip, EPUBCheck 5.3.0 0 errors/warnings, Chrome/Edge, reader engines 2 ตัว และ benchmark; edge cases จำลองรอข้อยกเว้นชุดข้อมูล |
+| Browser automation หลังปรับ offline/XSS/download/409 | **PENDING** | โค้ดและ syntax ตรวจแล้ว; รอรัน integration suite ใน workspace แยกเพื่อเก็บหลักฐานใหม่ |
+| EPUB Export & XHTML Quick Preview | **PASSED: 44-PAGE SCOPE** | ผ่านชุดจริง 44 หน้า: roundtrip, EPUBCheck 5.3.0 0 errors/warnings, Chrome/Edge, reader engines 2 ตัว และ benchmark; edge cases จำลองรอข้อยกเว้นชุดข้อมูล |
 | การยอมรับข้อจำกัดก่อนใช้งานจริง | **PENDING** | รอเจ้าของงานตรวจผลและยอมรับข้อจำกัดที่ระบุไว้ |
+
+## สถานะปัจจุบันและงานถัดไป
+
+ปัจจุบันระบบ OCR, ตรวจแก้ข้อความ, Structured Text/HTML, XHTML Quick Preview, EPUB และ Editable TOC ใช้งานได้แล้ว งานที่กำลังทำคือออกแบบระบบแปลเอกสาร โดยล็อก input `demo/08.pdf`–`13.png` สำหรับตารางอังกฤษ, จีน+อังกฤษพร้อมศัพท์เฉพาะ, นิยายอังกฤษ และหนังสือสอน IT ที่มี code program
+
+งานถัดไป:
+
+1. สร้าง translation model, provider interface, background worker, API และ Translation tab
+2. รองรับ Google Cloud Translation, Local AI และ Hybrid พร้อม consent, cost estimate และ retry/cancel
+3. รักษา segment/table/TOC/code และแยกศัพท์เป็น `translated`, `preserved` หรือ `transliterated`
+4. สร้าง glossary, do-not-translate, ground truth และเพิ่มตัวอย่างเอกสารราชการ
+5. ตรวจ diff ด้วยคน แล้วทดสอบ Text/HTML/EPUB, Chrome/Edge, EPUBCheck และ reader ก่อนประกาศพร้อมใช้งาน
 
 ## การแก้ปัญหาล่าสุด
 
@@ -833,53 +859,4 @@ OCR/
 
 - ซอร์สโค้ดและระบบเว็บนี้พัฒนาขึ้นเพื่อการใช้งานภายในเครื่อง (Localhost Desktop Utility)
 - ไบนารีและโมเดล OneOCR (`oneocr.dll`, `oneocr.onemodel`, `onnxruntime.dll`) มาจาก Windows 11 Snipping Tool สำหรับการใช้งานส่วนบุคคลบนระบบปฏิบัติการ Windows ที่มีลิขสิทธิ์ถูกต้อง
-
-
-<a id="phase8-phase9-boundary"></a>
-
-## ขอบเขต Phase 8–9 ที่ใช้ร่วมกัน
-
-Phase 8 ดูแล EPUB pipeline, XHTML Preview และรูปปก ส่วน Phase 9 เพิ่มสารบัญแก้มือ, `toc.json` และ stable targets โดยใช้ exporter/validator/ปกเดิม Implementation และ automated acceptance ผ่านแล้ว
-
-ปกคง input สูงสุด 2 MB / 16 megapixels และ canonical PNG สูงสุด 8 MB ใช้ preview payload และ API เดิม Phase 9 ไม่เพิ่ม storage/API ปกอีกชุด; UI เพิ่ม thumbnail, drag-and-drop และรายละเอียดไฟล์
-
-Phase 9 รวม `toc_revision` ใน preview config เดิม งานเก่าไม่มี `toc.json` ใช้สารบัญอัตโนมัติได้ Source/publish 9/9, Phase 8 regression 17/17, EPUBCheck 5.3.0, epub.js/Foliate และ benchmark ผ่าน ดู [checklist](checklist.md#phase-9--แก้ไขสารบัญ-epub-และ-stable-targets-editable-epub-toc) และ [หลักฐาน](phase9/evidence.md)
-
-## Phase 8.1 — Structured OCR
-
-Implementation เสร็จแล้ว: layout schema 1.0.0, vector/scanned table, OCR-to-cell mapping, heading/list, Text/HTML, raw/corrected/final comparison, stale revision และ structured EPUB ใช้งานได้ Source/publish suite ผ่านฝั่งละ 12/12; Chrome/Edge, EPUBCheck 5.3.0, epub.js/Foliate และ benchmark ผ่านทั้งหมด
-
-`demo/04.pdf` ได้ 4 คอลัมน์ × 9 แถว = 36 cells ทั้ง vector และ scanned derivative ส่วน `demo/08.pdf` 11 หน้าได้ 29 tables ระบบคง private-use checkbox glyph 9 จุดเป็น unresolved และไม่เดาค่า สถานะสุดท้ายรอเจ้าของงานยืนยัน ground truth ด้วยคน ดู [checklist](checklist.md#phase8-1), [หลักฐาน](phase8_1/evidence.md) และ [manifest](phase8_1/dataset_manifest.json)
-
-## Phase 9 — Editable EPUB TOC
-
-ระบบแก้ไขสารบัญ EPUB และ Stable Targets พัฒนาต่อยอดบนระบบ EPUB ของ Phase 8:
-- **TOC Data Model (`toc.json`):** รองรับ Schema 9.0, จัดเก็บ entry ID, label, parent ID, level (1–3), order, target ID และสถานะ user-edited / auto-generated พร้อม atomic write
-- **Stable Targets:** ดึง target จากต้นบท (chapter start) และหัวข้อ `h1`–`h3` ภายในเอกสาร กำหนด ID ถาวร ทำให้การแทรกหัวข้อใหม่ไม่ทำให้ลิงก์สารบัญเดิมเลื่อนผิดตำแหน่ง
-- **TOC Web Studio:** ส่วนต่อประสานผู้ใช้ในแท็บ EPUB แสดงรายการสารบัญ รองรับการเพิ่มรายการ, ลบรายการ, แก้ไขชื่อ, เลื่อนลำดับขึ้น/ลง, ปรับระดับชั้น (Indent/Outdent) และเลือกลิงก์ปลายทาง
-- **Revision & Stale Protection:** ทำงานร่วมกับ `source_revision`, `toc_revision` และ `preview_revision`; หากมีการแก้ไข HTML ต้นทาง ระบบจะแจ้งเตือนและทำการ Re-match หัวข้อให้อัตโนมัติ โดยรายการที่ปลายทางหายไปจะขึ้นสถานะ `unresolved` ชัดเจน
-- **EPUB Packaging Sync:** รวมสารบัญที่แก้ไขแล้วเข้าสู่ XHTML Quick Preview และไฟล์ `EPUB/nav.xhtml` ในหนังสือ EPUB โดยตรง ผ่านการทดสอบความถูกต้องและการเปิดอ่านด้วย Reader engines
-
-## Phase 10 — Document Translation
-
-Phase 10 วางแผนให้ผู้ใช้เลือกภาษาต้นทาง/ปลายทางและรูปแบบ `ทั่วไป`, `นิยาย`, `วิชาการ` หรือ `ราชการ` โดยใช้ Google Cloud Translation, Local AI หรือ Hybrid ตามที่เลือก
-
-```mermaid
-flowchart LR
-    Source["Saved final / structured artifact"] --> Segment["Stable block-cell-target segments"]
-    Segment --> Config["Source-target language / style / glossary"]
-    Config --> Provider{"Provider"}
-    Provider --> Google["Google baseline"]
-    Provider --> Local["Local AI"]
-    Google --> Hybrid["Optional AI style polish"]
-    Local --> Validate["Structure / critical-token validator"]
-    Hybrid --> Validate
-    Google --> Validate
-    Validate --> Review["Source / baseline / AI / final diff"]
-    Review --> Export["Translated Text / HTML / EPUB"]
-```
-
-ระบบจะรักษา segment ID, ตาราง, heading และ TOC target เดิม แยก source/Google/AI/manual-final พร้อม revision guard กฎร่วมทุก style คือไม่บังคับแปลทุกคำ โดยศัพท์เฉพาะทาง ชื่อเทคโนโลยี ชื่อผลิตภัณฑ์ ตัวย่อ หรือคำที่แปลแล้วทำให้ความหมายคลาดเคลื่อน สามารถคงคำเดิมหรือใช้คำทับศัพท์ตาม glossary/context ได้ Google/Hybrid ต้อง opt-in เพราะข้อความออกจากเครื่อง ส่วน Local AI ทำงานโดยไม่มี external request การตรวจรับคุณภาพต้องใช้ชุดข้อมูลคู่ภาษาที่ผู้ใช้อนุมัติและ blind human review ดูรายละเอียดใน [Phase 10 checklist](checklist.md#phase-10--แปลเอกสารหลายภาษาและเลือกรูปแบบการแปล-document-translation)
-
-ชุด input ที่ล็อกสำหรับ Phase 10 คือ `demo/08.pdf` ตารางอังกฤษ, `09.png` จีน+อังกฤษพร้อมศัพท์เฉพาะ, `10.png`–`11.png` นิยายอังกฤษ, `12.png` หนังสือสอน IT และ `13.png` หนังสือสอน IT ที่มี code program รายละเอียดและ SHA-256 อยู่ใน `phase10/dataset_manifest.json` ชุดนี้ยังไม่มีเอกสารราชการและยังต้องจัดทำ ground truth ก่อนใช้ตัดสินคุณภาพคำแปล
 
