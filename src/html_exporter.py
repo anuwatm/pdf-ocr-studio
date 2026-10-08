@@ -889,7 +889,7 @@ def generate_ai_html(
 
 class StrictHtmlSanitizer(HTMLParser):
     ALLOWED_TAGS = {"p", "h1", "h2", "h3", "b", "i", "strong", "em", "u", "s", "span", "br", "section", "main", "div", "ul", "ol", "li", "a", "blockquote", "table", "thead", "tbody", "tfoot", "tr", "th", "td", "caption"}
-    ALLOWED_ATTRS = {"id", "class", "data-page", "data-src", "data-edited", "lang", "rowspan", "colspan"}
+    ALLOWED_ATTRS = {"id", "class", "data-page", "data-src", "data-edited", "data-block-id", "data-cell-id", "data-bbox", "lang", "rowspan", "colspan"}
     # Tags that have closing tags and whose inner text must be completely discarded
     DISCARD_CONTENT_TAGS = {"head", "title", "script", "style", "iframe", "object", "svg", "math", "applet", "form", "button", "textarea", "select"}
     # Void/self-closing tags that must simply be dropped without affecting discard depth

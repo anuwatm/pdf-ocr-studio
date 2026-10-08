@@ -36,7 +36,7 @@ OCR worker ต้องแยก process จาก FastAPI เพราะ nativ
 - [x] บันทึก CPU, RAM, GPU, VRAM, Windows และ Snipping Tool version (บันทึก: Windows 11 x64, Snipping Tool 11.2601.0.0, Python 3.10 x64)
 - [x] ยืนยันชนิดเอกสารเป้าหมาย: ตัวพิมพ์ไทย/อังกฤษเป็นขอบเขตตั้งต้น; ลายมือเป็นงานทดลองจนกว่าจะมีผลทดสอบและเกณฑ์แยก
 - [x] ยืนยันว่าตารางใน `.txt` ใช้ tab คั่นคอลัมน์ ไม่รับประกันหน้าตาเหมือน PDF
-- [x] ยืนยันเพดานเริ่มต้น: 50 MB/ไฟล์, 100 หน้า/ไฟล์, 1 งานประมวลผลพร้อมกัน
+- [x] ยืนยันเพดานปัจจุบัน: 300 MB/ไฟล์, 100 หน้า/ไฟล์, 1 งานประมวลผลพร้อมกัน
 - [x] หลัง benchmark กำหนดงบเวลา OCR/หน้า, AI/หน้า, งาน 100 หน้า และ RAM/VRAM สูงสุดบนเครื่องเป้าหมายเป็นตัวเลข ก่อน Phase 4
 - [x] ยืนยันระยะเวลาเก็บเอกสารก่อนเปิดใช้งานจริง (ยืนยัน: TTL 24 ชั่วโมง / 86,400 วินาที)
 - [x] กำหนดรูปแบบตัวแบ่งหน้าและข้อความระบุหน้าล้มเหลว/ยกเลิกสำหรับ export รวมทั้งนโยบาย retention ที่ระบุจุดเริ่มนับอายุ รอบ cleanup และการจัดการงานที่ยังทำอยู่
@@ -198,7 +198,7 @@ aw.txt ที่ประกอบแล้ว; ระบุ tolerance ของ
 - [x] เก็บสถานะ queued/running/completed/partial/failed/cancelled พร้อมความคืบหน้ารายหน้า (จัดเก็บใน src/database.py และส่งผ่าน JobStatusResponse)
 - [x] ใช้นิยามสถานะจาก README แยก OCR/AI/review; OCR สำเร็จแต่ AI ล้มต้องมี raw และเป็น `partial` เมื่อร้องขอ AI ไม่ถือเป็น `completed` (ทดสอบผ่านใน test_fault_and_limits.py)
 - [x] retry เฉพาะขั้นตอนที่ล้มเหลวได้ เช่น AI ล้มไม่ต้องรัน OCR ที่สำเร็จใหม่; retry หลัง cancel ทำได้เมื่อ attempt เดิมสิ้นสุด และห้ามผลเก่าทับ final (รองรับ failed_only, ai_only, full และ increment attempt)
-- [x] จำกัดขนาดไฟล์ จำนวนหน้า เวลา และขนาดภาพที่ decode เพื่อควบคุมหน่วยความจำ (ไฟล์ไม่เกิน 50 MB, อ่านจำนวนหน้า PDF ก่อนเริ่ม, ผู้ใช้เลือกช่วงหน้าได้และระบบแบ่งประมวลผล batch ละ 200 หน้า, ปฏิเสธ encrypted PDF)
+- [x] จำกัดขนาดไฟล์ จำนวนหน้า เวลา และขนาดภาพที่ decode เพื่อควบคุมหน่วยความจำ (ไฟล์ไม่เกิน 300 MB, upload แบบ streaming, อ่านจำนวนหน้า PDF ก่อนเริ่ม, ผู้ใช้เลือกช่วงหน้าได้และระบบแบ่งประมวลผล batch ละ 200 หน้า, ปฏิเสธ encrypted PDF)
 - [x] รองรับลองใหม่เฉพาะหน้าที่ล้มเหลวโดยไม่ทำผลซ้ำ (ทดสอบผ่านใน test_cancellation_and_retry.py)
 - [x] กำหนด transition ของงาน/หน้า, attempt และสิทธิ์อัปเดตผล ผลจาก attempt เก่าห้ามทับผลล่าสุด; เมื่อเริ่มระบบใหม่ตรวจงานค้าง `running` และกู้คืนตามนโยบายที่บันทึกไว้ (ทดสอบผ่านใน test_system_restart_recovery.py และ test_cancellation_and_retry.py)
 - [x] บันทึกผลรายหน้าให้สมบูรณ์ก่อนประกาศสำเร็จ มีการตรวจความสอดคล้องระหว่างไฟล์กับฐานข้อมูลหลัง crash และจัดการดิสก์เต็ม/เขียนไฟล์ล้มเหลว (ตรวจสอบไฟล์จริงก่อนอัปเดต DB รายหน้า)
@@ -228,7 +228,7 @@ aw.txt ที่ประกอบแล้ว; ระบุ tolerance ของ
 
 ### ขั้นตอน
 
-- [x] อัปโหลดด้วยลากวางและปุ่มเลือกไฟล์ (พัฒนาครบถ้วนใน static/index.html และ static/app.js รองรับ dragover, file picker, file size validation <= 50MB)
+- [x] อัปโหลดด้วยลากวางและปุ่มเลือกไฟล์ (พัฒนาครบถ้วนใน static/index.html และ static/app.js รองรับ dragover, file picker, file size validation <= 300 MB)
 - [x] เลือก OCR อย่างเดียว หรือ OCR + AI พร้อมบอกสถานะโมเดล (สวิตช์เลือกโหมดชัดเจน พร้อมตัวตรวจจับสถานะ Local AI model /api/ai/status แบบเรียลไทม์)
 - [x] แสดงคิว จำนวนหน้าที่เสร็จ หน้าที่กำลัง OCR ข้อผิดพลาด และปุ่มยกเลิก/retry (Progress bar, page counter, current-page status, error alert banner, Cancel & Retry dropdown)
 - [x] แสดงภาพต้นฉบับคู่ข้อความและเปลี่ยนหน้าได้ (Dual-pane layout ฝั่งซ้ายภาพต้นฉบับ ฝั่งขวาข้อความ พร้อม Page Switcher dropdown และปุ่ม Prev/Next)
@@ -261,7 +261,7 @@ aw.txt ที่ประกอบแล้ว; ระบุ tolerance ของ
 ### ขั้นตอน
 
 - [x] รันชุดตรวจรับเดิมทั้งระบบหลังล็อกเวอร์ชัน (ผ่านการทดสอบครบ 19/19 รายการใน tests/phase6/ โดยแยกขอบเขตชุดข้อมูลอนุมัติ 44 หน้าออกจากชุดขยาย 2,185 หน้า)
-- [x] ยกเว้นการทดสอบเอกสารจริงกรณีไฟล์เสีย, PDF มีรหัสผ่าน และภาพใหญ่ตามคำสั่งเจ้าของงาน; ระบบต้องดัก error โดยไม่ล้ม: ไฟล์เกิน 50 MB ตอบ HTTP 413, PDF เสียตอบ HTTP 400, PDF มีรหัสผ่านตอบ HTTP 422 และภาพที่เปิดไม่ได้ตอบ error ชัดเจน
+- [x] ยกเว้นการทดสอบเอกสารจริงกรณีไฟล์เสีย, PDF มีรหัสผ่าน และภาพใหญ่ตามคำสั่งเจ้าของงาน; ระบบต้องดัก error โดยไม่ล้ม: ไฟล์เกิน 300 MB ตอบ HTTP 413, PDF เสียตอบ HTTP 400, PDF มีรหัสผ่านตอบ HTTP 422 และภาพที่เปิดไม่ได้ตอบ error ชัดเจน
 - [x] ทดสอบ offline หลังติดตั้ง dependencies และโมเดลครบ (ผ่าน 2/2 รายการใน test_03_offline_and_network_isolation.py ทั้งโหมด OCR อย่างเดียว และโหมด OCR+AI ด้วย Local LLM จริง 3 ภาพและ 3 PDF ภายใต้ Network Isolation โดยมี 0 external network requests)
 - [x] ทดสอบ retention และลบไฟล์ต้นฉบับ ภาพชั่วคราว ผลลัพธ์ตามนโยบาย (ผ่าน 4/4 รายการใน test_04_retention_and_cleanup_coordination.py)
 - [x] กำหนดการประสาน cleanup กับ worker ไม่ลบไฟล์ที่ยังใช้ และไม่ให้ผลที่มาถึงช้าสร้างไฟล์กลับหลังงานถูกลบ (ผ่านใน test_04 โดย Worker หยุดทันทีและไม่สร้างไฟล์กลับ 0 resurrection)
@@ -503,14 +503,14 @@ aw.txt ที่ประกอบแล้ว; ระบุ tolerance ของ
 |---|---|---|
 | EPUB | BookModel, XHTML Preview, package, download, validator และ artifact guard | ส่ง TOC แก้มือเข้า pipeline เดิม |
 | สารบัญ | สร้างอัตโนมัติจาก h1–h3 พร้อม ID deterministic | toc.json, stable targets, แก้ชื่อ/ลำดับ/ระดับ/ปลายทาง และ unresolved |
-| รูปปก | นำเข้า PNG/JPEG, alt, Preview, ฝังปก/landmark, reuse และสร้างแบบไม่มีปก | ปรับ UX เช่น thumbnail/drag-and-drop/ข้อมูลไฟล์ โดยใช้ระบบเดิม |
+| รูปปก | นำเข้า PNG/JPEG, alt, Preview, ฝังปก/landmark, reuse และสร้างแบบไม่มีปก | thumbnail/drag-and-drop/ข้อมูลไฟล์ และเลือกหน้า PDF ต้นฉบับเป็นปก |
 | Revision | source_revision และ preview_revision จาก metadata/config รวม cover_sha256 | เพิ่ม toc_revision ลง config เดิม ไม่สร้าง revision ปกอีกชุด |
 | การตรวจรับ | หลักฐานพื้นฐานและข้อคงค้าง Phase 8 | ตรวจงานใหม่และรัน regression ของระบบร่วมหลังเปลี่ยนโค้ด |
 
-- ปกใช้เพดานเดียว: input สูงสุด **2 MB**, PNG/JPEG, ไม่เกิน **16 megapixels**; re-encode PNG สูงสุด **8 MB** ตาม runtime ปัจจุบัน ไม่ขยายเป็น 10 MB ใน Phase 9
+- [x] หน้าปก EPUB เลือกได้ 2 แบบ: อัปโหลด PNG/JPEG สูงสุด **10 MB** หรือเลือกหน้า PDF ต้นฉบับ 1 หน้าเพื่อแปลงเป็นปก โดยไม่ OCR ซ้ำ; ไม่เกิน **16 megapixels** และ canonical PNG สูงสุด **20 MB**
 - ปกฉบับบันทึกใช้ `preview_payload.json.cover`; `epub_meta.json.cover` เป็นข้อมูลสำหรับแสดงผล ส่วน hash อยู่ใน config `cover_sha256` ไม่สร้าง `cover.{ext}`/`cover_meta.json` เป็นแหล่งข้อมูลคู่ขนาน
-- ใช้ `POST /api/jobs/{job_id}/export/epub/preview` กับ `cover: {data_base64, alt}` หรือ `{reuse: true, alt}` และ `GET /api/jobs/{job_id}/export/epub/cover` เดิม การบันทึกแบบไม่มีปกใช้ preview config ที่ไม่มี cover
-- Phase 9 รุ่นแรกไม่เพิ่ม POST multipart/DELETE cover API; การเปลี่ยน transport/storage หรือเพิ่มเพดานต้องเสนอเป็นงานแยกพร้อมแผน migration ก่อน
+- ใช้ `POST /api/jobs/{job_id}/export/epub/preview` กับ `cover: {data_base64, alt, source_type, source_page}` หรือ `{reuse: true, alt}` และ `GET /api/jobs/{job_id}/export/epub/cover`; การบันทึกแบบไม่มีปกใช้ preview config ที่ไม่มี cover
+- การเลือกหน้า PDF ใช้ `GET .../cover/pdf-pages` เพื่อตรวจช่วง และ `GET .../cover/pdf-page/{page_num}` เพื่อ render หน้าที่ระบุ โดยไม่เพิ่ม storage ปกคู่ขนาน
 - ปก/metadata/config ที่แก้ค้างต้องเตือนและบล็อก package จนบันทึก Preview ใหม่; TOC draft ใหม่ใช้กฎเดียวกัน การบันทึก TOC ต้องคงปก/metadata/chapter split เดิมหากผู้ใช้ไม่ได้แก้
 - การผ่าน Phase 9 ไม่ปิด checkbox คงค้างของ Phase 8 และไม่ถือว่าได้รับข้อยกเว้น fixture จำลอง
 
@@ -539,6 +539,8 @@ aw.txt ที่ประกอบแล้ว; ระบุ tolerance ของ
 ### 8.1.2 Text / HTML / EPUB
 
 - [x] เพิ่ม API/UI ส่งออก Text / HTML หลัง OCR จาก `ocr.json` เดิมโดยไม่เรียก OCR/Local AI ใหม่
+- [x] หน้า Upload แสดงปุ่ม `OCR เป็น Text` และ `OCR เป็น HTML` หลังตรวจจำนวนหน้า; HTML ใช้งาน OCR job เดียวกันแล้วสร้าง structured artifact และเปิดหน้าตรวจผลอัตโนมัติ
+- [x] Structured OCR เปิดผลใน HTML Studio ได้ทั้ง Code/Visual; บันทึกเป็น `final.html` ผ่าน sanitizer/revision guard และรักษา block/cell/bbox/rowspan/colspan
 - [x] Text ตารางใช้ tab-separated รักษาเซลล์ว่าง/ขอบเขตแถว และรักษา marker ของรายการ
 - [x] HTML สร้าง table/thead/tbody/tr/th/td และ ul/ol/li จริง พร้อมย่อหน้า
 - [x] Escape เนื้อหา/attribute, จำกัด 20,000 cells/100,000 blocks; คง sandbox/CSP และ browser test ยืนยัน zero external calls
@@ -647,7 +649,7 @@ aw.txt ที่ประกอบแล้ว; ระบุ tolerance ของ
 - [x] ปฏิเสธ 0 entries, target ไม่ถูกต้อง, label ว่าง, เกิน 3 ระดับ, orphan และ cycle ก่อนบันทึก/package
 - [x] ทดสอบ re-match สำเร็จ/กำกวม/target หาย และยกเลิก โดยไม่สูญ draft
 - [x] ทดสอบสองแท็บ/409, response ช้าไม่ปนงาน, source/config เปลี่ยนระหว่าง save/package และยกเลิก regenerate
-- [x] UX ปก thumbnail/alt/ข้อมูลไฟล์ตรงกับปกที่เลือก; dirty state, เพดาน 2 MB และไม่มี external calls
+- [x] UX ปก thumbnail/ภาพขนาดใหญ่/alt/ข้อมูลไฟล์ตรงกับปกที่เลือก; แยกสถานะเลือกแล้วกับบันทึกใน XHTML Preview แล้ว, dirty state, เพดาน upload 10 MB, จำเลขหน้า PDF และไม่มี external calls
 - [x] Browser Chrome/Edge ครอบคลุม editor/save/reload/target/stale/conflict/mobile/keyboard พร้อม network log
 
 Regression ของ Phase 8 หลังเปลี่ยนระบบร่วม — ต้องทดสอบซ้ำ ไม่ใช่งานพัฒนาระบบพื้นฐานใหม่:

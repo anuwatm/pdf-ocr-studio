@@ -4,9 +4,9 @@
 window.createVisualEditor = ({getValue, onChange, onSave, canEdit}) => {
   const frame = document.getElementById("html-visual-frame");
   const toolbar = document.getElementById("html-visual-toolbar");
-  const allowedTags = new Set(["P", "H1", "H2", "H3", "B", "I", "STRONG", "EM", "U", "S", "SPAN", "BR", "SECTION", "MAIN", "DIV", "UL", "OL", "LI", "A", "BLOCKQUOTE"]);
+  const allowedTags = new Set(["P", "H1", "H2", "H3", "B", "I", "STRONG", "EM", "U", "S", "SPAN", "BR", "SECTION", "MAIN", "DIV", "UL", "OL", "LI", "A", "BLOCKQUOTE", "TABLE", "THEAD", "TBODY", "TFOOT", "TR", "TH", "TD", "CAPTION"]);
   const discardTags = new Set(["SCRIPT", "STYLE", "IFRAME", "OBJECT", "SVG", "MATH", "APPLET", "FORM", "BUTTON", "TEXTAREA", "SELECT", "TEMPLATE"]);
-  const allowedAttrs = new Set(["id", "class", "data-page", "data-src", "data-edited", "lang"]);
+  const allowedAttrs = new Set(["id", "class", "data-page", "data-src", "data-edited", "data-block-id", "data-cell-id", "data-bbox", "lang", "rowspan", "colspan"]);
   let sourceDocument;
   let selectionRange;
   let loadedValue;

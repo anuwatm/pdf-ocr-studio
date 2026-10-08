@@ -32,9 +32,12 @@
 ### โหมด OCR และ Local AI
 
 - ค่าเริ่มต้นคือ **OneOCR อย่างเดียว (Baseline)** จึงใช้งาน OCR ได้แม้ไม่ได้เปิด Local LLM
+- อัปโหลดเอกสาร PDF/PNG/JPG/JPEG ได้สูงสุด **300 MB ต่อไฟล์**; Backend อ่านข้อมูลแบบ streaming และตอบ HTTP 413 เมื่อเกินเพดาน
 - เลือกช่วงหน้าเริ่มต้น–สิ้นสุดได้ตามจำนวนหน้าของเอกสาร; ระบบแบ่งทำงานเป็น **batch ละ 200 หน้า** ต่อเนื่องจนจบช่วงที่เลือก
 - ก่อนเริ่มงานเลือกได้ว่าจะใส่หัวข้อเลขหน้า เช่น `--- Page 1 ---` ในไฟล์ข้อความรวม (`raw.txt`, `corrected.txt`, `final.txt`) หรือไม่; ค่าเริ่มต้นคือใส่
 - เลือก PDF แล้วระบบจะอัปโหลดและตรวจจำนวนหน้าทันที; งานที่ยกเลิกสามารถเริ่มต่อเฉพาะหน้าที่ยังไม่เสร็จได้
+- หลังตรวจจำนวนหน้า หน้า Upload จะแสดง `OCR เป็น Text` และ `OCR เป็น HTML`; ทั้งสองทาง OCR เพียงครั้งเดียว โดยตัวเลือก HTML สร้าง Structured HTML จาก artifact เดิมแล้วเปิดหน้าตรวจผลอัตโนมัติ
+- หน้า Structured OCR มีปุ่ม `เปิดใน HTML Studio` เพื่อแก้ Structured HTML ผ่าน CodeMirror หรือ Visual Editor; เมื่อบันทึกจะสร้าง `final.html` ผ่าน sanitizer และ revision guard โดยรักษา table/block/cell mapping
 - เมื่อ OCR แต่ละหน้าเสร็จ หน้า Preview จะเปลี่ยนไปแสดงภาพและข้อความของหน้านั้นทันที
 - เมื่อ Local AI เป็น Offline ระบบจะล็อก **OneOCR + Local AI ตรวจแก้คำ** ไว้
 - กด **ทดสอบการเชื่อมต่อ** ข้างสถานะ Local AI; เมื่อเชื่อมต่อและพบโมเดลแล้ว ตัวเลือก AI จะถูกปลดล็อก
@@ -105,7 +108,7 @@
 9. **EPUB 3 Export, XHTML Quick Preview และ Editable TOC Editor:**
    - เลือก `basic.html`, `ai.html`, `final.html` หรือ `structured.html` เป็นฐาน แล้วตรวจ XHTML Quick Preview พร้อมโครงสร้างสารบัญก่อนสร้างไฟล์ `.epub`; เมื่อสร้างสำเร็จเบราว์เซอร์ดาวน์โหลดอัตโนมัติ
    - EPUB 3 แบบ reflowable มีสารบัญ, metadata, CSS ภาษาไทยภายในไฟล์, ระบบตรวจจับ stale revision และ internal package validator (สอดคล้องกับ EPUBCheck 5.3.0) ตรวจสอบความถูกต้อง
-   - **Cover Drag-and-Drop & Thumbnail:** ลากวางไฟล์รูปปก (PNG/JPEG สูงสุด 2 MB) แสดงภาพตัวอย่าง Thumbnail พร้อมขนาดไฟล์และมิติรูปภาพ รองรับการสร้างแบบไม่มีปก หรือนำรูปปกเดิมมาใช้ซ้ำ (Reuse)
+   - **EPUB Cover:** เลือกได้ 2 แบบ: อัปโหลด PNG/JPEG สูงสุด 10 MB หรือนำหน้าใดหน้าหนึ่งของ PDF ต้นฉบับมาแปลงเป็นรูปปก แสดง Thumbnail ที่กดดูภาพขนาดใหญ่ได้ และแยกสถานะ `เลือกเป็นหน้าปกแล้ว` ออกจาก `บันทึกใน XHTML Preview แล้ว`
    - **Editable TOC & Stable Targets:** สตูดิโอแก้ไขสารบัญ EPUB ปรับแต่งชื่อ (Label), สลับลำดับ (Reorder), จัดโครงสร้างชั้นลำดับ (Level 1–3), เลือกลิงก์ปลายทาง (Target) จากต้นบทหรือหัวข้อ h1–h3 พร้อม stable target ID ป้องกันลิงก์เลื่อนหลุด และระบบ Re-match อัตโนมัติเมื่อเนื้อหา HTML เปลี่ยนแปลง
 10. **Minimal Web Studio และ Visual Editor แบบ Word:**
     - Light theme เป็นค่าเริ่มต้น สลับ Dark ได้ พร้อม icon ปุ่ม, focus state และ responsive layout
@@ -125,25 +128,27 @@
 
 ## สถาปัตยกรรมและแผนภาพการทำงาน (Architecture & Diagrams)
 
-อัปเดตวันที่ 2026-10-07: OCR ใช้ subprocess, HTML AI ใช้ background thread, Structured OCR สร้าง layout/Text/HTML จาก artifact เดิม และ EPUB รองรับ XHTML Quick Preview กับ Editable TOC งานที่กำลังวางแผนคือ Document Translation ซึ่งยังไม่มี tab/API/worker ใช้งานจริง
+อัปเดตวันที่ 2026-10-09: อัปโหลด PDF/PNG/JPG/JPEG ได้สูงสุด 300 MB, OCR ใช้ subprocess, Structured OCR เปิดแก้ใน HTML Studio ได้ และ EPUB รองรับหน้าปกทั้งไฟล์อัปโหลดกับหน้า PDF ต้นฉบับพร้อมภาพตัวอย่างขนาดใหญ่ งานถัดไปคือ Document Translation ซึ่งยังไม่มี tab/API/worker ใช้งานจริง
 
 ### 1. สถาปัตยกรรมระบบ
 
 ```mermaid
 flowchart LR
-    UI["Browser: 6 tabs / Light-Dark / Icons"] --> API["FastAPI / loopback"]
+    UI["Browser: 6 tabs / Upload สูงสุด 300 MB"] --> API["FastAPI / 127.0.0.1"]
     API --> Templates["index + text + html + epub + structured partials"]
+    API --> Upload["Streaming upload / format-size-page validation"]
     API --> Manager["JobManager / queue supervisor"]
     Manager --> Worker["OCR worker subprocess"]
-    Worker --> Pipeline["PDF routing / OneOCR / AI correction"]
+    Worker --> Pipeline["PDF routing / OneOCR / optional AI correction"]
     API --> Tasks["HtmlAiTasks / background thread"]
     Tasks --> Exporter["HTML batches / annotation validator"]
     Manager --> Lock["Shared AI lock"]
     Tasks --> Lock
     Pipeline --> LLM["Local LLM / loopback"]
     Exporter --> LLM
-    API --> Editor["Sanitizer / revision conflict checks"]
-    API --> EPUB["XHTML preview / EPUB package validator"]
+    API --> Editor["HTML Studio / sanitizer / revision guard"]
+    API --> EPUB["XHTML preview / cover renderer / EPUB validator"]
+    EPUB --> CoverUX["Cover thumbnail / large modal / selected-saved status"]
     API --> TOC["TOC Editor / stable targets validator"]
     API --> Structured["Layout schema / Text-HTML renderer"]
     API --> Translation["PLANNED / translation provider-validator-review"]
@@ -151,11 +156,12 @@ flowchart LR
     Manager --> DB[("data/jobs.db / SQLite WAL")]
     Worker --> DB
     Cleanup --> DB
-    Worker --> Files[("files/job_id: input / pages / text / JSON")]
+    Upload --> Files[("files/job_id: input สูงสุด 300 MB / pages / text / JSON")]
+    Worker --> Files
     Exporter --> Exports[("export: basic / ai / final HTML / metadata / AI progress")]
     Editor --> Exports
     TOC --> Books[("export/epub: preview / payload / toc.json / metadata / book.epub")]
-    EPUB --> Books
+    CoverUX --> Books
     Structured --> Layouts[("export/structured: layout.json / structured.txt / structured.html")]
     Translation --> Translated[("PLANNED: translation.json / translated Text-HTML-EPUB")]
 ```
@@ -164,10 +170,14 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    Upload["Upload PDF / image; create queued DB record"] --> Count["Read page count; choose page range"]
+    Upload["เลือก PDF / PNG / JPG / JPEG"] --> Limit{"ชนิดถูกต้องและไม่เกิน 300 MB?"}
+    Limit -->|No| Reject["Frontend block หรือ Backend HTTP 413"]
+    Limit -->|Yes| Stream["Streaming upload 64 KB/chunk; create queued job"]
+    Stream --> Count["Read page count; choose page range"]
     Count --> Choice{"Action"}
     Choice -->|PDF images ZIP| Images["Render PNG 200 DPI; download ZIP without OCR"]
-    Choice -->|Start OCR| Queue["Dispatch job to supervisor queue"]
+    Choice -->|OCR เป็น Text| Queue["Dispatch one OCR job to supervisor queue"]
+    Choice -->|OCR เป็น HTML| Queue
     Queue --> Batch["Worker: batches of 200 pages"]
     Batch --> Page{"Page routing"}
     Page -->|Blank| Blank["Record blank page"]
@@ -182,7 +192,10 @@ flowchart TD
     Save --> Preview["Browser updates completed-page preview"]
     Preview --> More{"More selected pages"}
     More -->|Yes| Batch
-    More -->|No| Final["Assemble text / JSON; downloadable results"]
+    More -->|No| Final["Assemble text / ocr.json once"]
+    Final --> Output{"Selected output"}
+    Output -->|Text| TextOut["Text Studio / downloads"]
+    Output -->|HTML| StructuredOut["Generate Structured HTML from saved artifacts"]
 ```
 
 งานถูกสร้างตั้งแต่อัปโหลด แต่เริ่ม worker เมื่อกดเริ่มแปลงหน้า แบ่ง OCR ละ 200 หน้าเพื่อคืนทรัพยากรระหว่าง batch; preview ไม่ทับข้อความแก้มือที่ยังไม่บันทึก
@@ -199,7 +212,7 @@ flowchart TD
     Review --> Accept["Accept / Revert / manual edit"]
     Accept --> TextSave["Save final.txt / revision check"]
     TextSave --> Basic["Generate deterministic basic.html"]
-    Raw --> Structured["Generate structured layout / Text / HTML; see diagram 8"]
+    Raw --> Structured["Generate structured layout / Text / HTML from saved OCR"]
     Structured --> Compare["Compare source page & semantic result / bbox selection"]
     Basic --> AI["Optional background HTML AI; see diagram 6"]
     Basic --> Code["CodeMirror HTML editor"]
@@ -214,6 +227,8 @@ flowchart TD
     Revision -->|Yes| Sanitize["Remove unsafe HTML / head / title"]
     Sanitize --> Final["export/final.html"]
     Final --> EPUB["EPUB Studio; see diagram 7 & 9"]
+    Structured --> OpenStudio["Open Structured HTML in HTML Studio"]
+    OpenStudio --> Code
     Structured --> EPUB
     TextSave --> Translation["Planned translation; see diagram 10"]
     Structured --> Translation
@@ -225,7 +240,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    Upload["Upload: queued record"] --> Start["Start: dispatch worker"]
+    Upload["Validated upload up to 300 MB: queued"] --> Start["Start Text or HTML: dispatch worker"]
     Start --> Running["running"]
     Running --> Done["completed / partial / failed / cancelled"]
     Running --> Restart["Server restart: interrupted-job recovery"]
@@ -252,13 +267,18 @@ flowchart TD
 ```mermaid
 flowchart LR
     Open["Open localhost:8000"] --> Upload["Tab 1: upload / range / OCR mode"]
-    Upload --> Text["Tab 2: OCR progress / preview / text review"]
+    Upload --> Choice{"OCR เป็น Text หรือ HTML"}
+    Choice --> Text["Tab 2: one OCR run / progress / text review"]
     Text --> Save["Save final text / download text or ZIP"]
     Save --> HTML["Tab 3: Basic or AI HTML / progress / Code-Visual editor"]
     HTML --> Final["Save final HTML / download"]
-    Final --> EPUB["Tab 4: EPUB config / TOC editor / XHTML preview / cover"]
-    EPUB --> Download["Create EPUB / automatic download"]
-    Text --> Structured["Tab 5: structured Text-HTML / source comparison"]
+    Final --> EPUB["Tab 4: EPUB config / TOC / XHTML preview / 2 cover modes"]
+    EPUB --> CoverPreview["Cover thumbnail / large view / selected then saved"]
+    CoverPreview --> Download["Create EPUB / automatic download"]
+    Choice --> Structured["Tab 5: structured Text-HTML from same OCR artifacts"]
+    Text --> Structured
+    Structured --> Studio["Open Structured HTML in HTML Studio"]
+    Studio --> HTML
     Structured --> EPUB
     Open --> History["Tab 6: previous jobs / retention / delete all"]
     History --> Text
@@ -269,7 +289,7 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    Start["Browser POST html/ai/start"] --> Lock{"Shared AI lock available?"}
+    Start["POST /api/jobs/job_id/export/html/ai/start"] --> Lock{"Shared AI lock available?"}
     Lock -->|No| Busy["Return current task or busy status"]
     Lock -->|Yes| Task["Start HtmlAiTasks background thread"]
     Task --> Capability{"Local LLM and model available?"}
@@ -283,11 +303,11 @@ flowchart TD
     Publish --> Completed["Status completed"]
     Capability -->|No, offline or timeout| Failed["Status failed; preserve basic.html"]
     Validate -->|No| Failed
-    Poll["Browser GET html/ai/progress every 2 seconds"] --> Status["Show counts, elapsed, waiting, timeout or error"]
+    Poll["GET .../html/ai/progress every 2 seconds"] --> Status["Show counts, elapsed, waiting, timeout or error"]
     Persist --> Status
     Completed --> Status
     Failed --> Status
-    Cancel["Browser POST html/ai/cancel"] --> Cancelling["Status cancelling"]
+    Cancel["POST .../html/ai/cancel"] --> Cancelling["Status cancelling"]
     Cancelling --> Checkpoint["Stop at cancellation checkpoint"]
     Checkpoint --> Cancelled["Status cancelled; do not publish partial AI HTML"]
     Cancelled --> Status
@@ -303,18 +323,28 @@ LM Studio ที่แจ้ง capability รองรับ `reasoning: off` �
 
 ```mermaid
 flowchart TD
-    Source["Choose source: basic / ai / final / structured"] --> Config["Metadata / chapter split / cover drop & thumbnail"]
-    Config --> TOCEdit{"Edit TOC?"}
+    Source["Choose source: basic / ai / final / structured"] --> Config["Metadata / chapter split"]
+    Config --> Cover{"Cover source"}
+    Cover -->|Upload| CoverFile["PNG/JPEG สูงสุด 10 MB"]
+    Cover -->|PDF page| PdfInfo["Read source PDF page count"]
+    PdfInfo --> PdfPage["Render exact selected page to PNG"]
+    Cover -->|No cover| TOCEdit{"Edit TOC?"}
+    CoverFile --> Selected["Thumbnail / เลือกเป็นหน้าปกแล้ว"]
+    PdfPage --> Selected
+    Selected --> Large["Optional large modal / close button, backdrop or Escape"]
+    Selected --> TOCEdit
+    Large --> TOCEdit
     TOCEdit -->|Yes| TOC["Edit label / reorder / level 1-3 / targets; see diagram 9"]
     TOCEdit -->|No| AutoTOC["Default automatic h1-h3 TOC"]
-    TOC --> Preview["Generate XHTML preview & canonical payload"]
+    TOC --> Preview["Generate XHTML preview & persist canonical cover/config"]
     AutoTOC --> Preview
-    Preview --> Review["Review chapters / table of contents / source view"]
+    Preview --> Saved["บันทึกใน XHTML Preview แล้ว"]
+    Saved --> Review["Review chapters / table of contents / source view"]
     Review --> Build["Create EPUB with base_preview_revision"]
     Build --> Revision{"Source, TOC and preview revisions match"}
     Revision -->|No| Stale["409 / stale; update TOC or regenerate preview"]
     Stale --> Preview
-    Revision -->|Yes| Package["Build mimetype / OPF / nav / CSS / chapters / cover"]
+    Revision -->|Yes| Package["Build mimetype / OPF / nav / CSS / chapters / canonical PNG cover"]
     Package --> Validate["Internal package validator (EPUBCheck 5.3.0 compliant)"]
     Validate --> Ready["Publish export/epub/book.epub; epub_ready"]
     Ready --> Fetch["Browser fetches download endpoint"]
@@ -323,7 +353,7 @@ flowchart TD
     Check -->|No| Error["Show download error; keep manual download link when ready"]
 ```
 
-กด **สร้างไฟล์ EPUB** แล้วดาวน์โหลดอัตโนมัติ และมีลิงก์ดาวน์โหลดซ้ำ เมื่อแก้ HTML ต้นทางหรือแก้ไขสารบัญต้องสร้าง preview ใหม่ก่อน package; ไม่เรียก AI เพิ่มระหว่างสร้าง EPUB การผ่าน internal validator สอดคล้องกับมาตรฐาน EPUBCheck 5.3.0
+กด **สร้างไฟล์ EPUB** แล้วดาวน์โหลดอัตโนมัติ และมีลิงก์ดาวน์โหลดซ้ำ หน้าปกเลือกได้ระหว่างอัปโหลด PNG/JPEG สูงสุด 10 MB, render หน้า PDF ต้นฉบับตามเลขหน้าที่ระบุ หรือสร้างแบบไม่มีปก เมื่อแก้ HTML ต้นทาง สารบัญ หรือหน้าปก ต้องสร้าง preview ใหม่ก่อน package; ไม่เรียก OCR/AI เพิ่มระหว่างสร้าง EPUB
 
 ### 8. Structured OCR และหน้าตรวจเทียบ
 
@@ -344,16 +374,19 @@ flowchart TD
     TabFallback --> Model
     Reuse --> Model
     Model --> Text["Tab-separated structured.txt"]
-    Model --> HTML["Sandboxed semantic structured.html (table / ul / ol / h1-h3)"]
+    Model --> HTML["Semantic structured.html (table / ul / ol / h1-h3)"]
     Model --> JSON["layout.json"]
     Variants["raw.txt / corrected.txt / final.txt"] --> CompareUI["Dual-pane comparison viewer"]
     HTML --> CompareUI
     CompareUI --> Interactive["Select page / zoom (50%-200%) / click block or cell"]
     Interactive --> Highlight["Highlight exact BBox overlay on source PDF / image"]
+    HTML --> Studio["Open in HTML Studio: CodeMirror or Visual Editor"]
+    Studio --> FinalHTML["Sanitize + revision guard -> final.html"]
     HTML --> EPUBPipe["Structured XHTML export to EPUB pipeline"]
+    FinalHTML --> EPUBPipe
 ```
 
-การส่งออกจาก artifact เดิมไม่เรียก OCR หรือ Local AI เพิ่ม งานที่ไม่มี bbox หรือ glyph ที่ตีความไม่ได้แสดง unresolved ตามจริง รองรับ vector/scanned table, raw/corrected/final, semantic HTML และ structured EPUB พร้อม stale guard
+การส่งออกจาก artifact เดิมไม่เรียก OCR หรือ Local AI เพิ่ม งานที่ไม่มี bbox หรือ glyph ที่ตีความไม่ได้แสดง unresolved ตามจริง รองรับ vector/scanned table, raw/corrected/final, semantic HTML และ structured EPUB พร้อม stale guard ผู้ใช้เปิด Structured HTML ใน HTML Studio เพื่อแก้ด้วย CodeMirror หรือ Visual Editor แล้วบันทึกเป็น `final.html` ได้
 
 ### 9. Editable TOC และ stable targets
 
@@ -367,22 +400,24 @@ flowchart TD
     Validate -->|Yes| Save["Atomic toc.json + toc_revision calculation"]
     HTML --> Rematch["Source HTML changed: stable-ID then unique-key re-match"]
     Rematch --> Editor
-    Save --> Preview["Update XHTML Quick Preview TOC"]
+    Save --> Preview["Update XHTML Quick Preview with persisted cover/config"]
     Save --> Nav["Update EPUB nav.xhtml"]
     Preview --> Guard{"Source + TOC + Preview revisions match?"}
     Guard -->|No| Stale9["HTTP 409 / stale warning; regenerate preview"]
-    Guard -->|Yes| Package9["Build package with EPUB exporter; automatic download"]
+    Guard -->|Yes| Package9["Build package with TOC, chapters and selected cover; automatic download"]
 ```
 
-TOC editor รองรับจัดลำดับและย่อหน้าได้สูงสุด 3 ระดับ เลือกลิงก์ปลายทางจากหัวข้อหรือต้นบท และสร้าง href อัตโนมัติจาก BookModel งานเก่าที่ไม่มี `toc.json` ยังใช้สารบัญอัตโนมัติได้ตามปกติ รูปปกยังคงใช้ storage/API เดิมพร้อม UX ลากวางไฟล์ (Drag-and-drop), แสดง Thumbnail และข้อมูลขนาดไฟล์
+TOC editor รองรับจัดลำดับและย่อหน้าได้สูงสุด 3 ระดับ เลือกลิงก์ปลายทางจากหัวข้อหรือต้นบท และสร้าง href อัตโนมัติจาก BookModel งานเก่าที่ไม่มี `toc.json` ยังใช้สารบัญอัตโนมัติได้ตามปกติ รูปปกรองรับทั้งการลากวาง PNG/JPEG สูงสุด 10 MB และการเลือกหน้า PDF ต้นฉบับเพื่อแปลงเป็นภาพปก โดยไม่เรียก OCR ซ้ำ
 
 ### 10. งานแปลเอกสารที่กำลังวางแผน
 
 ```mermaid
 flowchart TD
-    Source["Saved final or structured artifact"] --> Segment["Stable block, cell and target segments"]
+    Planned["PLANNED: no Translation tab/API/worker yet"] --> Source["Saved final or structured artifact"]
+    Source --> Segment["Stable block, cell and target segments"]
     Segment --> Config["Source-target language, style and glossary"]
-    Config --> Provider{"Choose provider"}
+    Config --> Style["Style: general / novel / academic / official"]
+    Style --> Provider{"Choose provider"}
     Provider --> Google["Google Cloud Translation baseline"]
     Provider --> Local["Local AI translation"]
     Google --> Hybrid{"Use Hybrid polish?"}
@@ -390,7 +425,7 @@ flowchart TD
     Hybrid -->|No| Validate["Structure and critical-token validator"]
     Local --> Validate
     Polish --> Validate
-    Validate --> Terms["Classify terms: translated, preserved or transliterated"]
+    Validate --> Terms["Keep technical terms when needed: translated / preserved / transliterated"]
     Terms --> Review["Compare source, baseline, AI and manual final"]
     Review --> Preview["Translated XHTML Quick Preview"]
     Preview --> Export["Translated Text, HTML and EPUB"]
@@ -608,7 +643,7 @@ Correct only OCR spelling mistakes in this text. original_text must be copied ex
 
 | Method | Endpoint | พารามิเตอร์ / Body | คำอธิบาย |
 |---|---|---|---|
-| `POST` | `/api/upload` | Multipart/form-data:<br>• `file`: ไฟล์ PDF / รูปภาพ<br>• `max_pages_limit`: (optional)<br>• `max_size_limit`: (optional) | อัปโหลดและตรวจสอบไฟล์ ตรวจสอบความปลอดภัย สร้าง `job_id` |
+| `POST` | `/api/upload` | Multipart/form-data:<br>• `file`: ไฟล์ PDF / รูปภาพ สูงสุด 300 MB<br>• `max_pages_limit`: (optional)<br>• `max_size_limit`: (optional; ลดเพดานลงได้) | อัปโหลดแบบ streaming และตรวจสอบไฟล์ ตรวจสอบความปลอดภัย สร้าง `job_id`; เกินเพดานคืน 413 |
 | `POST` | `/api/jobs/{job_id}/start` | JSON: `{ enable_ai: true, page_start?: 1, page_end?: N, include_page_numbers?: true }` | นำงานเข้าคิวประมวลผล OneOCR / Local AI |
 | `GET` | `/api/jobs/{job_id}/status` | Path: `job_id` | เช็คสถานะงานโดยละเอียดระดับหน้าและ latency |
 | `POST` | `/api/jobs/{job_id}/cancel` | Path: `job_id` | ยกเลิกงานที่กำลังรันหรือรอคิว พร้อมหยุด Worker ทันที |
@@ -666,12 +701,14 @@ HTML export ใช้ฟอนต์ระบบในเครื่องแ�
 | `PUT` | `/api/jobs/{job_id}/export/epub/toc` | JSON: `{ entries, base_source_revision, base_toc_revision, base_preview_revision }` | ตรวจและบันทึกสารบัญแบบ atomic; revision ไม่ตรงคืน 409 |
 | `POST` | `/api/jobs/{job_id}/export/epub/toc/regenerate` | JSON: base revisions และ `confirm: true` | สร้างสารบัญอัตโนมัติใหม่โดยยืนยันก่อนทับ |
 | `GET` | `/api/jobs/{job_id}/export/epub/cover` | Path: `job_id` | รูปปก PNG ที่ sanitize แล้วผ่าน loopback; nosniff/no-store |
+| `GET` | `/api/jobs/{job_id}/export/epub/cover/pdf-pages` | Path: `job_id` | อ่านจำนวนหน้าจาก PDF ต้นฉบับสำหรับตัวเลือกหน้าปก |
+| `GET` | `/api/jobs/{job_id}/export/epub/cover/pdf-page/{page_num}` | Path: `job_id`, `page_num` | แปลงหน้า PDF ที่ระบุเป็น PNG สำหรับ Thumbnail และหน้าปก; หน้าเกินช่วงคืน 422 |
 | `GET` | `/api/jobs/{job_id}/export/epub/preview` | Path: `job_id` | แสดง XHTML Quick Preview พร้อม CSP sandbox และ nosniff |
 | `POST` | `/api/jobs/{job_id}/export/epub` | JSON: `{ base_preview_revision }` | ตรวจ revision แล้ว package EPUB; คืน 409 เมื่อต้นทางหรือ Preview เปลี่ยน |
 | `GET` | `/api/jobs/{job_id}/export/epub/status` | Path: `job_id` | ตรวจ `preview_ready`, `ready`, `stale`, validation และ file metadata |
 | `GET` | `/api/jobs/{job_id}/export/epub/download` | Path: `job_id` | ดาวน์โหลด `.epub` แบบ attachment ชื่อ UTF-8 |
 
-รูปปกใช้ `cover: {data_base64, alt}` (PNG/JPEG สูงสุด 2 MB) หรือ `{reuse: true, alt}` เพื่อใช้ปกเดิม; metadata รองรับ identifier, description และ date ISO 8601 เพิ่มเติม
+รูปปกใช้ `cover: {data_base64, alt, source_type, source_page}` โดยไฟล์อัปโหลดรองรับ PNG/JPEG สูงสุด 10 MB และ `source_type=pdf_page` ระบุหน้า PDF ต้นฉบับที่นำมาแปลง หรือใช้ `{reuse: true, alt}` เพื่อใช้ปกเดิม; metadata รองรับ identifier, description และ date ISO 8601 เพิ่มเติม
 
 Quick Preview ใช้ XHTML ชุดข้อมูลเดียวกับ chapter XHTML ใน EPUB และไม่ใช้ EPUB renderer ระหว่างสร้าง EPUB ระบบไม่เรียก Local LLM เพิ่มเอง; ถ้าต้องการ semantic structure จาก AI ให้เลือก `ai.html` ที่ผ่าน validator แล้ว
 
@@ -760,7 +797,7 @@ OCR/
 
 ## ผลการทดสอบและเกณฑ์ตรวจรับ (Verification & Benchmarks)
 
-เอกสารอัปเดต 2026-10-07; ตารางตรวจรับคงผลตามหลักฐานจริง และงานแปลเอกสารยังไม่ถือว่าผ่านก่อนมี implementation กับ quality acceptance
+เอกสารอัปเดต 2026-10-09; ตารางตรวจรับคงผลตามหลักฐานจริง การเพิ่มเพดาน Upload 300 MB และหน้าปก EPUB 2 แหล่งพร้อมภาพตัวอย่างขนาดใหญ่ผ่านการตรวจระดับโค้ด/API แล้ว แต่ยังไม่เพิ่มผล browser acceptance ใหม่ลงในตารางเดิม งานแปลเอกสารยังไม่ถือว่าผ่านก่อนมี implementation กับ quality acceptance
 
 ### การตรวจล่าสุด 2026-10-07
 
@@ -824,7 +861,7 @@ OCR/
 
 ## สถานะปัจจุบันและงานถัดไป
 
-ปัจจุบันระบบ OCR, ตรวจแก้ข้อความ, Structured Text/HTML, XHTML Quick Preview, EPUB และ Editable TOC ใช้งานได้แล้ว งานที่กำลังทำคือออกแบบระบบแปลเอกสาร โดยล็อก input `demo/08.pdf`–`13.png` สำหรับตารางอังกฤษ, จีน+อังกฤษพร้อมศัพท์เฉพาะ, นิยายอังกฤษ และหนังสือสอน IT ที่มี code program
+ปัจจุบันระบบรองรับไฟล์ต้นฉบับสูงสุด 300 MB, OCR ครั้งเดียวแล้วเลือก Text/Structured HTML, เปิด Structured HTML ใน HTML Studio, สร้าง XHTML Quick Preview และ EPUB พร้อม Editable TOC หน้าปก EPUB เลือกอัปโหลดรูปหรือ render หน้า PDF ต้นฉบับได้ Thumbnail เปิดดูภาพใหญ่ได้ และแสดงสถานะเลือกแล้ว/บันทึกแล้วแยกกัน งานที่กำลังทำต่อคือออกแบบระบบแปลเอกสาร โดยล็อก input `demo/08.pdf`–`13.png` สำหรับตารางอังกฤษ, จีน+อังกฤษพร้อมศัพท์เฉพาะ, นิยายอังกฤษ และหนังสือสอน IT ที่มี code program
 
 งานถัดไป:
 
@@ -844,6 +881,8 @@ OCR/
 | HTML AI ไม่สำเร็จ | ดู error/failed_chunk; ทดสอบ Local AI, ตรวจ model และ timeout; ระบบยังใช้ basic.html ได้ |
 | Refresh ขณะ AI ทำงาน | เปิดงานเดิมเพื่อดู progress ต่อ; restart server ต้องสั่ง AI ใหม่ |
 | EPUB ไม่ดาวน์โหลด | ตรวจว่ามี preview ปัจจุบันและ package พร้อม; ดู error แล้วใช้ลิงก์ดาวน์โหลดซ้ำ |
+| ภาพตัวอย่างหน้าปก PDF เล็ก | คลิก Thumbnail หรือปุ่ม `ดูภาพขนาดใหญ่`; ปิดด้วยปุ่ม `ปิด`, คลิกพื้นหลัง หรือกด `Escape` |
+| รูปปกขึ้นแต่ยังไม่บันทึก | `เลือกเป็นหน้าปกแล้ว` คือเลือกในฟอร์ม; กด `สร้าง XHTML Quick Preview` จนแสดง `บันทึกใน XHTML Preview แล้ว` |
 | แก้โค้ดแล้วไม่เห็นผล | Backend ต้อง stop/start server; Frontend ใช้ Ctrl+F5; run_server ไม่ reload โค้ดที่กำลังรัน |
 
 ## ข้อควรรู้ก่อนเผยแพร่บน GitHub

@@ -36,17 +36,41 @@
                 <label>คำอธิบายหนังสือ
                   <textarea id="epub-description" maxlength="2000" rows="2"></textarea>
                 </label>
-                <label>รูปปก (PNG/JPEG ไม่เกิน 2 MB)
-                  <input id="epub-cover" type="file" accept="image/png,image/jpeg">
-                </label>
+                <fieldset class="epub-cover-source">
+                  <legend>ที่มาของหน้าปก</legend>
+                  <label><input id="epub-cover-source-upload" type="radio" name="epub-cover-source" value="upload" checked> อัปโหลดรูปเอง</label>
+                  <label><input id="epub-cover-source-pdf" type="radio" name="epub-cover-source" value="pdf_page"> ใช้หน้า PDF</label>
+                </fieldset>
+                <div id="epub-cover-upload-panel">
+                  <label>รูปปก (PNG/JPEG ไม่เกิน 10 MB)
+                    <input id="epub-cover" type="file" accept="image/png,image/jpeg">
+                  </label>
+                </div>
+                <div id="epub-cover-pdf-panel" class="hidden">
+                  <label>หน้าของ PDF ที่ใช้เป็นปก
+                    <input id="epub-cover-pdf-page" type="number" min="1" step="1" value="1">
+                  </label>
+                  <button id="btn-preview-epub-pdf-cover" class="btn btn-outline btn-xs" type="button">แสดงตัวอย่างและเลือกเป็นปก</button>
+                  <span id="epub-cover-pdf-info" class="text-muted text-xs"></span>
+                </div>
                 <label>ข้อความแทนรูปปก
                   <input id="epub-cover-alt" type="text" maxlength="300" placeholder="ปกหนังสือ">
                 </label>
                 <label class="epub-cover-toggle"><input id="epub-remove-cover" type="checkbox">สร้างแบบไม่มีปก</label>
               </div>
               <div id="epub-cover-drop" class="epub-cover-drop" tabindex="0" role="button" aria-label="วางหรือเลือกรูปปก">
-                <img id="epub-cover-thumbnail" class="hidden" alt="ตัวอย่างรูปปกที่เลือก">
-                <div><strong>ลากรูปปกมาวาง หรือกดเพื่อเลือก</strong><br><span id="epub-cover-details" class="text-muted text-xs">ยังไม่ได้เลือกรูปปกใหม่</span></div>
+                <img id="epub-cover-thumbnail" class="hidden" alt="ตัวอย่างรูปปกที่เลือก" title="คลิกเพื่อดูรูปขนาดใหญ่">
+                <div><strong id="epub-cover-drop-title">ลากรูปปกมาวาง หรือกดเพื่อเลือก</strong><br><span id="epub-cover-details" class="text-muted text-xs">ยังไม่ได้เลือกรูปปกใหม่</span></div>
+              </div>
+              <button id="btn-view-epub-cover-large" class="btn btn-outline btn-xs hidden" type="button">ดูภาพขนาดใหญ่</button>
+              <div id="epub-cover-modal" class="epub-cover-modal hidden" role="dialog" aria-modal="true" aria-labelledby="epub-cover-modal-title">
+                <div class="epub-cover-modal-card">
+                  <div class="epub-cover-modal-header">
+                    <strong id="epub-cover-modal-title">ภาพตัวอย่างหน้าปก</strong>
+                    <button id="btn-close-epub-cover-modal" class="btn btn-outline btn-xs" type="button" aria-label="ปิดภาพตัวอย่างหน้าปก">ปิด</button>
+                  </div>
+                  <div class="epub-cover-modal-body"><img id="epub-cover-large-image" alt="ภาพหน้าปกขนาดใหญ่"></div>
+                </div>
               </div>
               <p id="epub-preview-details" class="text-muted text-xs" aria-live="polite"></p>
 

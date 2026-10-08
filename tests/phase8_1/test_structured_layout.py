@@ -136,8 +136,9 @@ class TestStructuredLayout(unittest.TestCase):
         self.assertIn("<tbody>", markup)
 
     def test_html_sanitizer_and_ai_preserve_table_model(self):
-        sanitized = sanitize_final_html('<table><tbody><tr><td colspan="2" onclick="bad()">A</td></tr></tbody></table>')
-        self.assertIn('<td colspan="2">A</td>', sanitized)
+        sanitized = sanitize_final_html('<table data-block-id="t1" data-bbox="{&quot;x1&quot;:1}"><tbody><tr><td data-cell-id="c1" colspan="2" onclick="bad()">A</td></tr></tbody></table>')
+        self.assertIn('<table data-block-id="t1" data-bbox="{&quot;x1&quot;:1}">', sanitized)
+        self.assertIn('<td data-cell-id="c1" colspan="2">A</td>', sanitized)
         self.assertNotIn("onclick", sanitized)
         job_id = "ai_table_" + uuid.uuid4().hex[:8]
         export = os.path.join(RUNTIME, job_id, "export")

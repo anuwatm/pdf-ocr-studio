@@ -585,12 +585,12 @@ def _clean_cover(cover):
     if not isinstance(cover, dict):
         raise ValueError('Cover must be an object')
     encoded = str(cover.get('data_base64', ''))
-    if len(encoded) > 3 * 1024 * 1024:
-        raise ValueError('Cover exceeds 2 MB limit')
+    if len(encoded) > 14 * 1024 * 1024:
+        raise ValueError('Cover exceeds 10 MB limit')
     try:
         data = base64.b64decode(encoded, validate=True)
-        if len(data) > 2 * 1024 * 1024:
-            raise ValueError('Cover exceeds 2 MB limit')
+        if len(data) > 10 * 1024 * 1024:
+            raise ValueError('Cover exceeds 10 MB limit')
         with Image.open(io.BytesIO(data)) as image:
             if image.format not in {'PNG', 'JPEG'} or image.width * image.height > 16_000_000:
                 raise ValueError('Cover must be PNG/JPEG within 16 megapixels')
@@ -598,11 +598,20 @@ def _clean_cover(cover):
             output = io.BytesIO()
             image.convert('RGB').save(output, format='PNG')
             clean = output.getvalue()
-            if len(clean) > 8 * 1024 * 1024:
-                raise ValueError('Decoded cover exceeds 8 MB limit')
+            if len(clean) > 20 * 1024 * 1024:
+                raise ValueError('Decoded cover exceeds 20 MB limit')
+            source_type = str(cover.get('source_type') or 'upload')
+            if source_type not in {'upload', 'pdf_page'}:
+                raise ValueError('Invalid cover source type')
+            source_page = None
+            if source_type == 'pdf_page':
+                source_page = int(cover.get('source_page') or 0)
+                if source_page < 1:
+                    raise ValueError('Invalid PDF cover page')
             return {'data_base64': base64.b64encode(clean).decode('ascii'),
                     'width': image.width, 'height': image.height,
                     'alt': re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff\ufffe\uffff]', '', str(cover.get('alt') or 'ปกหนังสือ'))[:300],
+                    'source_type': source_type, 'source_page': source_page,
                     'sha256': _hash_bytes(clean)}
     except (OSError, ValueError, Image.DecompressionBombError) as exc:
         raise ValueError('Invalid cover: ' + str(exc)) from exc

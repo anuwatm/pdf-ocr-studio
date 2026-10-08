@@ -1,7 +1,7 @@
 # คู่มือการติดตั้ง เริ่ม/หยุดระบบ ตรวจสอบข้อผิดพลาด และข้อจำกัด (System Operations Manual)
 
 **โครงการ:** Local Thai OCR Web  
-**อัปเดต:** 2026-10-04 — OCR, HTML AI background tasks และ EPUB Studio  
+**อัปเดต:** 2026-10-09 — OCR, HTML AI background tasks และ EPUB Studio  
 **สถาปัตยกรรม:** Localhost Single-User Web Application (Loopback 127.0.0.1)
 
 ---
@@ -9,6 +9,8 @@
 ## 1. บทนำและสถาปัตยกรรมระบบ
 
 ระบบแปลง PDF/ภาพเป็นข้อความภาษาไทย (Local Thai OCR Web) ได้รับการออกแบบสำหรับการใช้งานบน Windows 10/11 64-bit ภายในเครื่องเดี่ยว (Localhost Desktop) ทำงานแบบ 100% Offline ไม่ส่งเอกสารออกภายนอก
+
+หน้าอัปโหลดรองรับ PDF, PNG, JPG และ JPEG สูงสุด **300 MB ต่อไฟล์** หากเกินเพดาน Frontend จะไม่ส่งไฟล์ และ Backend จะตอบ HTTP 413 สำหรับคำขอที่ข้าม Frontend
 
 ### ส่วนประกอบหลัก:
 1. **Frontend:** Web Studio พัฒนาด้วย HTML5, Modern CSS และ Vanilla JavaScript รองรับ Dual-Pane Viewer, Bidirectional Bounding Box Sync, Diff Review และ Multi-tab Conflict Prevention
@@ -174,9 +176,10 @@ INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
 
 1. เปิดงาน → HTML → สร้าง/บันทึก HTML ต้นทาง
 2. EPUB → เลือกต้นทางและแบ่งบท กรอก metadata/วันที่/รหัสหนังสือ; เว้นรหัสให้ระบบสร้างได้
-3. เลือก PNG/JPEG ไม่เกิน 2 MB ใส่ข้อความแทนรูป หรือเลือกสร้างแบบไม่มีปก
-4. สร้าง XHTML Quick Preview แล้วตรวจสารบัญ/บทและ source revision
-5. กดสร้างไฟล์ EPUB เพื่อดาวน์โหลดอัตโนมัติ; ถ้า source/config เปลี่ยนให้สร้าง Preview ใหม่
+3. เลือกหน้าปกได้ 2 แบบ: อัปโหลด PNG/JPEG ไม่เกิน 10 MB หรือเลือกเลขหน้าจาก PDF ต้นฉบับให้ระบบแปลงเป็นรูปปก
+4. ตรวจ Thumbnail โดยกดรูปหรือปุ่ม `ดูภาพขนาดใหญ่`; สถานะ `เลือกเป็นหน้าปกแล้ว` หมายถึงเลือกในฟอร์มแล้ว และจะเปลี่ยนเป็น `บันทึกใน XHTML Preview แล้ว` หลังสร้าง Preview สำเร็จ
+5. สร้าง XHTML Quick Preview แล้วตรวจสารบัญ/บทและ source revision
+6. กดสร้างไฟล์ EPUB เพื่อดาวน์โหลดอัตโนมัติ; ถ้า source/config เปลี่ยนให้สร้าง Preview ใหม่
 
 ระบบเก็บปกเดิมหลัง refresh และใช้ซ้ำเมื่อ regenerate; ไม่จำเป็นต้องเลือกไฟล์ใหม่ หากต้องการเอาปกออกให้เลือกสร้างแบบไม่มีปก
 
@@ -189,7 +192,7 @@ Generation ของ job เดียวกันชนกันคืน 409 �
 
 Phase 8 ดูแล EPUB pipeline, XHTML Preview และรูปปก ส่วน Phase 9 เพิ่มการแก้สารบัญด้วยมือ, `toc.json` และ stable targets โดยใช้ exporter/validator/ปกเดิม Implementation ผ่านแล้ว
 
-ปกคง input สูงสุด 2 MB / 16 megapixels และ canonical PNG สูงสุด 8 MB ใช้ preview payload และ API เดิม Phase 9 เพิ่ม thumbnail, drag-and-drop และรายละเอียดไฟล์ โดยไม่เพิ่ม storage/API ปกอีกชุด
+ปกรองรับ input สูงสุด 10 MB / 16 megapixels และ canonical PNG สูงสุด 20 MB ใช้ preview payload เดิม พร้อม thumbnail, drag-and-drop และเลือกหน้า PDF ต้นฉบับได้ ระบบบันทึก `source_type` กับ `source_page` เพื่อแสดงที่มาของปก
 
 Phase 9 รวม `toc_revision` ใน preview config งานเก่าไม่มี `toc.json` ใช้สารบัญอัตโนมัติได้ ผลตรวจรับดู [checklist](checklist.md#phase-9--แก้ไขสารบัญ-epub-และ-stable-targets-editable-epub-toc) และ [หลักฐาน](phase9/evidence.md)
 
@@ -204,7 +207,7 @@ Phase 9 รวม `toc_revision` ใน preview config งานเก่าไ�
 
 ถ้า HTML หรือ config เปลี่ยน ระบบให้ re-match และแสดง matched/unresolved โดยไม่ทับ draft เงียบ ๆ การยกเลิก re-match คง draft เดิม สองแท็บแก้พร้อมกันคืน 409 ให้โหลด revision ล่าสุดก่อนบันทึกใหม่
 
-รูปปกลากมาวางในพื้นที่ปกหรือใช้ file picker ได้ thumbnail ที่ระบุ `ยังไม่บันทึก` เป็น draft; ต้องสร้าง Preview ใหม่จึงจะเป็นปกของ package
+รูปปกลากมาวางในพื้นที่ปกหรือใช้ file picker ได้ Thumbnail ที่ระบุ `เลือกเป็นหน้าปกแล้ว` เป็นค่าที่เลือกในฟอร์ม; ต้องสร้าง XHTML Quick Preview ก่อนจึงเปลี่ยนเป็น `บันทึกใน XHTML Preview แล้ว` และนำไปใช้กับ package
 
 ## Phase 10 — Document Translation (วางแผน)
 
@@ -218,7 +221,9 @@ Google/Hybrid จะส่งข้อความออกจากเครื
 
 ## Phase 8.1 — Structured OCR
 
-เปิดงาน OCR → แท็บ `Structured OCR` → `สร้าง Structured Text / HTML` ระบบใช้ artifact เดิมโดยไม่ OCR หรือเรียก Local AI ซ้ำ เลือกหน้า ซูม และคลิก cell/block เพื่อไฮไลต์ตำแหน่งบนต้นฉบับได้
+หน้า Upload ตรวจจำนวนหน้าก่อน แล้วแสดงปุ่ม `OCR เป็น Text` และ `OCR เป็น HTML` ทั้งสองปุ่มใช้ OCR งานเดียวกัน ปุ่ม HTML จะสร้าง Structured HTML จาก artifact เดิมและเปิดแท็บ `Structured OCR` อัตโนมัติ โดยไม่ OCR หรือเรียก Local AI ซ้ำ เลือกหน้า ซูม และคลิก cell/block เพื่อไฮไลต์ตำแหน่งบนต้นฉบับได้
+
+กด `เปิดใน HTML Studio` เพื่อแก้ Structured HTML ในโหมด HTML Code หรือ Visual แล้วกด `บันทึก Final HTML` การบันทึกผ่าน sanitizer และ revision guard พร้อมรักษา `data-block-id`, `data-cell-id`, `data-bbox`, `rowspan` และ `colspan`
 
 เมนูผลลัพธ์สลับ `Structured HTML`, `OCR ต้นฉบับ`, `ข้อความ AI แก้ไข` และ `ข้อความฉบับผู้ใช้` ได้ พร้อมดาวน์โหลด Text, HTML และ layout.json ถ้าข้อความต้นทางเปลี่ยน ระบบซ่อน download และขึ้นสถานะล้าสมัย ให้กดสร้าง Structured ใหม่ก่อน
 

@@ -6,7 +6,7 @@
   <meta name="description" content="Local Thai OCR Web Studio - ระบบแปลงเอกสาร PDF และภาพเป็นข้อความภาษาไทย พร้อมตรวจแก้ด้วย Local AI และตรวจทานบนเว็บ">
   <title>OneOCR Thai Web Studio - ระบบแปลงและตรวจทานเอกสารไทย</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%232f6feb'/%3E%3Cpath d='M8 8h16v16H8z' fill='none' stroke='white' stroke-width='2'/%3E%3Cpath d='M11 13h10M11 18h10' stroke='white' stroke-width='2'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="/static/app.css?v=20261003-visual-1">
+  <link rel="stylesheet" href="/static/app.css?v=20261009-cover-preview-2">
 <link rel="stylesheet" href="/static/vendor/codemirror/lib/codemirror.css">
 <link rel="stylesheet" href="/static/vendor/codemirror/addon/dialog/dialog.css">
   <link rel="stylesheet" href="/static/minimal.css?v=20261004-phase8-1">
@@ -85,7 +85,7 @@
       <section id="section-upload" class="card upload-card" data-main-panel="upload">
         <div class="card-header">
           <h2 class="card-title">อัปโหลดเอกสาร</h2>
-          <span class="badge badge-info">PDF / PNG / JPG • สูงสุด 50 MB • Batch ละ 200 หน้า</span>
+          <span class="badge badge-info">PDF / PNG / JPG • สูงสุด 300 MB • Batch ละ 200 หน้า</span>
         </div>
 
         <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="ลากไฟล์มาวางที่นี่ หรือคลิกเพื่อเลือกไฟล์">
@@ -170,10 +170,15 @@
           </span>
         </label>
 
+        <p class="dropzone-hint">OCR ทำงานครั้งเดียว แล้วเลือกเปิดผลลัพธ์เป็น Text หรือ Structured HTML ได้โดยไม่ประมวลผลเอกสารซ้ำ</p>
+
         <!-- Start Processing CTA -->
         <div class="action-footer">
           <button id="btn-start-job" class="btn btn-primary btn-large" disabled>
             <span>ตรวจสอบจำนวนหน้า</span>
+          </button>
+          <button id="btn-start-job-html" class="btn btn-outline btn-large hidden" type="button" disabled>
+            <span>OCR เป็น HTML</span>
           </button>
             <button id="btn-download-page-images" class="btn btn-outline btn-large" type="button" disabled>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -323,10 +328,10 @@
 <script src="/static/vendor/codemirror/addon/dialog/dialog.js"></script>
 <script src="/static/vendor/codemirror/addon/search/search.js"></script>
 <script src="/static/text.js?v=20261003-visual-1"></script>
-<script src="/static/visual.js?v=20261003-visual-1"></script>
-<script src="/static/html.js?v=20261004-ai-progress-2"></script>
-<script src="/static/epub.js?v=20261004-phase8-2"></script>
-<script src="/static/structured.js?v=20261005-phase8-1"></script>
-  <script src="/static/app.js?v=20261004-ai-progress-4"></script>
+<script src="/static/visual.js?v=20261008-structured-editor-1"></script>
+<script src="/static/html.js?v=20261008-structured-editor-1"></script>
+<script src="/static/epub.js?v=20261009-cover-preview-2"></script>
+<script src="/static/structured.js?v=20261008-structured-editor-1"></script>
+  <script src="/static/app.js?v=20261008-upload-300mb-1"></script>
 </body>
 </html>

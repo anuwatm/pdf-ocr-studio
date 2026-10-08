@@ -11,6 +11,7 @@ window.createStructuredWorkspace = ({state}) => {
     zoomLabel: byId("structured-zoom-label"),
     sourcePane: byId("structured-source-pane"), resultPane: byId("structured-result-pane"),
     mobileSource: byId("btn-structured-mobile-source"), mobileResult: byId("btn-structured-mobile-result"),
+    editHtml: byId("btn-edit-structured-html"),
     links: [byId("btn-dl-structured-text"), byId("btn-dl-structured-html"), byId("btn-dl-structured-layout")],
   };
   let loadedJob = null, documentLayout = null, previewHtml = "";
@@ -21,7 +22,10 @@ window.createStructuredWorkspace = ({state}) => {
     ui.status.textContent = label;
     ui.status.className = `badge badge-${kind}`;
   }
-  function hideDownloads() { ui.links.forEach(link => link?.classList.add("hidden")); }
+  function hideDownloads() {
+    ui.links.forEach(link => link?.classList.add("hidden"));
+    ui.editHtml?.classList.add("hidden");
+  }
   function showDownloads(jobId) {
     ["text", "html", "layout"].forEach((variant, index) => {
       const link = ui.links[index];
@@ -29,6 +33,7 @@ window.createStructuredWorkspace = ({state}) => {
       link.href = `/api/jobs/${jobId}/export/structured/${variant}`;
       link.classList.remove("hidden");
     });
+    ui.editHtml?.classList.remove("hidden");
   }
   function syncJob() {
     if (loadedJob === state.currentJobId) return;
@@ -173,5 +178,5 @@ window.createStructuredWorkspace = ({state}) => {
     showMobilePane("source");
     applyZoom();
   }
-  return {init, loadStatus, syncJob};
+  return {init, loadStatus, syncJob, generate};
 };

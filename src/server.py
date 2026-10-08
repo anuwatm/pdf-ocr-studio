@@ -42,7 +42,7 @@ from src.job_models import (
 )
 
 # Configuration defaults
-MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024  # 50 MB
+MAX_FILE_SIZE_BYTES = 300 * 1024 * 1024  # 300 MB
 DEFAULT_DB_PATH = "data/jobs.db"
 DEFAULT_OUTPUT_DIR = "files"
 
@@ -1327,6 +1327,44 @@ def get_epub_cover_endpoint(job_id: JobId):
     if not cover:
         raise HTTPException(status_code=404, detail="No cover")
     return Response(base64.b64decode(cover['data_base64']), media_type='image/png',
+                    headers={'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-store'})
+
+
+@app.get("/api/jobs/{job_id}/export/epub/cover/pdf-pages")
+def get_epub_cover_pdf_pages_endpoint(job_id: JobId):
+    if not db.get_job_status(job_id):
+        raise HTTPException(status_code=404, detail="Job not found")
+    source_path = db.get_job_raw_path(job_id)
+    if not source_path or not os.path.isfile(source_path):
+        raise HTTPException(status_code=404, detail="Source file not found")
+    if os.path.splitext(source_path)[1].lower() != '.pdf':
+        raise HTTPException(status_code=422, detail="EPUB cover page source must be a PDF")
+    try:
+        return {"page_count": _inspect_pdf_page_count(source_path)}
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Cannot read PDF pages: {exc}")
+
+
+@app.get("/api/jobs/{job_id}/export/epub/cover/pdf-page/{page_num}")
+def get_epub_cover_pdf_page_endpoint(job_id: JobId, page_num: int):
+    if not db.get_job_status(job_id):
+        raise HTTPException(status_code=404, detail="Job not found")
+    source_path = db.get_job_raw_path(job_id)
+    if not source_path or not os.path.isfile(source_path):
+        raise HTTPException(status_code=404, detail="Source file not found")
+    if os.path.splitext(source_path)[1].lower() != '.pdf':
+        raise HTTPException(status_code=422, detail="EPUB cover page source must be a PDF")
+    import pymupdf
+    try:
+        with pymupdf.open(source_path) as document:
+            if page_num < 1 or page_num > len(document):
+                raise HTTPException(status_code=422, detail=f"PDF page must be between 1 and {len(document)}")
+            image_bytes = document[page_num - 1].get_pixmap(dpi=150, alpha=False).tobytes('png')
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Cannot render PDF cover page: {exc}")
+    return Response(image_bytes, media_type='image/png',
                     headers={'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-store'})
 
 

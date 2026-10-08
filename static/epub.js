@@ -4,24 +4,29 @@ window.createEpubWorkspace = ({state, el}) => {
   let requestVersion = 0;
   let building = false;
   let persistedCover = null;
+  let pdfCoverPageCount = null;
+  let coverObjectUrl = null;
+  let coverModalReturnFocus = null;
   let tocState = null;
   let tocDirty = false;
   const tocDrafts = new Map();
   const field = id => document.getElementById(id);
   const extraFields = ['epub-identifier', 'epub-date', 'epub-description', 'epub-cover', 'epub-cover-alt', 'epub-remove-cover'];
-  extraFields.forEach(id => field(id)?.addEventListener('input', () => {
+  function markEpubConfigDirty() {
     state.epubConfigDirty = true;
     state.epubPreviewRevision = null;
     el.btnBuildEpub.disabled = true;
     el.epubExportStatusBadge.textContent = 'ตั้งค่าเปลี่ยน — สร้าง Preview ใหม่';
     el.epubExportStatusBadge.className = 'badge badge-warning';
     [el.btnDlEpub, el.btnDownloadEpub].forEach(link => link?.classList.add('hidden'));
-  }));
+  }
+  extraFields.forEach(id => field(id)?.addEventListener('input', markEpubConfigDirty));
   function syncJob() {
     if (loadedJob === state.currentJobId) return;
     if (loadedJob && tocState) tocDrafts.set(loadedJob, {tocState: structuredClone(tocState), tocDirty});
     loadedJob = state.currentJobId;
     persistedCover = null;
+    pdfCoverPageCount = null;
     state.epubConfigDirty = false;
     state.epubPreviewRevision = null;
     for (const input of [el.epubTitle, el.epubCreator, el.epubPublisher]) input.value = "";
@@ -32,6 +37,14 @@ window.createEpubWorkspace = ({state, el}) => {
     el.epubSourceEditor.value = "";
     el.btnBuildEpub.disabled = true;
     extraFields.forEach(id => { if (field(id)) { field(id).value = ''; if (field(id).type === 'checkbox') field(id).checked = false; } });
+    field('epub-cover-source-upload').checked = true;
+    field('epub-cover-pdf-page').value = '1';
+    const coverThumb = field('epub-cover-thumbnail');
+    if (coverThumb) { coverThumb.removeAttribute('src'); coverThumb.classList.add('hidden'); }
+    field('btn-view-epub-cover-large')?.classList.add('hidden');
+    field('epub-cover-modal')?.classList.add('hidden');
+    if (field('epub-cover-details')) field('epub-cover-details').textContent = 'ยังไม่ได้เลือกรูปปกใหม่';
+    updateCoverModeUi();
     for (const link of [el.btnDlEpub, el.btnDownloadEpub]) link.classList.add("hidden");
     const draft = loadedJob ? tocDrafts.get(loadedJob) : null;
     tocState = draft?.tocState || null;
@@ -200,11 +213,108 @@ window.createEpubWorkspace = ({state, el}) => {
     markTocDirty(); renderToc();
   }
 
+  function coverSourceMode() {
+    return field('epub-cover-source-pdf')?.checked ? 'pdf_page' : 'upload';
+  }
+
+  function updateCoverModeUi() {
+    const mode = coverSourceMode();
+    const removeCover = Boolean(field('epub-remove-cover')?.checked);
+    field('epub-cover-upload-panel')?.classList.toggle('hidden', mode !== 'upload');
+    field('epub-cover-pdf-panel')?.classList.toggle('hidden', mode !== 'pdf_page');
+    if (field('epub-cover-drop-title')) {
+      field('epub-cover-drop-title').textContent = mode === 'pdf_page'
+        ? 'ภาพตัวอย่างหน้าปกจาก PDF'
+        : 'ลากรูปปกมาวาง หรือกดเพื่อเลือก';
+    }
+    for (const id of ['epub-cover', 'epub-cover-pdf-page', 'btn-preview-epub-pdf-cover']) {
+      if (field(id)) field(id).disabled = removeCover;
+    }
+  }
+
+  function setCoverThumbnail(url, details) {
+    const image = field('epub-cover-thumbnail');
+    image.src = url;
+    image.classList.remove('hidden');
+    field('btn-view-epub-cover-large')?.classList.remove('hidden');
+    field('epub-cover-details').textContent = details;
+  }
+
+  function openCoverModal(trigger) {
+    const thumbnail = field('epub-cover-thumbnail');
+    const modal = field('epub-cover-modal');
+    const largeImage = field('epub-cover-large-image');
+    if (!thumbnail?.src || thumbnail.classList.contains('hidden') || !modal || !largeImage) return;
+    coverModalReturnFocus = trigger || document.activeElement;
+    largeImage.src = thumbnail.currentSrc || thumbnail.src;
+    largeImage.alt = thumbnail.alt || 'ภาพหน้าปกขนาดใหญ่';
+    modal.classList.remove('hidden');
+    field('btn-close-epub-cover-modal')?.focus();
+  }
+
+  function closeCoverModal(restoreFocus=true) {
+    const modal = field('epub-cover-modal');
+    if (!modal || modal.classList.contains('hidden')) return;
+    modal.classList.add('hidden');
+    field('epub-cover-large-image')?.removeAttribute('src');
+    if (restoreFocus && coverModalReturnFocus?.focus) coverModalReturnFocus.focus();
+    coverModalReturnFocus = null;
+  }
+
   function showCoverFile(file) {
     if (!file) return;
-    const image = field('epub-cover-thumbnail');
-    const url = URL.createObjectURL(file); image.src = url; image.classList.remove('hidden');
-    const probe = new Image(); probe.onload = () => { field('epub-cover-details').textContent = `${file.type} · ${probe.width}×${probe.height} · ${(file.size/1024).toFixed(1)} KB · ยังไม่บันทึก`; URL.revokeObjectURL(url); }; probe.src = url;
+    field('epub-cover-source-upload').checked = true;
+    updateCoverModeUi();
+    if (coverObjectUrl) URL.revokeObjectURL(coverObjectUrl);
+    coverObjectUrl = URL.createObjectURL(file);
+    const probe = new Image();
+    probe.onload = () => setCoverThumbnail(coverObjectUrl, `${file.type} · ${probe.width}×${probe.height} · ${(file.size/1024).toFixed(1)} KB · เลือกเป็นหน้าปกแล้ว`);
+    probe.src = coverObjectUrl;
+  }
+
+  async function loadPdfCoverInfo() {
+    if (!state.currentJobId) throw new Error('ยังไม่ได้เลือกงาน');
+    const response = await fetch(`/api/jobs/${state.currentJobId}/export/epub/cover/pdf-pages`, {cache:'no-store'});
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'อ่านจำนวนหน้า PDF ไม่สำเร็จ');
+    pdfCoverPageCount = data.page_count;
+    const input = field('epub-cover-pdf-page');
+    input.max = String(pdfCoverPageCount);
+    field('epub-cover-pdf-info').textContent = `เลือกได้หน้า 1–${pdfCoverPageCount}`;
+    return pdfCoverPageCount;
+  }
+
+  async function getPdfCoverBlob(showThumbnail=false) {
+    if (!pdfCoverPageCount) await loadPdfCoverInfo();
+    const pageNumber = Number(field('epub-cover-pdf-page')?.value);
+    if (!Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > pdfCoverPageCount) {
+      throw new Error(`หน้าปก PDF ต้องอยู่ระหว่าง 1–${pdfCoverPageCount}`);
+    }
+    const response = await fetch(`/api/jobs/${state.currentJobId}/export/epub/cover/pdf-page/${pageNumber}`, {cache:'no-store'});
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.detail || 'แปลงหน้า PDF เป็นรูปปกไม่สำเร็จ');
+    }
+    const blob = await response.blob();
+    if (blob.size > 10 * 1024 * 1024) throw new Error('รูปที่แปลงจากหน้า PDF มีขนาดเกิน 10 MB');
+    if (showThumbnail) {
+      if (coverObjectUrl) URL.revokeObjectURL(coverObjectUrl);
+      coverObjectUrl = URL.createObjectURL(blob);
+      const probe = new Image();
+      probe.onload = () => {
+        setCoverThumbnail(coverObjectUrl, `PDF หน้า ${pageNumber} · ${probe.width}×${probe.height} · ${(blob.size/1024).toFixed(1)} KB · เลือกเป็นหน้าปกแล้ว`);
+        field('epub-cover-pdf-info').textContent = `เลือกหน้า ${pageNumber} เป็นหน้าปกแล้ว · กดสร้าง XHTML Quick Preview เพื่อบันทึก`;
+      };
+      probe.src = coverObjectUrl;
+    }
+    return {blob, pageNumber};
+  }
+
+  async function blobToBase64(blob) {
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    let binary = '';
+    for (let offset = 0; offset < bytes.length; offset += 8192) binary += String.fromCharCode(...bytes.subarray(offset, offset + 8192));
+    return btoa(binary);
   }
 
   async function loadEpubPreviewContent(jobId, version) {
@@ -268,10 +378,14 @@ window.createEpubWorkspace = ({state, el}) => {
         }
         if (field('epub-cover-alt') && persistedCover) field('epub-cover-alt').value = persistedCover.alt || '';
         if (persistedCover && !field('epub-cover')?.files?.length) {
-          const thumb = field('epub-cover-thumbnail');
-          thumb.src = `/api/jobs/${jobId}/export/epub/cover?revision=${encodeURIComponent(status.preview_revision || '')}`;
-          thumb.classList.remove('hidden');
-          field('epub-cover-details').textContent = `image/png · ${persistedCover.width}×${persistedCover.height} · Preview ที่บันทึกแล้ว`;
+          const sourceType = persistedCover.source_type || 'upload';
+          field(sourceType === 'pdf_page' ? 'epub-cover-source-pdf' : 'epub-cover-source-upload').checked = true;
+          if (sourceType === 'pdf_page' && persistedCover.source_page) field('epub-cover-pdf-page').value = String(persistedCover.source_page);
+          updateCoverModeUi();
+          const sourceLabel = sourceType === 'pdf_page' ? `PDF หน้า ${persistedCover.source_page} · ` : '';
+          setCoverThumbnail(`/api/jobs/${jobId}/export/epub/cover?revision=${encodeURIComponent(status.preview_revision || '')}`,
+            `${sourceLabel}image/png · ${persistedCover.width}×${persistedCover.height} · บันทึกใน XHTML Preview แล้ว`);
+          if (sourceType === 'pdf_page') field('epub-cover-pdf-info').textContent = `บันทึก PDF หน้า ${persistedCover.source_page} เป็นหน้าปกแล้ว`;
         }
         if (el.epubTitle && !el.epubTitle.value) el.epubTitle.value = status.metadata.title || "";
         if (el.epubCreator && !el.epubCreator.value) el.epubCreator.value = status.metadata.creator || "";
@@ -299,7 +413,7 @@ window.createEpubWorkspace = ({state, el}) => {
     if (state.htmlDirty) { alert("กรุณาบันทึก Final HTML ก่อนสร้าง EPUB Preview"); return; }
     const button = el.btnGenerateEpubPreview;
     const jobId = state.currentJobId;
-    const fingerprint = () => JSON.stringify([collectEpubConfig(), field('epub-cover-alt')?.value, field('epub-remove-cover')?.checked]);
+    const fingerprint = () => JSON.stringify([collectEpubConfig(), coverSourceMode(), field('epub-cover-pdf-page')?.value, field('epub-cover-alt')?.value, field('epub-remove-cover')?.checked]);
     const configFingerprint = fingerprint();
     const originalCover = field('epub-cover')?.files?.[0];
     const originalText = button?.textContent || "";
@@ -312,15 +426,16 @@ window.createEpubWorkspace = ({state, el}) => {
       const config = collectEpubConfig();
       const coverFile = field('epub-cover')?.files?.[0];
       const removeCover = Boolean(field('epub-remove-cover')?.checked);
-      if (!removeCover && coverFile) {
-        if (!['image/png', 'image/jpeg'].includes(coverFile.type) || coverFile.size > 2 * 1024 * 1024) {
-          throw new Error('รูปปกต้องเป็น PNG/JPEG ไม่เกิน 2 MB');
+      const sourceMode = coverSourceMode();
+      if (!removeCover && sourceMode === 'pdf_page') {
+        const {blob, pageNumber} = await getPdfCoverBlob(true);
+        config.cover = {data_base64: await blobToBase64(blob), alt: field('epub-cover-alt')?.value.trim() || 'ปกหนังสือ', source_type:'pdf_page', source_page:pageNumber};
+      } else if (!removeCover && coverFile) {
+        if (!['image/png', 'image/jpeg'].includes(coverFile.type) || coverFile.size > 10 * 1024 * 1024) {
+          throw new Error('รูปปกต้องเป็น PNG/JPEG ไม่เกิน 10 MB');
         }
-        const bytes = new Uint8Array(await coverFile.arrayBuffer());
-        let binary = '';
-        for (let offset = 0; offset < bytes.length; offset += 8192) binary += String.fromCharCode(...bytes.subarray(offset, offset + 8192));
-        config.cover = {data_base64: btoa(binary), alt: field('epub-cover-alt')?.value.trim() || 'ปกหนังสือ'};
-      } else if (!removeCover && persistedCover) {
+        config.cover = {data_base64: await blobToBase64(coverFile), alt: field('epub-cover-alt')?.value.trim() || 'ปกหนังสือ', source_type:'upload'};
+      } else if (!removeCover && persistedCover && sourceMode === (persistedCover.source_type || 'upload')) {
         config.cover = {reuse: true, alt: field('epub-cover-alt')?.value.trim() || persistedCover.alt};
       }
       if (jobId !== state.currentJobId) return;
@@ -426,14 +541,25 @@ window.createEpubWorkspace = ({state, el}) => {
   }));
   const coverInput = field('epub-cover'), coverDrop = field('epub-cover-drop');
   coverInput?.addEventListener('change', () => showCoverFile(coverInput.files?.[0]));
-  coverDrop?.addEventListener('click', event => { if (event.target !== coverInput) coverInput?.click(); });
-  coverDrop?.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); coverInput?.click(); } });
+  for (const id of ['epub-cover-source-upload', 'epub-cover-source-pdf']) field(id)?.addEventListener('change', () => { updateCoverModeUi(); markEpubConfigDirty(); if (coverSourceMode() === 'pdf_page') loadPdfCoverInfo().catch(error => { field('epub-cover-pdf-info').textContent = error.message; }); });
+  field('epub-cover-pdf-page')?.addEventListener('input', markEpubConfigDirty);
+  field('epub-remove-cover')?.addEventListener('change', updateCoverModeUi);
+  field('btn-preview-epub-pdf-cover')?.addEventListener('click', () => getPdfCoverBlob(true).catch(error => alert(error.message)));
+  field('btn-view-epub-cover-large')?.addEventListener('click', event => { event.stopPropagation(); openCoverModal(event.currentTarget); });
+  field('epub-cover-thumbnail')?.addEventListener('click', event => { event.stopPropagation(); openCoverModal(event.currentTarget); });
+  field('btn-close-epub-cover-modal')?.addEventListener('click', () => closeCoverModal());
+  field('epub-cover-modal')?.addEventListener('click', event => { if (event.target === event.currentTarget) closeCoverModal(); });
+  document.addEventListener('keydown', event => { if (event.key === 'Escape' && !field('epub-cover-modal')?.classList.contains('hidden')) closeCoverModal(); });
+  coverDrop?.addEventListener('click', event => { if (coverSourceMode() === 'upload' && event.target !== coverInput) coverInput?.click(); });
+  coverDrop?.addEventListener('keydown', event => { if (coverSourceMode() === 'upload' && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); coverInput?.click(); } });
   coverDrop?.addEventListener('dragover', event => { event.preventDefault(); coverDrop.classList.add('dragover'); });
   coverDrop?.addEventListener('dragleave', () => coverDrop.classList.remove('dragover'));
   coverDrop?.addEventListener('drop', event => {
     event.preventDefault(); coverDrop.classList.remove('dragover');
     const file = event.dataTransfer?.files?.[0];
     if (!file || !coverInput) return;
+    field('epub-cover-source-upload').checked = true;
+    updateCoverModeUi();
     const transfer = new DataTransfer(); transfer.items.add(file); coverInput.files = transfer.files;
     coverInput.dispatchEvent(new Event('input', {bubbles:true})); showCoverFile(file);
   });

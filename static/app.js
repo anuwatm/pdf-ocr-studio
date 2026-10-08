@@ -31,6 +31,7 @@
     activeHtmlSubtab: "preview",
     epubPreviewRevision: null,
     activeEpubSubtab: "preview",
+    postOcrDestination: null,
   };
 
   // DOM Elements
@@ -56,6 +57,8 @@
     selectedFileIcon: document.getElementById("selected-file-icon"),
     btnRemoveFile: document.getElementById("btn-remove-file"),
     btnStartJob: document.getElementById("btn-start-job"),
+    btnStartJobHtml: document.getElementById("btn-start-job-html"),
+    btnEditStructuredHtml: document.getElementById("btn-edit-structured-html"),
     pageOptions: document.getElementById("page-options"),
     pdfPageSummary: document.getElementById("pdf-page-summary"),
     inputPageStart: document.getElementById("input-page-start"),
@@ -318,8 +321,8 @@
       return;
     }
 
-    if (file.size > 50 * 1024 * 1024) {
-      alert("ไฟล์มีขนาดเกินเพดาน 50 MB กรุณาเลือกไฟล์ที่มีขนาดเล็กกว่า 50 MB");
+    if (file.size > 300 * 1024 * 1024) {
+      alert("ไฟล์มีขนาดเกินเพดาน 300 MB กรุณาเลือกไฟล์ที่มีขนาดไม่เกิน 300 MB");
       return;
     }
 
@@ -335,6 +338,8 @@
     el.fileSelectedBox.classList.remove("hidden");
     el.btnStartJob.disabled = false;
     el.btnStartJob.innerHTML = "<span>ตรวจสอบจำนวนหน้า</span>";
+    el.btnStartJobHtml?.classList.add("hidden");
+    if (el.btnStartJobHtml) el.btnStartJobHtml.disabled = true;
     el.pageOptions.classList.add("hidden");
 
     // PDF page count is needed before the user can choose a range, so upload
@@ -360,6 +365,8 @@
     el.dropzone.classList.remove("hidden");
     el.btnStartJob.disabled = true;
     el.btnStartJob.innerHTML = "<span>ตรวจสอบจำนวนหน้า</span>";
+    el.btnStartJobHtml?.classList.add("hidden");
+    if (el.btnStartJobHtml) el.btnStartJobHtml.disabled = true;
     el.pageOptions.classList.add("hidden");
   }
 
@@ -375,6 +382,7 @@
     if (!state.selectedFile || state.uploadedJob) return;
     el.btnStartJob.disabled = true;
     el.btnStartJob.innerHTML = "<span>กำลังตรวจสอบจำนวนหน้า...</span>";
+    if (el.btnStartJobHtml) el.btnStartJobHtml.disabled = true;
 
     const formData = new FormData();
     formData.append("file", state.selectedFile);
@@ -403,6 +411,7 @@
     el.pageRangeLimit.textContent = `เลือก ${endPage} หน้า • ระบบแบ่ง ${totalBatches} batch ละ 200 หน้า`;
     el.pageOptions.classList.remove("hidden");
     el.btnStartJob.disabled = false;
+    el.btnStartJobHtml?.classList.remove("hidden");
     updateRangeButton();
   }
 
@@ -414,7 +423,16 @@
     el.mainTabButtons.forEach(button => {
       button.addEventListener("click", () => activateMainTab(button.dataset.mainTab));
     });
-    el.btnStartJob.addEventListener("click", startJobFlow);
+    el.btnStartJob.addEventListener("click", () => startJobFlow("text"));
+    el.btnStartJobHtml?.addEventListener("click", () => startJobFlow("html"));
+    el.btnEditStructuredHtml?.addEventListener("click", async () => {
+      activateMainTab("html");
+      try {
+        await htmlWorkspace.loadStructuredHtml();
+      } catch (error) {
+        alert(`เปิด Structured HTML ไม่สำเร็จ: ${error.message}`);
+      }
+    });
     el.btnDownloadPageImages.addEventListener("click", () => {
       if (!el.btnDownloadPageImages.disabled && el.btnDownloadPageImages.dataset.downloadUrl) {
         window.location.assign(el.btnDownloadPageImages.dataset.downloadUrl);
@@ -546,10 +564,12 @@
     if (tabName === "history") loadJobHistory();
   }
 
-  async function startJobFlow() {
+  async function startJobFlow(destination = "text") {
     if (!state.selectedFile) return;
 
+    state.postOcrDestination = destination;
     el.btnStartJob.disabled = true;
+    if (el.btnStartJobHtml) el.btnStartJobHtml.disabled = true;
 
     try {
       if (!state.uploadedJob) {
@@ -569,7 +589,8 @@
         throw new Error("กรุณาเลือกช่วงหน้าที่ถูกต้อง");
       }
 
-      el.btnStartJob.innerHTML = "<span>กำลังเริ่มงาน...</span>";
+      const activeButton = destination === "html" ? el.btnStartJobHtml : el.btnStartJob;
+      if (activeButton) activeButton.innerHTML = `<span>กำลังเริ่ม OCR เพื่อ ${destination === "html" ? "HTML" : "Text"}...</span>`;
       const enableAi = el.modeOcrAi.checked;
       if (!htmlWorkspace.confirmJobChange(state.uploadedJob.job_id)) {
         updateRangeButton();
@@ -602,10 +623,12 @@
       startStatusPolling();
     } catch (err) {
       alert(`เกิดข้อผิดพลาด: ${err.message}`);
-      el.btnStartJob.disabled = false;
-      el.btnStartJob.innerHTML = state.uploadedJob
-        ? "<span>เริ่มแปลงเอกสาร</span>"
-        : "<span>ตรวจสอบจำนวนหน้า</span>";
+      state.postOcrDestination = null;
+      if (state.uploadedJob) updateRangeButton();
+      else {
+        el.btnStartJob.disabled = false;
+        el.btnStartJob.innerHTML = "<span>ตรวจสอบจำนวนหน้า</span>";
+      }
     }
   }
 
@@ -647,9 +670,14 @@
           loadPageData(state.currentJobId, state.currentPageNum);
         }
         loadJobHistory();
+        const destination = state.postOcrDestination;
+        state.postOcrDestination = null;
+        if (destination === "html" && ["completed", "partial"].includes(job.status) && job.completed_pages > 0) {
+          activateMainTab("structured");
+          await structuredWorkspace.generate();
+        }
         if (job.status === "cancelled" && state.uploadedJob?.job_id === job.job_id) {
-          el.btnStartJob.disabled = false;
-          el.btnStartJob.innerHTML = "<span>เริ่มงานต่อจากหน้าที่เหลือ</span>";
+          updateRangeButton();
         }
       }
     } catch (err) {
@@ -949,6 +977,7 @@
     const count = end - start + 1;
     const valid = Number.isInteger(start) && Number.isInteger(end) && start >= 1 && end >= start && end <= state.uploadedJob.total_pages;
     el.btnStartJob.disabled = !valid;
+    if (el.btnStartJobHtml) el.btnStartJobHtml.disabled = !valid;
     const canExportImages = valid && state.selectedFile?.name.toLowerCase().endsWith(".pdf");
     el.btnDownloadPageImages.disabled = !canExportImages;
     if (canExportImages) {
@@ -960,7 +989,10 @@
     el.pageRangeLimit.textContent = valid
       ? `เลือก ${count} หน้า • ระบบแบ่ง ${totalBatches} batch ละ 200 หน้า`
       : "ช่วงหน้าไม่ถูกต้อง";
-    if (valid) el.btnStartJob.innerHTML = `<span>เริ่มแปลงหน้า ${start}–${end} (${totalBatches} batch)</span>`;
+    if (valid) {
+      el.btnStartJob.innerHTML = `<span>OCR เป็น Text • หน้า ${start}–${end}</span>`;
+      if (el.btnStartJobHtml) el.btnStartJobHtml.innerHTML = `<span>OCR เป็น HTML • หน้า ${start}–${end}</span>`;
+    }
   }
 
   async function loadPageData(jobId, pageNum) {

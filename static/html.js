@@ -204,6 +204,35 @@ window.createHtmlWorkspace = ({state, el, loadEpubExportStatus}) => {
     if (content !== savedText) setContent(content);
   }
 
+  async function loadStructuredHtml() {
+    if (!state.currentJobId) throw new Error("ยังไม่ได้เลือกงาน OCR");
+    if (dirty() && !confirm("HTML ยังไม่บันทึก ต้องการทิ้งฉบับร่างแล้วเปิด Structured HTML หรือไม่?")) return false;
+    syncJob();
+    const jobId = state.currentJobId;
+    const version = ++requestVersion;
+    const [structuredStatusResponse, htmlStatusResponse] = await Promise.all([
+      fetch(`/api/jobs/${jobId}/export/structured/status`, {cache: "no-store"}),
+      fetch(`/api/jobs/${jobId}/export/html/status`, {cache: "no-store"}),
+    ]);
+    if (!structuredStatusResponse.ok || !htmlStatusResponse.ok) throw new Error("อ่านสถานะ HTML ไม่สำเร็จ");
+    const structuredStatus = await structuredStatusResponse.json();
+    const htmlStatus = await htmlStatusResponse.json();
+    if (structuredStatus.status === "stale") throw new Error("Structured HTML ล้าสมัย กรุณาสร้างใหม่ก่อนแก้ไข");
+    if (structuredStatus.status !== "ready") throw new Error("ยังไม่มี Structured HTML กรุณาสร้างก่อน");
+    const response = await fetch(`/api/jobs/${jobId}/export/structured/html`, {cache: "no-store"});
+    if (!response.ok) throw new Error("โหลด Structured HTML ไม่สำเร็จ");
+    const content = await response.text();
+    if (jobId !== state.currentJobId || version !== requestVersion) return false;
+    state.htmlBaseRevision = htmlStatus.source_revision || structuredStatus.current_source_revision || 1;
+    state.currentHtmlVariant = "structured";
+    setContent(content);
+    el.htmlExportStatusBadge.textContent = "เปิด Structured HTML แล้ว";
+    el.htmlExportStatusBadge.className = "badge badge-success";
+    switchHtmlSubtab("source");
+    refresh();
+    return true;
+  }
+
   function duration(seconds) {
     const total = Math.max(0, Math.floor(seconds || 0));
     return `${Math.floor(total / 60).toString().padStart(2, "0")}:${(total % 60).toString().padStart(2, "0")}`;
@@ -386,5 +415,5 @@ window.createHtmlWorkspace = ({state, el, loadEpubExportStatus}) => {
     } catch (err) { alert(`บันทึก final.html ไม่สำเร็จ: ${err.message}`); }
     finally { saving = false; updateDirty(); el.btnSaveFinalHtml.textContent = "บันทึก Final HTML"; }
   }
-  return {init, refresh, confirmJobChange, syncJob, switchHtmlSubtab, loadHtmlExportStatus, generateHtmlExport, saveFinalHtml};
+  return {init, refresh, confirmJobChange, syncJob, switchHtmlSubtab, loadHtmlExportStatus, loadStructuredHtml, generateHtmlExport, saveFinalHtml};
 };
