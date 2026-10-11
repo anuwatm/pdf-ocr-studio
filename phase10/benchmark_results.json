@@ -1,0 +1,10 @@
+{
+  "scope": "deterministic translation model/validator/Text-HTML export; provider latency excluded",
+  "runs": 10,
+  "median_seconds": 0.031292050000274685,
+  "p95_seconds": 0.13909120000016628,
+  "peak_tracemalloc_mb": 20.04730796813965,
+  "provider_cost_usd": 0,
+  "provider": "fixture-local",
+  "quality_acceptance": false
+}

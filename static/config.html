@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="ตั้งค่า Local LLM สำหรับ OneOCR Thai Studio">
-  <title>ตั้งค่า Local LLM - OneOCR Thai Studio</title>
-  <link rel="stylesheet" href="/static/app.css">
+  <meta name="description" content="ตั้งค่า Local LLM และ Google Cloud Translation สำหรับ OneOCR Thai Studio">
+  <title>ตั้งค่า Local LLM & Translation - OneOCR Thai Studio</title>
+  <link rel="stylesheet" href="/static/app.css?v=20261010-ui-1">
   <link rel="stylesheet" href="/static/minimal.css?v=20261004-phase8-1">
 </head>
 <body class="theme-light">
@@ -14,8 +14,8 @@
       <a class="brand brand-link" href="/" aria-label="กลับหน้า OneOCR Thai Studio">
         <div class="logo-icon">⚙</div>
         <div>
-          <h1 class="brand-title">ตั้งค่า Local LLM</h1>
-          <p class="brand-subtitle">เชื่อมต่อโมเดล AI ที่ทำงานบนเครื่องของคุณ</p>
+          <h1 class="brand-title">ตั้งค่า Local LLM & Translation</h1>
+          <p class="brand-subtitle">จัดการการเชื่อมต่อ Local LLM และ Google Cloud Translation</p>
         </div>
       </a>
       <div class="header-status">
@@ -25,17 +25,32 @@
     </header>
 
     <main class="app-main config-main">
-      <section class="card config-card" aria-labelledby="config-title">
+      <nav class="config-nav-tabs" style="display: flex; gap: 0.75rem; margin-bottom: 1.5rem; flex-wrap: wrap;" aria-label="เมนูการตั้งค่า">
+        <a class="btn btn-outline btn-sm" href="#llm-config-card">💻 การเชื่อมต่อ Local LLM</a>
+        <a class="btn btn-primary btn-sm" href="#google-config-card">☁️ Google Cloud Translation</a>
+        <a class="btn btn-outline btn-sm" href="#cli-status-card">🖥️ สถานะ AI CLI</a>
+      </nav>
+
+      <section class="card config-card" id="llm-config-card" aria-labelledby="config-title">
         <div class="card-header">
           <div>
             <h2 id="config-title" class="card-title">การเชื่อมต่อ Local LLM</h2>
-            <p class="config-subtitle">รองรับ API แบบ OpenAI-compatible เช่น LM Studio, Ollama, vLLM และ llama.cpp server</p>
+            <p class="config-subtitle">เลือกเรียกโมเดลผ่าน Local API หรือ AI CLI โดยข้อมูลยังอยู่ในเครื่อง</p>
           </div>
           <span id="config-status" class="status-badge status-checking">กำลังโหลดค่า...</span>
         </div>
 
         <form id="llm-config-form" class="config-form">
-          <label class="form-field" for="llm-base-url">
+          <label class="form-field" for="llm-transport">
+            <span>วิธีเรียก Local AI</span>
+            <select id="llm-transport" name="transport">
+              <option value="api">Local API — OpenAI-compatible (แนะนำ)</option>
+              <option value="cli">LM Studio CLI — lms chat (ทดลอง)</option>
+            </select>
+            <small>CLI ใช้ adapter `lms chat` แบบตายตัว ไม่อนุญาตให้กำหนด shell command จากหน้าเว็บ</small>
+          </label>
+
+          <label id="llm-base-url-field" class="form-field" for="llm-base-url">
             <span>Base URL</span>
             <input id="llm-base-url" name="base_url" type="url" inputmode="url" required placeholder="http://127.0.0.1:1234/v1" autocomplete="url">
             <small>อนุญาตเฉพาะ `127.0.0.1`, `localhost` หรือ `::1` เพื่อให้ข้อมูลเอกสารอยู่ในเครื่อง</small>
@@ -46,7 +61,7 @@
             <input id="llm-model" name="model" type="text" required maxlength="200" placeholder="google/gemma-3-1b" autocomplete="off">
           </label>
 
-          <label class="form-field" for="llm-api-key">
+          <label id="llm-api-key-field" class="form-field" for="llm-api-key">
             <span>API key <em>(ไม่บังคับ)</em></span>
             <input id="llm-api-key" name="api_key" type="password" maxlength="500" placeholder="เว้นว่างเพื่อใช้ค่าเดิม" autocomplete="new-password">
             <small id="api-key-hint">API key จะไม่แสดงหรือส่งกลับมายังหน้าเว็บ</small>
@@ -57,6 +72,28 @@
             <input id="llm-timeout" name="timeout" type="number" required min="1" max="300" step="1" value="60">
           </label>
 
+          <label id="llm-cli-provider-field" class="form-field hidden" for="llm-cli-provider">
+            <span>AI Command Interface</span>
+            <select id="llm-cli-provider" name="cli_provider">
+              <optgroup label="ChatGPT CLI">
+                <option value="codex">Codex — codex</option>
+              </optgroup>
+              <optgroup label="Gemini CLI">
+                <option value="gemini">Gemini — gemini</option>
+                <option value="agy">AGY — agy</option>
+              </optgroup>
+              <optgroup label="Claude CLI">
+                <option value="claude">Claude Code — claude</option>
+              </optgroup>
+              <optgroup label="Adapter รอง">
+                <option value="lms">LM Studio — lms</option>
+              </optgroup>
+            </select>
+            <small>ระบบรับเฉพาะ adapter ที่กำหนดไว้ ไม่รับ shell command หรือ executable path จากหน้าเว็บ</small>
+          </label>
+
+          <div id="llm-cli-notice" class="config-result info hidden">Codex/Gemini/AGY/Claude รับข้อมูลผ่าน stdin ใน read-only/plan mode; LM Studio เป็น adapter รองและใช้ <code>--dont-fetch-catalog</code></div>
+
           <div id="config-result" class="config-result hidden" role="status" aria-live="polite"></div>
 
           <div class="config-actions">
@@ -65,8 +102,64 @@
           </div>
         </form>
       </section>
+
+      <section class="card config-card" id="google-config-card" aria-labelledby="google-config-title">
+        <div class="card-header">
+          <div>
+            <h2 id="google-config-title" class="card-title">Google Cloud Translation</h2>
+            <p class="config-subtitle">ตั้งค่าบริการแปลภาษา Google Cloud Translation (v3 Advanced หรือ v2 Basic)</p>
+          </div>
+          <span id="google-config-status" class="status-badge status-checking">กำลังโหลดค่า...</span>
+        </div>
+
+        <form id="google-config-form" class="config-form">
+          <label class="form-field" for="google-project">
+            <span>Project ID <em>(ไม่บังคับหากใช้ Service Account)</em></span>
+            <input id="google-project" name="project" type="text" maxlength="200" placeholder="my-gcp-project-id" autocomplete="off">
+            <small>ระบบจะอ่าน Project ID จากไฟล์ JSON โดยอัตโนมัติหากเว้นว่างไว้</small>
+          </label>
+
+          <label class="form-field" for="google-location">
+            <span>Location</span>
+            <input id="google-location" name="location" type="text" maxlength="50" placeholder="global" value="global" autocomplete="off">
+            <small>ค่าเริ่มต้นคือ <code>global</code> หรือระบุ Region เช่น <code>us-central1</code></small>
+          </label>
+
+          <label class="form-field" for="google-credentials-path">
+            <span>Service Account Key File Path <em>(แนะนำสำหรับ v3)</em></span>
+            <input id="google-credentials-path" name="credentials_path" type="text" maxlength="1000" placeholder="C:\keys\my-service-account.json" autocomplete="off">
+            <small id="google-credentials-hint">พาธไฟล์ JSON ของ Google Cloud Service Account บนเครื่อง</small>
+          </label>
+
+          <label class="form-field" for="google-api-key">
+            <span>API Key <em>(ทางเลือกสำรองสำหรับ v2 Basic)</em></span>
+            <input id="google-api-key" name="api_key" type="password" maxlength="500" placeholder="เว้นว่างเพื่อใช้ค่าเดิม" autocomplete="new-password">
+            <small id="google-api-key-hint">ใช้สำหรับ Translation API v2 Basic หากไม่มี Service Account JSON</small>
+          </label>
+
+          <div id="google-config-result" class="config-result hidden" role="status" aria-live="polite"></div>
+
+          <div class="config-actions">
+            <button id="btn-test-google" type="button" class="btn btn-outline">ทดสอบการแปล</button>
+            <button id="btn-save-google" type="submit" class="btn btn-primary">บันทึกการตั้งค่า</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card config-card cli-status-section" id="cli-status-card" aria-labelledby="cli-status-title">
+        <div class="card-header">
+          <div>
+            <h2 id="cli-status-title" class="card-title">สถานะ AI CLI</h2>
+            <p class="config-subtitle">ตรวจโปรแกรมในเครื่องเท่านั้น ไม่ส่งข้อความเอกสารไปยังผู้ให้บริการ</p>
+          </div>
+          <button id="btn-refresh-cli-status" type="button" class="btn btn-outline btn-sm">ตรวจสอบสถานะ</button>
+        </div>
+        <div id="cli-status-summary" class="config-result info" role="status" aria-live="polite">แสดงผลตรวจล่าสุดที่บันทึกไว้</div>
+        <div id="cli-status-list" class="cli-status-grid" aria-live="polite" aria-busy="false"></div>
+        <p id="cli-status-checked-at" class="cli-status-checked"></p>
+      </section>
     </main>
   </div>
-  <script src="/static/config.js"></script>
+  <script src="/static/config.js?v=20261011-google-2"></script>
 </body>
 </html>

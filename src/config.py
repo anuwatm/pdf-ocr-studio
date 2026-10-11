@@ -20,6 +20,16 @@ load_dotenv(ENV_PATH)
 # Local LLM Endpoint (e.g., LM Studio, Ollama, vLLM, llama.cpp server)
 LLM_BASE_URL: str = os.getenv("LLM_BASE_URL", "http://127.0.0.1:1234/v1")
 
+# Invocation transport: OpenAI-compatible loopback API or the fixed LM Studio CLI adapter.
+LLM_TRANSPORT: str = os.getenv("LLM_TRANSPORT", "api").strip().lower()
+if LLM_TRANSPORT not in {"api", "cli"}:
+    LLM_TRANSPORT = "api"
+
+# Fixed AI command interface adapter. Browser users select an allowlisted ID only.
+LLM_CLI_PROVIDER: str = os.getenv("LLM_CLI_PROVIDER", "codex").strip().lower()
+if LLM_CLI_PROVIDER not in {"codex", "gemini", "agy", "claude", "lms"}:
+    LLM_CLI_PROVIDER = "codex"
+
 # Target Model identifier
 LLM_MODEL: str = os.getenv("LLM_MODEL", "google/gemma-3-1b")
 
@@ -49,6 +59,8 @@ def get_llm_config() -> dict:
     """Returns local LLM settings without exposing its API key."""
     return {
         "base_url": LLM_BASE_URL,
+        "transport": LLM_TRANSPORT,
+        "cli_provider": LLM_CLI_PROVIDER,
         "model": LLM_MODEL,
         "timeout": LLM_TIMEOUT,
         "api_key_configured": bool(LLM_API_KEY and LLM_API_KEY != "not-needed"),
@@ -61,14 +73,25 @@ def update_llm_config(
     model: str,
     timeout: float,
     api_key: str | None = None,
+    transport: str = "api",
+    cli_provider: str = "codex",
 ) -> dict:
     """Persists local LLM settings and updates this running process immediately."""
-    global LLM_BASE_URL, LLM_MODEL, LLM_TIMEOUT, LLM_API_KEY
+    global LLM_BASE_URL, LLM_MODEL, LLM_TIMEOUT, LLM_API_KEY, LLM_TRANSPORT, LLM_CLI_PROVIDER
+
+    transport = str(transport).strip().lower()
+    if transport not in {"api", "cli"}:
+        raise ValueError("LLM transport must be api or cli")
+    cli_provider = str(cli_provider).strip().lower()
+    if cli_provider not in {"codex", "gemini", "agy", "claude", "lms"}:
+        raise ValueError("LLM CLI provider must be codex, gemini, agy, claude or lms")
 
     updates = {
         "LLM_BASE_URL": base_url.rstrip("/"),
         "LLM_MODEL": model,
         "LLM_TIMEOUT": str(timeout),
+        "LLM_TRANSPORT": transport,
+        "LLM_CLI_PROVIDER": cli_provider,
     }
     if api_key is not None:
         updates["LLM_API_KEY"] = api_key
@@ -91,6 +114,73 @@ def update_llm_config(
     LLM_BASE_URL = updates["LLM_BASE_URL"]
     LLM_MODEL = updates["LLM_MODEL"]
     LLM_TIMEOUT = float(timeout)
+    LLM_TRANSPORT = transport
+    LLM_CLI_PROVIDER = cli_provider
     if api_key is not None:
         LLM_API_KEY = api_key
     return get_llm_config()
+
+
+# ------------------------------------------------------------------------------
+# Google Cloud Translation Configuration (Phase 10)
+# ------------------------------------------------------------------------------
+GOOGLE_CLOUD_PROJECT: str = os.getenv("GOOGLE_CLOUD_PROJECT", "").strip()
+GOOGLE_CLOUD_LOCATION: str = os.getenv("GOOGLE_CLOUD_LOCATION", "global").strip() or "global"
+GOOGLE_APPLICATION_CREDENTIALS: str = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
+GOOGLE_TRANSLATION_API_KEY: str = os.getenv("GOOGLE_TRANSLATION_API_KEY", "").strip() or os.getenv("GOOGLE_API_KEY", "").strip()
+
+
+def get_google_config() -> dict:
+    """Returns Google Cloud settings without exposing credentials."""
+    return {
+        "project": os.getenv("GOOGLE_CLOUD_PROJECT", "").strip(),
+        "location": os.getenv("GOOGLE_CLOUD_LOCATION", "global").strip() or "global",
+        "credentials_configured": bool(os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "").strip()),
+        "api_key_configured": bool(os.getenv("GOOGLE_TRANSLATION_API_KEY", "").strip() or os.getenv("GOOGLE_API_KEY", "").strip()),
+    }
+
+
+def update_google_config(
+    *,
+    project: str = "",
+    location: str = "global",
+    credentials_path: str | None = None,
+    api_key: str | None = None,
+) -> dict:
+    """Persists Google Cloud Translation settings and updates environment immediately."""
+    global GOOGLE_CLOUD_PROJECT, GOOGLE_CLOUD_LOCATION, GOOGLE_APPLICATION_CREDENTIALS, GOOGLE_TRANSLATION_API_KEY
+
+    updates = {}
+    if project is not None:
+        updates["GOOGLE_CLOUD_PROJECT"] = project.strip()
+    if location is not None:
+        updates["GOOGLE_CLOUD_LOCATION"] = location.strip() or "global"
+    if credentials_path is not None:
+        updates["GOOGLE_APPLICATION_CREDENTIALS"] = credentials_path.strip()
+    if api_key is not None:
+        updates["GOOGLE_TRANSLATION_API_KEY"] = api_key.strip()
+
+    existing_lines = ENV_PATH.read_text(encoding="utf-8").splitlines() if ENV_PATH.exists() else []
+    remaining = dict(updates)
+    output_lines = []
+    for line in existing_lines:
+        match = re.match(r"^(\s*)([A-Za-z_][A-Za-z0-9_]*)\s*=", line)
+        if match and match.group(2) in remaining:
+            output_lines.append(f"{match.group(1)}{match.group(2)}={remaining.pop(match.group(2))}")
+        else:
+            output_lines.append(line)
+    output_lines.extend(f"{key}={value}" for key, value in remaining.items())
+
+    temp_path = ENV_PATH.with_suffix(".tmp")
+    temp_path.write_text("\n".join(output_lines) + "\n", encoding="utf-8")
+    temp_path.replace(ENV_PATH)
+
+    for k, v in updates.items():
+        os.environ[k] = v
+    GOOGLE_CLOUD_PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT", "").strip()
+    GOOGLE_CLOUD_LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "global").strip() or "global"
+    GOOGLE_APPLICATION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
+    GOOGLE_TRANSLATION_API_KEY = os.getenv("GOOGLE_TRANSLATION_API_KEY", "").strip()
+
+    return get_google_config()
+

@@ -1,0 +1,7 @@
+{
+  "schema_version": "10.0",
+  "status": "example_only_not_quality_ground_truth",
+  "syntax": ["source => target", "~source => transliteration", "!do-not-translate"],
+  "approved_quality_glossary": null,
+  "reason": "User-approved glossary and target language are still pending."
+}

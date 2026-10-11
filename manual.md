@@ -8,7 +8,7 @@
 
 ## 1. บทนำและสถาปัตยกรรมระบบ
 
-ระบบแปลง PDF/ภาพเป็นข้อความภาษาไทย (Local Thai OCR Web) ได้รับการออกแบบสำหรับการใช้งานบน Windows 10/11 64-bit ภายในเครื่องเดี่ยว (Localhost Desktop) ทำงานแบบ 100% Offline ไม่ส่งเอกสารออกภายนอก
+ระบบแปลง PDF/ภาพเป็นข้อความภาษาไทย (Local Thai OCR Web) ทำงานบน Windows 10/11 64-bit ภายในเครื่องเดี่ยว OCR, Local AI และ Local Translation ไม่ส่งเอกสารออกภายนอก ส่วน Google/Hybrid Translation เป็น cloud opt-in ที่ต้องยืนยันก่อนเริ่ม
 
 หน้าอัปโหลดรองรับ PDF, PNG, JPG และ JPEG สูงสุด **300 MB ต่อไฟล์** หากเกินเพดาน Frontend จะไม่ส่งไฟล์ และ Backend จะตอบ HTTP 413 สำหรับคำขอที่ข้าม Frontend
 
@@ -48,7 +48,7 @@
 3. **ติดตั้ง Dependencies:**
    ```powershell
    py -3 -m pip install --upgrade pip
-   py -3 -m pip install fastapi uvicorn pypdfium2 pymupdf pillow python-dotenv openai python-multipart
+   py -3 -m pip install fastapi uvicorn pypdfium2 pymupdf pillow python-dotenv openai python-multipart google-auth
    ```
 
 4. **ตั้งค่า Environment File (`.env`):**
@@ -68,13 +68,13 @@
    RETENTION_SECONDS=86400.0
    ```
 
-### ตั้งค่า Local LLM ผ่านหน้าเว็บ
+### ตั้งค่า Local LLM และ Google Cloud Translation ผ่านหน้าเว็บ
 
-หลังเริ่มระบบ เปิด `http://127.0.0.1:8000/config.html` แล้วกำหนด `Base URL`, `Model`, `API key` (ถ้ามี) และ `Timeout` จากนั้นกด **ทดสอบการเชื่อมต่อ** ก่อนกด **บันทึกการตั้งค่า**
-
-- Base URL รับเฉพาะ `127.0.0.1`, `localhost` หรือ `::1` เพื่อไม่ให้เอกสารถูกส่งออกนอกเครื่อง
-- หน้าเว็บไม่แสดง API key เดิม; เว้นช่อง API key ว่างเพื่อเก็บค่าเดิม
-- ค่าที่บันทึกลง `.env` มีผลกับงาน AI ใหม่ทันที
+หลังเริ่มระบบ เปิด `http://127.0.0.1:8000/config.html`
+- **Local LLM**: กำหนด `Base URL`, `Model`, `API key` (ถ้ามี) และ `Timeout` จากนั้นกด **ทดสอบการเชื่อมต่อ** ก่อนกด **บันทึกการตั้งค่า** (Base URL รับเฉพาะ `127.0.0.1`, `localhost` หรือ `::1`)
+- **Google Cloud Translation**: กำหนด `Project ID`, `Location`, `Service Account Key File Path` (สำหรับ v3 Advanced) หรือ `API Key` (สำหรับ v2 Basic) จากนั้นกด **ทดสอบการแปล** เพื่อทดสอบเชื่อมต่อและแปลตัวอย่างจริง ก่อนกด **บันทึกการตั้งค่า**
+- หน้าเว็บไม่เปิดเผยค่า API key เดิม; หากเว้นว่างไว้ระบบจะคงค่าเดิมที่มีอยู่ใน `.env`
+- ค่าที่บันทึกลง `.env` มีผลกับงานแปลและงาน AI ทันทีโดยไม่ต้องเริ่มเซิร์ฟเวอร์ใหม่
 
 5. **ทดสอบความพร้อมของ OneOCR Wrapper (Smoke Test):**
    ```powershell
@@ -209,15 +209,19 @@ Phase 9 รวม `toc_revision` ใน preview config งานเก่าไ�
 
 รูปปกลากมาวางในพื้นที่ปกหรือใช้ file picker ได้ Thumbnail ที่ระบุ `เลือกเป็นหน้าปกแล้ว` เป็นค่าที่เลือกในฟอร์ม; ต้องสร้าง XHTML Quick Preview ก่อนจึงเปลี่ยนเป็น `บันทึกใน XHTML Preview แล้ว` และนำไปใช้กับ package
 
-## Phase 10 — Document Translation (วางแผน)
+## Document Translation
 
-วางแผนรองรับการเลือกภาษาปลายทางและ style `ทั่วไป`, `นิยาย`, `วิชาการ`, `ราชการ` ผ่าน Google Cloud Translation, Local AI หรือ Hybrid ฟีเจอร์นี้ยังไม่เริ่ม implementation และยังไม่มีเมนูใช้งาน
+เปิดงานที่มี HTML บันทึกแล้ว → แท็บ `แปลเอกสาร` → เลือก HTML ต้นทาง ภาษาต้นทาง/ปลายทาง style และ provider จากนั้นบันทึก glossary และกด `ประเมินก่อนเริ่ม` ก่อนกด `เริ่มแปล`
 
 ทุก style ไม่บังคับแปลทุกคำ ศัพท์เฉพาะทาง ชื่อเทคโนโลยี ชื่อผลิตภัณฑ์ ตัวย่อ หรือคำที่แปลแล้วทำให้ความหมายคลาดเคลื่อน สามารถคงคำเดิมหรือใช้คำทับศัพท์ได้ โดยควรกำหนดใน glossary/do-not-translate เพื่อให้ใช้สม่ำเสมอทั้งเอกสาร
 
 ชุดทดสอบที่ล็อกไว้คือ `demo/08.pdf`–`13.png`: ตารางอังกฤษ, ภาพจีน+อังกฤษที่มีศัพท์เฉพาะ, นิยายอังกฤษสองภาพ, หนังสือสอน IT และหนังสือสอน IT ที่มี code program ชุดนี้ยังรอ ground truth และยังไม่ครอบคลุมเอกสารราชการ
 
-Google/Hybrid จะส่งข้อความออกจากเครื่องและต้องให้ผู้ใช้ยืนยันก่อนเริ่ม ส่วน Local AI จะคงโหมดไม่มี external request ผลแปลต้องผ่านหน้าตรวจ diff และ validator ก่อนส่งออก Text/HTML/EPUB ดูขอบเขตใน [Phase 10 checklist](checklist.md#phase-10--แปลเอกสารหลายภาษาและเลือกรูปแบบการแปล-document-translation)
+Google/Hybrid ส่งเฉพาะข้อความ segment ออกไปและต้องติ๊ก consent; ตั้ง `GOOGLE_CLOUD_PROJECT` และ ADC/service account ที่ backend ห้ามใส่ credential ใน browser Local AI ใช้ Local LLM เดิมและไม่มี external request
+
+หน้าตรวจคำแปลเลือก Source/Google baseline/AI/Final แก้ Final แล้วบันทึกด้วย revision guard ได้ หากแปลซ้ำให้เลือกเก็บคำแก้มือ, rebase หรือเริ่มใหม่ ระบบบล็อก export เมื่อ critical token เปลี่ยนหรือตารางไม่มี cell model หลังผ่าน validator ดาวน์โหลด Text/HTML หรือกด `เปิดใน EPUB Studio` แล้วสร้าง XHTML Quick Preview ก่อน package
+
+Implementation และ automated acceptance ผ่านแล้ว คุณภาพคำแปลจริงของ `demo/08.pdf`–`13.png` ยังรอภาษาปลายทาง, ground truth, glossary, ชุดราชการ และ blind human review ดู [Phase 10 evidence](phase10/evidence.md)
 
 ## Phase 8.1 — Structured OCR
 

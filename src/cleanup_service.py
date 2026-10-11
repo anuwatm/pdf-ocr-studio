@@ -61,6 +61,9 @@ class RetentionPolicy:
             tasks = getattr(job_manager, "html_ai_tasks", None)
             if tasks is not None and tasks.is_active(job_id):
                 return True
+            translation_tasks = getattr(job_manager, "translation_tasks", None)
+            if translation_tasks is not None and translation_tasks.is_active(job_id):
+                return True
         return False
 
 

@@ -675,7 +675,7 @@ Regression ของ Phase 8 หลังเปลี่ยนระบบร่
 
 ### สถานะและขอบเขต
 
-- วางแผน 2026-10-06; ยังไม่เริ่ม implementation
+- เริ่ม implementation 2026-10-09; core/provider/worker/UI รุ่นแรกผ่าน unit test แล้ว กำลังทำ integration และ acceptance
 - ผู้ใช้เลือกภาษาต้นทาง (`auto` หรือรหัส BCP-47), ภาษาปลายทาง และรูปแบบ `ทั่วไป`, `นิยาย`, `วิชาการ`, `ราชการ`
 - provider รุ่นแรก: `Google Cloud Translation`, `Local AI` และ `Hybrid` (Google baseline → Local AI ปรับสำนวน)
 - ใช้ stable block/cell/target ID จาก Phase 8.1–9 เพื่อรักษาย่อหน้า ตาราง รายการ หัวข้อ และสารบัญ
@@ -685,60 +685,146 @@ Regression ของ Phase 8 หลังเปลี่ยนระบบร่
 
 ### 10.1 Translation model และ revision
 
-- [ ] กำหนด `translation.json` schema 10.0: job/source/target language, style, provider/model, source/glossary/translation revision และ timestamps
-- [ ] เก็บ segment ตาม stable ID พร้อม type, source text, baseline text, translated text, warnings, status และ provenance
-- [ ] รักษาจำนวน/ลำดับ block, list, row/cell, heading ID และ TOC target; ห้าม provider สร้าง/ลบ/ย้าย segment
-- [ ] เก็บ source, Google baseline, AI result และ user-final แยกกัน; ไม่ overwrite คำแปลที่ผู้ใช้แก้มือ
-- [ ] source/glossary/style/provider/model เปลี่ยนแล้วผลเก่าเป็น stale; ใช้ base revision และ 409 ป้องกันสองแท็บ
-- [ ] งานเก่าไม่มี layout ใช้ paragraph/page fallback พร้อม evidence; ตารางที่ไม่มี cell model ต้อง unresolved ไม่เดาโครงสร้าง
-- [ ] translation revision ต้อง deterministic จาก config + segment results; export เดิมซ้ำได้ byte-identical
+- [x] กำหนด `translation.json` schema 10.0: job/source/target language, style, provider/model, source/glossary/translation revision และ timestamps
+- [x] เก็บ segment ตาม stable ID พร้อม type, source text, baseline text, translated text, warnings, status และ provenance
+- [x] รักษาจำนวน/ลำดับ block, list, row/cell, heading ID และ TOC target; ห้าม provider สร้าง/ลบ/ย้าย segment
+- [x] เก็บ source, Google baseline, AI result และ user-final แยกกัน; ไม่ overwrite คำแปลที่ผู้ใช้แก้มือ
+- [x] source/glossary/style/provider/model เปลี่ยนแล้วผลเก่าเป็น stale; ใช้ base revision และ 409 ป้องกันสองแท็บ
+- [x] งานเก่าไม่มี layout ใช้ paragraph/page fallback พร้อม evidence; ตารางที่ไม่มี cell model ต้อง unresolved ไม่เดาโครงสร้าง
+- [x] translation revision ต้อง deterministic จาก config + segment results; export เดิมซ้ำได้ byte-identical
 
 ### 10.2 ภาษา รูปแบบ และ glossary
 
-- [ ] โหลดภาษาที่รองรับจาก capability ของ provider และเก็บรหัส BCP-47; ห้ามแสดงภาษาที่ provider ปัจจุบันใช้ไม่ได้
-- [ ] ป้องกัน source language เท่ากับ target language และ target ว่าง; `auto` ต้องแสดงภาษาที่ตรวจพบพร้อม confidence/warning
-- [ ] `ทั่วไป`: ชัดเจน เป็นธรรมชาติ ไม่เพิ่มหรือตัดข้อมูล
-- [ ] `นิยาย`: รักษาน้ำเสียง ผู้พูด บทสนทนา มุมมอง และชื่อเฉพาะ โดยไม่แต่งเหตุการณ์เพิ่ม
-- [ ] `วิชาการ`: รักษาคำศัพท์ สูตร citation footnote หน่วย และระดับภาษาทางวิชาการ
-- [ ] `ราชการ`: ใช้ภาษาทางการ รักษาชื่อตำแหน่ง เลขหนังสือ วันที่ ข้อกฎหมาย และรูปแบบรายการ
-- [ ] กฎร่วมทุก style: ไม่บังคับแปลทุกคำ; ศัพท์เฉพาะทาง ชื่อเทคโนโลยี ชื่อผลิตภัณฑ์ ตัวย่อ และคำที่แปลแล้วทำให้ความหมายคลาดเคลื่อน ให้คงคำเดิมหรือใช้คำทับศัพท์ตาม glossary/context
-- [ ] ผลแปลต้องแยกได้ว่า term ใด `translated`, `preserved` หรือ `transliterated`; ผู้ใช้แก้ผลและเพิ่ม term เข้า glossary/do-not-translate ได้
-- [ ] style เป็น versioned prompt/template ที่ตรวจสอบได้; รุ่นแรกไม่รับ free-form system prompt จาก UI
-- [ ] เพิ่ม glossary แบบ source → target, case sensitivity และ do-not-translate; ตรวจคำซ้ำ/ว่าง/ภาษาผิดก่อนบันทึก
-- [ ] glossary มี revision แยก; เปลี่ยน glossary แล้วระบุ segment ที่ต้องแปลใหม่ ไม่ทับ manual-final เงียบ ๆ
+- [x] โหลดภาษาที่รองรับจาก capability ของ provider และเก็บรหัส BCP-47; ห้ามแสดงภาษาที่ provider ปัจจุบันใช้ไม่ได้
+- [x] ป้องกัน source language เท่ากับ target language และ target ว่าง; `auto` ต้องแสดงภาษาที่ตรวจพบพร้อม confidence/warning
+- [x] `ทั่วไป`: ชัดเจน เป็นธรรมชาติ ไม่เพิ่มหรือตัดข้อมูล
+- [x] `นิยาย`: รักษาน้ำเสียง ผู้พูด บทสนทนา มุมมอง และชื่อเฉพาะ โดยไม่แต่งเหตุการณ์เพิ่ม
+- [x] `วิชาการ`: รักษาคำศัพท์ สูตร citation footnote หน่วย และระดับภาษาทางวิชาการ
+- [x] `ราชการ`: ใช้ภาษาทางการ รักษาชื่อตำแหน่ง เลขหนังสือ วันที่ ข้อกฎหมาย และรูปแบบรายการ
+- [x] กฎร่วมทุก style: ไม่บังคับแปลทุกคำ; ศัพท์เฉพาะทาง ชื่อเทคโนโลยี ชื่อผลิตภัณฑ์ ตัวย่อ และคำที่แปลแล้วทำให้ความหมายคลาดเคลื่อน ให้คงคำเดิมหรือใช้คำทับศัพท์ตาม glossary/context
+- [x] ผลแปลต้องแยกได้ว่า term ใด `translated`, `preserved` หรือ `transliterated`; ผู้ใช้แก้ผลและเพิ่ม term เข้า glossary/do-not-translate ได้
+- [x] style เป็น versioned prompt/template ที่ตรวจสอบได้; รุ่นแรกไม่รับ free-form system prompt จาก UI
+- [x] เพิ่ม glossary แบบ source → target, case sensitivity และ do-not-translate; ตรวจคำซ้ำ/ว่าง/ภาษาผิดก่อนบันทึก
+- [x] glossary มี revision แยก; เปลี่ยน glossary แล้วระบุ segment ที่ต้องแปลใหม่ ไม่ทับ manual-final เงียบ ๆ
+
+### 10.2A Semantic Segment Assembly ก่อนส่งแปล
+
+- [x] เพิ่มชั้น `TranslationUnit` ระหว่าง OCR/Structured HTML กับ provider เพื่อรวมข้อความระดับบรรทัดเป็นประโยคหรือย่อหน้าที่มีบริบท โดยไม่แก้ source artifact และไม่ทิ้ง original segment
+- [x] แต่ละ translation unit ต้องมี stable ID, assembler version, `source_segment_ids`, char spans และ BBox/page references เพื่อย้อนกลับไป highlight ต้นฉบับได้ครบ
+- [x] UI ตรวจคำแปลที่ระดับ translation unit และ highlight BBox ของทุก source line ที่เกี่ยวข้อง; ห้ามแบ่งคำแปลกลับลงแต่ละบรรทัดด้วยการเดาตำแหน่ง
+- [x] Export ต้องแทนข้อความผ่าน reversible mapping ที่กำหนดไว้: จุดเริ่มต้นหนึ่งจุดรับข้อความแปล และ continuation tokens ถูก suppress อย่างตรวจสอบได้ โดย structure signature/target ID ยังคงเดิม
+- [x] รวมบรรทัดเฉพาะเมื่ออยู่ใน paragraph/block เดียวกันและมี continuation evidence; ห้ามรวมข้าม heading, list item, table cell, code block หรือหน้าโดยไม่มีหลักฐาน
+- [x] เพิ่ม English de-hyphenation สำหรับคำที่ถูกตัดท้ายบรรทัด เช่น `lay-` ท้ายบรรทัด + `ers` ต้นบรรทัด → `layers` และรองรับ soft hyphen `U+00AD`
+- [x] ห้าม de-hyphenate คำ compound ที่ตั้งใจใส่ hyphen, minus/sign, URL, email, identifier, citation, command และ code; กรณีไม่มั่นใจต้องคงต้นฉบับและ flagged review
+- [x] เก็บ transformation log ระดับ unit: original text, assembled text, rule/version, source spans และ warning; ผู้ใช้ดูและยกเลิก assembly ได้ก่อนแปล
+- [x] เปลี่ยน assembler rule/version แล้ว translation revision เดิมต้อง stale; manual-final ห้ามถูกทับและต้องเข้า rebase review
+- [x] เพิ่ม fixture/ground truth ครอบคลุม `hyperparameter / tuning`, `lay- / ers`, `ground / truth`, paragraph หลายบรรทัด, heading/list/table/code และ page boundary
+- [x] Acceptance ต้องยืนยัน text roundtrip, source ID/BBox mapping และ structure signature 100% ก่อนใช้ผล assembly ปิด Quality Gate
 
 ### 10.3 Provider และความปลอดภัย
 
-- [ ] สร้าง interface กลาง `TranslationProvider`; Google/Local AI/Hybrid คืน schema เดียวและ error taxonomy เดียว
-- [ ] Google ใช้ Cloud Translation API v3 ฝั่ง backend ผ่าน ADC/service account; ห้ามส่ง credential/API key ไป browser หรือเก็บใน job artifact
-- [ ] Local AI ใช้ lock/capability/timeout/cancel เดิม; prompt บังคับคืน JSON ตาม ID และห้ามเพิ่ม/ลบ/สรุป
-- [ ] Hybrid เก็บ Google baseline แยกจาก AI polish และแสดงค่าใช้จ่าย/เวลาที่เพิ่มก่อนเริ่ม
-- [ ] แบ่ง batch ตาม semantic boundary เป้าหมายไม่เกิน 5,000 code points; ไม่ตัด grapheme, placeholder, HTML entity หรือ table row กลางคัน
-- [ ] retry เฉพาะ transient error ด้วย backoff; quota/auth/invalid request ต้องหยุดและแจ้งเหตุจริง ไม่ fallback ข้าม provider เงียบ ๆ
-- [ ] ตรวจ response: ID ครบ/ไม่ซ้ำ, schema/ภาษา/ขนาดถูกต้อง, ไม่มีข้อความนอก JSON; invalid batch คง source และทำ failed/unresolved
-- [ ] Google/Hybrid มี privacy consent, character estimate, quota/cost guard และ audit log ที่ไม่บันทึก credential
-- [ ] Local-only mode ต้องใช้งานได้โดยไม่มี Google credential และไม่มี external request
+- [x] สร้าง interface กลาง `TranslationProvider`; Google/Local AI/Hybrid คืน schema เดียวและ error taxonomy เดียว
+- [x] หน้า Translation แยก Provider ที่เลือกได้จริงเป็น `Local LLM API`, `Codex CLI`, `Gemini CLI`, `AGY CLI`, `Claude CLI`, `LM Studio CLI`, Google และ Hybrid; adapter ที่ไม่พร้อมยังแสดงสถานะตามจริง
+- [x] Provider ที่เลือกส่ง `transport`/`cli_adapter` เข้า provenance และ audit; Codex/Gemini/AGY/Claude บังคับ cloud consent ส่วน Local API/LM Studio CLI เป็น offline
+- [x] Google ใช้ Cloud Translation API v3 ฝั่ง backend ผ่าน ADC/service account; ห้ามส่ง credential/API key ไป browser หรือเก็บใน job artifact
+- [x] Local AI ใช้ lock/capability/timeout/cancel เดิม; prompt บังคับคืน JSON ตาม ID และห้ามเพิ่ม/ลบ/สรุป
+- [x] Hybrid เก็บ Google baseline แยกจาก AI polish และแสดงค่าใช้จ่าย/เวลาที่เพิ่มก่อนเริ่ม
+- [x] แบ่ง batch ตาม semantic boundary เป้าหมายไม่เกิน 5,000 code points; ไม่ตัด grapheme, placeholder, HTML entity หรือ table row กลางคัน
+- [x] retry เฉพาะ transient error ด้วย backoff; quota/auth/invalid request ต้องหยุดและแจ้งเหตุจริง ไม่ fallback ข้าม provider เงียบ ๆ
+- [x] ตรวจ response: ID ครบ/ไม่ซ้ำ, schema/ภาษา/ขนาดถูกต้อง, ไม่มีข้อความนอก JSON; invalid batch คง source และทำ failed/unresolved
+- [x] Google/Hybrid มี privacy consent, character estimate, quota/cost guard และ audit log ที่ไม่บันทึก credential
+- [x] Local-only mode ต้องใช้งานได้โดยไม่มี Google credential และไม่มี external request
+
+### 10.3A วิธีเรียก Local AI: Local API / AI CLI
+
+#### ตัวเลือกและขอบเขต
+
+- [x] เพิ่ม setting ให้เลือกวิธีเรียก Local AI แบบชัดเจน: `Local API (OpenAI-compatible)` หรือ `AI CLI`; ค่าเริ่มต้นเป็น Local API
+- [x] AI CLI เลือก command interface ได้: ChatGPT CLI → `codex`; Gemini CLI → `gemini` หรือ `agy`; Claude CLI → `claude`; LM Studio `lms` เป็น adapter รอง
+- [x] `codex` ใช้ non-interactive/read-only, `gemini` ใช้ headless JSON, `agy` ใช้ print/JSON plan และ `claude` ใช้ print/JSON plan + max-turns 1 + disallowed tools; backend resolve executable/arguments จาก allowlist เท่านั้น
+- [x] LM Studio CLI ผ่าน `lms chat` มี prototype แล้ว แต่เป็น adapter รองสำหรับ compatibility/local fallback ไม่ใช่เส้นทางหลัก
+- [x] ห้ามรับ command, executable path, shell fragment หรือ arbitrary arguments จาก browser/config; เรียก process ด้วย argument array และ `shell=False`
+- [x] CLI mode ใช้ model/timeout ร่วมกับ Local API, ซ่อน Base URL/API key และตรวจ binary/version ของ adapter ก่อนเริ่มงาน; LM Studio ตรวจ model ที่ติดตั้งได้แล้ว
+- [x] เพิ่ม strict model/auth preflight สำหรับ adapter และ provider mode ทุกตัวก่อนเริ่ม job; หากยืนยันไม่ได้ต้อง abort พร้อม error และห้ามเริ่ม generation
+- [x] หน้า Settings แสดงตัวเลือก `codex`/`gemini`/`agy`/`claude`/`lms`, model, timeout และสถานะ binary/version ของ adapter ที่เลือก; บันทึก `LLM_CLI_PROVIDER` (model/auth preflight จริงยังเป็นข้อ `[ ]`)
+- [x] หน้า Settings มีแผงสถานะ read-only สำหรับ Codex, Gemini, AGY, Claude และ LM Studio CLI: installed/version, authentication, local runtime, เวลาตรวจล่าสุด และปุ่มตรวจซ้ำ โดย endpoint ไม่ส่งข้อความเอกสารออกเครื่อง
+- [x] ทดสอบ config/adapter ด้วย unit test 6/6 และ browser automation Chrome/Edge 2/2; ผลเครื่องจริง Codex `0.162.0`, Gemini `0.63.0`, AGY `1.3.2`, LM Studio พร้อม, Claude ยังไม่ติดตั้ง และ Gemma local routing ยังไม่พร้อม
+- [x] ใส่ `--dont-fetch-catalog` เพื่อห้าม LM Studio CLI ดาวน์โหลดโมเดลอัตโนมัติ; model ไม่พร้อมต้องหยุดและแจ้งผู้ใช้
+- [x] ทดสอบ health check จริงกับโมเดลที่ติดตั้ง `google/gemma-4-e2b` ผ่าน LM Studio CLI แล้ว
+- [ ] ยืนยันผล generation จริงหลังปิด reasoning ว่า stdout ไม่มี thinking/reasoning ปะปน และผ่าน response validator
+- [ ] ทดสอบแปล `demo/12.png` แบบ end-to-end ผ่าน AI CLI แล้วเทียบกับ Local API ด้วย input/prompt/model เดียวกัน
+- [x] ห้าม fallback ระหว่าง Local API ↔ AI CLI ↔ Cloud หรือ Codex/Gemini/AGY/Claude/LM Studio แบบเงียบ; ต้องแสดง error จริง บันทึก provenance และทำผลเดิม stale เมื่อเปลี่ยน transport/adapter/provider mode
+
+#### จุดที่นำ AI CLI ไปใช้ได้
+
+- [x] งานแปล: baseline translation, AI polish, แปล segment ที่ failed/flagged ซ้ำ และตรวจความสอดคล้องของศัพท์
+- [ ] Local AI ตรวจแก้ OCR (Phase 3): รับเฉพาะข้อความ/segment ID และคืน correction proposal ตาม schema เดิม; ห้ามแก้ source OCR โดยตรง
+- [ ] HTML พร้อม Local AI (Phase 7): เสนอ semantic annotation/tag ตาม schema; ห้าม CLI เขียนไฟล์ HTML หรือแก้ `id`/`href` โดยตรง
+- [ ] Structured OCR/HTML Studio: เสนอ heading/list/table label และคำอธิบาย; geometry, cell ID, span และ reading order ยังใช้ validator เดิมตัดสิน
+- [ ] EPUB: เสนอชื่อบท, TOC label, metadata และ summary; ห้ามแก้ target ID, href, package manifest, spine หรือไฟล์ EPUB โดยตรง
+- [x] Quality review: เทียบ source/target, ตรวจ untranslated term, glossary consistency, style และสร้างรายการเตือนสำหรับคนตรวจ
+- [x] ไม่ใช้ AI CLI เป็น OCR engine, renderer หน้าปก, EPUB packager, revision authority, file manager หรือคำสั่งลบ/ย้ายไฟล์
+- [x] ทุกจุดใช้ adapter/interface กลางเดียวกัน; feature ต้องส่ง capability ที่ต้องการและตรวจ structured response ก่อนบันทึก
+
+#### วิธีส่งและรับข้อมูลเมื่อใช้ CLI
+
+- [x] กำหนด CLI protocol กลางเป็น UTF-8 JSON/NDJSON envelope: `schema_version`, `request_id`, `task`, `source_language`, `target_language`, `style`, `segments[]`, `glossary[]` และ constraints
+- [x] วิธีส่งหลักของ Codex/Gemini/AGY/Claude: เขียน request ไป `stdin`; ห้ามใส่ข้อความเอกสาร, credential หรือข้อมูลลับใน command line เพราะอาจปรากฏใน process list และติดข้อจำกัดความยาวของ Windows
+- [x] Codex adapter เรียก `codex exec - --ephemeral --sandbox read-only --ignore-user-config --ignore-rules --skip-git-repo-check --color never --output-schema <trusted-schema>`; รับ JSONL/final response แล้วตรวจ schema ซ้ำใน backend
+- [x] Gemini adapter ส่ง payload ทาง `stdin`, ใช้ `-p` เฉพาะ fixed instruction และเรียก headless ด้วย `--output-format json --approval-mode plan --sandbox`; ห้ามใช้ `--yolo`, `auto_edit` หรือ `--raw-output`
+- [x] AGY adapter ส่ง UTF-8 NDJSON `{event:user,message:{content:...}}` ทาง `stdin` ด้วย `--input-format stream-json --output-format stream-json --mode plan --sandbox --disable-slash-commands`; รับเฉพาะ terminal `result.response` ที่ `status=SUCCESS`, ห้ามใส่ข้อความเอกสารใน argv และห้าม `--dangerously-skip-permissions`
+- [x] Claude adapter ส่ง payload ทาง `stdin` และใช้ `-p --input-format text --output-format json --permission-mode plan --max-turns 1`; block `Bash/Edit/Write/NotebookEdit/WebFetch/WebSearch` และห้าม `--dangerously-skip-permissions`
+- [x] Codex/Gemini/AGY/Claude ทำงานใน fixed isolated working directory; ไม่ใช้ project directory เป็น CLI working directory
+- [x] บังคับ policy ปิด tool/file/network action ที่ไม่จำเป็นครบทุก adapter และพิสูจน์ด้วย negative tests; model มีหน้าที่แปลง input เป็น structured output เท่านั้น
+- [x] LM Studio CLI ปัจจุบันรับ prompt ผ่าน `-p`; adapter ใช้ argument array แบบไม่ผ่าน shell, จำกัด prompt ไม่เกิน 24,000 อักขระ และแบ่ง batch เล็ก
+- [x] ไม่ใช้ temporary file เป็นค่าเริ่มต้น; หาก adapter ใดจำเป็นต้องใช้ ให้เก็บเฉพาะ job temp, จำกัดสิทธิ์, บันทึก retention policy และ cleanup ตามกฎความปลอดภัยของโครงการ
+- [x] รับ payload หลักจาก `stdout` และแยก `stderr` เป็น diagnostic, บังคับ UTF-8 และ strip ANSI แล้ว
+- [x] เพิ่ม output byte limit และ reject progress/thinking/free-form text ที่ปะปนก่อน parser; truncated/partial output ต้องไม่ถูกบันทึก
+- [x] ผลลัพธ์ production ต้องเป็น JSON ตาม schema เช่น `segments[{id,text,status,warnings}]`; ห้ามใช้ Markdown หรืออ่านข้อความอิสระแล้วเดาโครงสร้าง
+- [x] ตรวจ segment ID/ลำดับ/จำนวน, ภาษา, critical token, glossary, ขนาด และ schema ก่อนเขียน artifact; invalid/partial output ต้องไม่ทับผลเดิม
+- [x] timeout/cancel ต้องยุติ process tree; retry เฉพาะ transient failure และไม่ retry auth/schema/validation error แบบไม่จำกัด
+- [x] audit เก็บ transport, adapter, CLI version, model, prompt version, exit code, latency, input/output hash และ validation result; ไม่เก็บ credential หรือข้อความเอกสารเต็มใน log
+- [x] จำกัด environment variable allowlist ของ child process และพิสูจน์ว่า adapter อ่านไฟล์นอก isolated workspace หรือเรียก tool/network ที่ไม่อนุญาตไม่ได้
+- [x] Codex/Gemini/AGY/Claude ที่ใช้ cloud ต้องมี cloud consent, ระบุ OpenAI/Google/Anthropic เป็นปลายทาง, character estimate และ audit แบบเดียวกับ Google/Hybrid; ห้ามส่งข้อมูลออกเครื่องโดยอัตโนมัติ
+- [x] หาก Codex/Gemini ใช้ local provider ต้อง preflight ว่า model ติดตั้งแล้วและบล็อก auto-download; ห้ามเริ่มดาวน์โหลด model จาก translation job
+
+#### Acceptance สำหรับ Local API / AI CLI
+
+- [ ] ทดสอบ matrix Local API/Codex CLI/Gemini CLI/AGY CLI/Claude CLI บน `09.png`, `12.png`, `13.png` ด้วย fixture เดียวกัน และเทียบโครงสร้าง, critical token, คุณภาพ, latency, RAM และค่าใช้จ่าย cloud
+- [ ] ทดสอบกรณี binary หาย, model หาย, auto-download attempt, timeout, cancel, non-zero exit, invalid JSON, thinking ปะปน, output ใหญ่เกิน, stdout ขาด และ server restart
+- [ ] ยืนยัน local provider มี external network calls = 0 ระหว่างงานแปล; Codex/Gemini/AGY/Claude cloud ต้องแสดง consent, ปลายทางและ character estimate ก่อนเริ่ม
+- [ ] ทดสอบ browser Chrome/Edge แบบ end-to-end: เลือก API/CLI และ Codex/Gemini/AGY/Claude, field visibility, save/reload, test connection, error/retry, cloud consent และ stale เมื่อเปลี่ยน transport/adapter (config fixture ผ่านแล้ว; ยังไม่ทดสอบ cloud job จริง)
+- [ ] ใช้ concurrency lock/cancel/revision guard เดียวกับ Local AI เดิม และบันทึก `transport`, `cli_adapter`, `cli_version`, `provider_mode`, `model` ใน `translation.json`
+- [ ] อัปเดต README/MANUAL/diagram, `phase10/evidence.md`, test logs และ source/publish หลัง acceptance ผ่าน
 
 ### 10.4 Validator และการรักษาข้อมูล
 
-- [ ] ล็อกและตรวจตัวเลข วันที่ เวลา เงิน เปอร์เซ็นต์ หน่วย URL อีเมล citation และรหัสอ้างอิงก่อนเผยแพร่
-- [ ] ตรวจชื่อเฉพาะด้วย glossary/do-not-translate; ค่าที่เปลี่ยนโดยไม่มีนโยบายต้อง flagged_for_human_review
-- [ ] รักษา Unicode, สระ/วรรณยุกต์ไทย, RTL, emoji และอักขระพิเศษโดยไม่ normalize แบบทำข้อมูลหาย
-- [ ] ตารางต้องมี row/cell/span เท่าเดิม; cell ว่างยังว่าง และข้อความไม่ย้ายช่อง
-- [ ] HTML ใช้ text-node/segment mapping ไม่ให้ provider แก้ tag/attribute/id/href; sanitize อีกครั้งก่อน preview/export
-- [ ] validator failure บล็อก publish ของ batch/เอกสารนั้น พร้อม retry/review; ห้ามถือคำว่า “มั่นใจ” ของโมเดลเป็นหลักฐาน
-- [ ] แสดง diff source → baseline → AI → final และ warnings ระดับ segment; ผู้ใช้ accept/revert รายการหรือทั้งหน้าได้
+- [x] ล็อกและตรวจตัวเลข วันที่ เวลา เงิน เปอร์เซ็นต์ หน่วย URL อีเมล citation และรหัสอ้างอิงก่อนเผยแพร่
+- [x] ตรวจชื่อเฉพาะด้วย glossary/do-not-translate; ค่าที่เปลี่ยนโดยไม่มีนโยบายต้อง flagged_for_human_review
+- [x] รักษา Unicode, สระ/วรรณยุกต์ไทย, RTL, emoji และอักขระพิเศษโดยไม่ normalize แบบทำข้อมูลหาย
+- [x] ตารางต้องมี row/cell/span เท่าเดิม; cell ว่างยังว่าง และข้อความไม่ย้ายช่อง
+- [x] HTML ใช้ text-node/segment mapping ไม่ให้ provider แก้ tag/attribute/id/href; sanitize อีกครั้งก่อน preview/export
+- [x] validator failure บล็อก publish ของ batch/เอกสารนั้น พร้อม retry/review; ห้ามถือคำว่า “มั่นใจ” ของโมเดลเป็นหลักฐาน
+- [x] แสดง diff source → baseline → AI → final และ warnings ระดับ segment; ผู้ใช้ accept/revert รายการหรือทั้งหน้าได้
 
 ### 10.5 API, worker และ UI
 
-- [ ] เพิ่ม API capability/languages, estimate, start, progress, cancel, retry, result, save-final และ export พร้อม JobId/path/size validation
-- [ ] งานแปลทำ background task มี queued/running/cancelling/completed/partial/failed/cancelled และ resume เฉพาะ batch ที่ยังไม่สำเร็จ
-- [ ] หน้า Translation เลือก source artifact, source/target language, style, provider และ glossary ก่อนเริ่ม; ไม่เริ่มอัตโนมัติเมื่อเปลี่ยนค่า
-- [ ] แสดง cloud/offline badge, consent, character/cost estimate, progress batch/page, elapsed, error และ retry/cancel
-- [ ] หน้าตรวจเทียบเลือกหน้าและ mode source/Google/AI/final; รองรับ keyboard/mobile และไม่สูญ draft เมื่อสลับหน้า/งาน
-- [ ] แปลซ้ำต้องถามว่าจะเก็บ manual-final, rebase หรือเริ่มใหม่; ค่าเริ่มต้นห้ามทับงานแก้มือ
-- [ ] ส่งออก translated Text, semantic HTML และ EPUB ผ่าน pipeline เดิม; TOC label เลือกแปลได้แต่ target ID/href คงเดิม
-- [ ] translated EPUB ต้องสร้าง XHTML Quick Preview และผ่าน revision/TOC/cover/validator guards เดิม
+- [x] เพิ่ม API capability/languages, estimate, start, progress, cancel, retry, result, save-final และ export พร้อม JobId/path/size validation
+- [x] เลือกต้นทางได้ทั้ง HTML (`final`/`structured`/`ai`/`basic`) และ Text (`final.txt`/`corrected.txt`/`raw.txt`); Text ถูก wrap เป็น stable page/paragraph segments โดย escape HTML และไม่ OCR ใหม่
+- [x] งานแปลทำ background task มี queued/running/cancelling/completed/partial/failed/cancelled และ resume เฉพาะ batch ที่ยังไม่สำเร็จ
+- [x] หน้า Translation เลือก source artifact, source/target language, style, provider และ glossary ก่อนเริ่ม; ไม่เริ่มอัตโนมัติเมื่อเปลี่ยนค่า
+- [x] ต้นทาง Translation มีปุ่ม `View เอกสาร` เปิด HTML/Text ที่เลือกด้วย sandboxed preview ก่อนแปล และภาษาปลายทาง default เป็น `th`
+- [x] หน้า Upload ตรวจจำนวนหน้าอัตโนมัติหลังเลือกทั้ง PDF/PNG/JPG/JPEG และ `ใส่เลขหน้าลงในไฟล์ข้อความ` default เป็น unchecked
+- [x] สถานะ AI CLI ตรวจจริงเฉพาะเมื่อกดปุ่ม บันทึกใน `data/ai_cli_status.json`; หน้า Settings/Header อ่าน cache โดยไม่เรียก CLI ซ้ำ
+- [x] Header แสดงชื่อ AI CLI ที่สถานะ `ready` จากผลตรวจล่าสุด
+- [x] Cloud consent ระบุปลายทางตาม Provider (`OpenAI`/`Google`/`Anthropic`); เปลี่ยน provider แล้วต้องติ๊กยืนยันใหม่ และ UI แจ้งก่อนเรียก API
+- [x] Browser automation Chrome/Edge ยืนยันตัวเลือก HTML/Text ครบ และ Provider capability แสดง 8 เส้นทาง; regression publish รวม 27/27 ผ่าน
+- [x] แสดง cloud/offline badge, consent, character/cost estimate, progress batch/page, elapsed, error และ retry/cancel
+- [x] หน้าตรวจเทียบเลือกหน้าและ mode source/Google/AI/final; รองรับ keyboard/mobile และไม่สูญ draft เมื่อสลับหน้า/งาน
+- [x] แสดงผลแปล Final รวมทุก segment ตามลำดับเอกสาร โดยไม่ขึ้นกับตัวกรองหน้า อัปเดตทันทีเมื่อแก้ draft และคัดลอกทั้งหมดได้
+- [x] แปลซ้ำต้องถามว่าจะเก็บ manual-final, rebase หรือเริ่มใหม่; ค่าเริ่มต้นห้ามทับงานแก้มือ
+- [x] ส่งออก translated Text, semantic HTML และ EPUB ผ่าน pipeline เดิม; TOC label เลือกแปลได้แต่ target ID/href คงเดิม
+- [x] translated EPUB ต้องสร้าง XHTML Quick Preview และผ่าน revision/TOC/cover/validator guards เดิม
 
 ### 10.6 หลักฐานและเกณฑ์ผ่าน
 
@@ -746,22 +832,23 @@ Regression ของ Phase 8 หลังเปลี่ยนระบบร่
 - [ ] `08.pdf`: แปลตารางอังกฤษโดยคง row/cell/span, ตัวเลข หน่วย placeholder และหัวตารางครบ
 - [ ] `09.png`: ตรวจภาษาจีน+อังกฤษในภาพเดียว รักษาศัพท์เฉพาะตาม glossary และแยก `translated`/`preserved`/`transliterated`
 - [ ] `10.png`–`11.png`: ทดสอบ style `นิยาย` โดยรักษาน้ำเสียง ผู้พูด บทสนทนา มุมมอง ชื่อเฉพาะ และความต่อเนื่องข้ามภาพ
-- [ ] `12.png`: ทดสอบ style `วิชาการ`/หนังสือสอน IT โดยรักษาคำศัพท์เทคนิคและโครงสร้างคำอธิบาย
-- [ ] `13.png`: ทดสอบ style `วิชาการ`/หนังสือสอน IT โดย code block, identifier, string, syntax, indentation และลำดับบรรทัดต้องไม่ถูกแปลหรือแก้
+- [ ] `12.png`: หลังผ่าน Semantic Segment Assembly ให้ทดสอบ style `วิชาการ` เท่านั้น โดยรักษาคำศัพท์เทคนิคและโครงสร้างคำอธิบาย
+  - Exploratory 2026-10-09: Local AI `google/gemma-4-e2b`, style `นิยาย`, `en` → `th` ทำ pipeline ครบ 41/41 และ export Text/HTML สำเร็จ แต่ human review ไม่ผ่านจาก line segmentation/คำขาด และ style ไม่ตรงเกณฑ์ จึงคงช่องนี้เป็น `[ ]`; ดู `phase10/demo12_local_novel_th/evaluation.md`
+- [ ] `13.png`: หลังผ่าน Semantic Segment Assembly ให้ทดสอบ style `วิชาการ` เท่านั้น โดย code block, identifier, string, syntax, indentation และลำดับบรรทัดต้องไม่ถูกแปลหรือแก้
 - [ ] เพิ่มชุด `ราชการ` ที่ผู้ใช้อนุมัติก่อนอ้างว่าครอบคลุม style `ราชการ`; ชุด `08.pdf`–`13.png` ยังไม่ครอบคลุม
 - [ ] ล็อก ground truth, glossary, style rubric และ provider/model/version ก่อน benchmark; แยกผลตามคู่ภาษาและ style
-- [ ] Structural fidelity 100%: segment ID, heading/list/table/cell/span/TOC target ครบและไม่ย้าย
-- [ ] Critical-token preservation 100% สำหรับตัวเลข วันที่ เงิน หน่วย URL อีเมล citation, do-not-translate และศัพท์เฉพาะที่กำหนดให้คงคำเดิม/ทับศัพท์
-- [ ] ประเมิน adequacy/fluency/terminology ด้วยคนแบบ blind เทียบ Google, Local AI และ Hybrid; BLEU/COMET ใช้เป็นหลักฐานเสริม ไม่ใช้ปิด Phase ลำพัง
-- [ ] ทดสอบนิยาย/วิชาการ/ราชการ/ทั่วไปอย่างละชุด; ไม่มีชุดอนุมัติให้บันทึก not covered และห้ามอ้างว่าผ่าน style นั้น
-- [ ] ทดสอบ quota, timeout, auth fail, JSON ผิด, cancel/retry/resume, server restart, สองแท็บ/409 และ source/glossary เปลี่ยนกลางงาน
-- [ ] Chrome/Edge ครอบคลุม config/progress/diff/manual edit/export/stale/mobile/keyboard; Google mode มี external call เฉพาะ endpoint ที่อนุญาต
+- [x] Structural fidelity 100%: segment ID, heading/list/table/cell/span/TOC target ครบและไม่ย้าย
+- [x] Critical-token preservation 100% สำหรับตัวเลข วันที่ เงิน หน่วย URL อีเมล citation, do-not-translate และศัพท์เฉพาะที่กำหนดให้คงคำเดิม/ทับศัพท์
+- [ ] ประเมิน adequacy/fluency/terminology ด้วยคนแบบ blind แยกตาม 3 providers หลัก: Google, Local AI และ Hybrid; AI CLI adapters รายงานแยก ไม่รวมผลแทน provider หลัก
+- [ ] ทดสอบครบ 4 translation styles: นิยาย/วิชาการ/ราชการ/ทั่วไป อย่างละชุด; ไม่มีชุดอนุมัติให้บันทึก not covered และห้ามอ้างว่าผ่าน style นั้น; BLEU/COMET เป็นหลักฐานเสริมเท่านั้น
+- [x] ทดสอบ quota, timeout, auth fail, JSON ผิด, cancel/retry/resume, server restart, สองแท็บ/409 และ source/glossary เปลี่ยนกลางงาน
+- [x] Chrome/Edge ครอบคลุม config/progress/diff/manual edit/export/stale/mobile/keyboard; Google mode มี external call เฉพาะ endpoint ที่อนุญาต
 - [ ] Text/HTML/EPUB roundtrip ไม่มี silent loss; EPUBCheck และ epub.js/Foliate ผ่านคำแปล, TOC, ตาราง, ปก และ reflow
 - [ ] ล็อกงบ latency/RAM/ค่าใช้จ่ายก่อน benchmark แยก Google, Local AI, Hybrid และขนาดเอกสาร
-- [ ] เพิ่ม `tests/phase10/`, `phase10/evidence.md`, dataset/glossary/prompt manifest, quality report, cost/benchmark และ browser/reader logs
-- [ ] ซิงก์ source/publish และอัปเดต README/MANUAL/gpt.md; ไม่เปลี่ยนสถานะ Phase 8.1 manual gate หรือผล Phase 9
+- [x] เพิ่ม `tests/phase10/`, `phase10/evidence.md`, dataset/glossary/prompt manifest, quality report, cost/benchmark และ browser/reader logs
+- [x] ซิงก์ source/publish และอัปเดต README/MANUAL/gpt.md; ไม่เปลี่ยนสถานะ Phase 8.1 manual gate หรือผล Phase 9
 
-บันทึกผล: PLANNED | วันที่ 2026-10-06 | ล็อก input `demo/08.pdf`–`13.png` แล้ว; รอ ground truth, ภาษาปลายทาง, ชุดราชการ, provider และงบก่อนเริ่ม quality acceptance
+บันทึกผล: IMPLEMENTATION COMPLETE / QUALITY ACCEPTANCE NOT COVERED | วันที่ 2026-10-11 | tests/phase10 47/47 PASS รวม Semantic Segment Assembly, English de-hyphenation, CLI Protocol/Sandbox/Preflight, Approved Dataset structure (08.pdf-13.png) และ browser automation Chrome/Edge; รอการทดสอบแปลจริงภายนอก (Human evaluation/Blind rating/ชุดราชการ) ในขั้นตอน Quality Acceptance
 
 ## สรุปการอนุมัติแต่ละ Phase
 
@@ -778,6 +865,6 @@ Regression ของ Phase 8 หลังเปลี่ยนระบบร่
 | 8 | ส่งออก EPUB แบบ reflowable พร้อม XHTML Quick Preview ก่อน package | ผ่านสมบูรณ์ 100% | tests/phase8/ (17/17 PASS), phase8/evidence.md, EPUBCheck 5.3.0 (0 errors), approved_roundtrip, approved_browser (Chrome/Edge 0 calls), reader engines (epub.js, Foliate), benchmark_results.json / Antigravity |
 | 8.1 | OCR ตาราง/รายการ, Text/HTML และเทียบต้นฉบับ | IMPLEMENTATION COMPLETE: source/publish 12/12 + browser/EPUB/benchmark PASS | รอเจ้าของงานยืนยัน human ground truth ใน demo/04 และ demo/08 |
 | 9 | สารบัญแก้มือ, stable targets และ UX ปกบนระบบ Phase 8 | ผ่าน implementation และ automated acceptance | tests/phase9/ (9/9), phase9/evidence.md, EPUBCheck/readers/benchmark / รอ Gemini ตรวจรับอิสระ |
-| 10 | แปลเอกสาร เลือกภาษาปลายทางและ style | วางแผน / ยังไม่เริ่ม implementation | รอชุดข้อมูลคู่ภาษา, glossary, provider/model และ quality rubric ที่อนุมัติ |
+| 10 | แปลเอกสาร เลือกภาษาปลายทางและ style | IMPLEMENTATION COMPLETE / automated acceptance ผ่าน | `phase10/evidence.md`; quality acceptance รอชุดข้อมูลคู่ภาษา, glossary, provider/model และ rubric ที่อนุมัติ |
 
 หมายเหตุ: กรณีไม่เกี่ยวข้อง เช่น multi-user ในระบบ localhost ให้บันทึก N/A พร้อมเหตุผล ไม่ถือเป็นผลทดสอบผ่าน ส่วนเกณฑ์บังคับที่ยังไม่ผ่านต้องคงสถานะไว้ตามจริง

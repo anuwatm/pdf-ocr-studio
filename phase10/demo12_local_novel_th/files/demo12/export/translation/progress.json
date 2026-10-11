@@ -1,0 +1,18 @@
+{
+  "schema_version": "10.0",
+  "task_id": "672172831465d0d2c3f2a6ca",
+  "job_id": "demo12",
+  "status": "completed",
+  "stage": "completed",
+  "started_at": 1791542219.5337338,
+  "updated_at": 1791542410.3666222,
+  "completed_batches": 3,
+  "batch_count": 41,
+  "completed_segments": 41,
+  "total_segments": 41,
+  "characters": 3294,
+  "error": null,
+  "provider": "local",
+  "model": "google/gemma-4-e2b",
+  "flagged_segments": 0
+}

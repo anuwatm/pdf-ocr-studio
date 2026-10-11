@@ -74,7 +74,7 @@ class JobStartRequest(BaseModel):
     enable_ai: bool = True
     page_start: Optional[int] = Field(default=None, ge=1)
     page_end: Optional[int] = Field(default=None, ge=1)
-    include_page_numbers: bool = True
+    include_page_numbers: bool = False
 
 
 class JobStatusResponse(BaseModel):
@@ -116,6 +116,8 @@ class PageEditResponse(BaseModel):
 
 
 class LocalLLMConfigRequest(BaseModel):
+    transport: Literal["api", "cli"] = "api"
+    cli_provider: Literal["codex", "gemini", "agy", "claude", "lms"] = "codex"
     base_url: str = Field(min_length=1, max_length=300)
     model: str = Field(min_length=1, max_length=200)
     timeout: float = Field(ge=1, le=300)

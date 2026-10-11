@@ -1,0 +1,10 @@
+{
+  "task_id": "672172831465d0d2c3f2a6ca",
+  "provider": "local",
+  "model": "google/gemma-4-e2b",
+  "characters": 3294,
+  "started_at": 1791542219.5337338,
+  "completed_at": 1791542410.3716114,
+  "cloud_consent": false,
+  "credential_recorded": false
+}

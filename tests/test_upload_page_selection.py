@@ -9,7 +9,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from src.server import app, db, job_manager, DEFAULT_OUTPUT_DIR
-from src.job_models import PageStatus, StageStatus
+from src.job_models import JobStartRequest, PageStatus, StageStatus
 from src.worker_process import _iter_page_batches
 
 DEMO_DIR = "demo" if os.path.isdir("demo") else os.path.abspath(os.path.join("..", "demo"))
@@ -70,7 +70,8 @@ class TestUploadPageSelection(unittest.TestCase):
         self.assertIn('/static/app.js?v=', response.text)
         self.assertIn('/static/app.css?v=', response.text)
         self.assertIn('id="btn-delete-all-history"', response.text)
-        self.assertIn('id="include-page-numbers" type="checkbox" checked', response.text)
+        self.assertIn('id="include-page-numbers" type="checkbox"', response.text)
+        self.assertNotIn('id="include-page-numbers" type="checkbox" checked', response.text)
         self.assertIn('id="btn-test-ai-connection"', response.text)
         self.assertIn('id="mode-ocr-only" checked', response.text)
         self.assertIn('id="mode-ocr-ai" disabled', response.text)
@@ -81,10 +82,12 @@ class TestUploadPageSelection(unittest.TestCase):
         script = self.client.get("/static/app.js")
         self.assertEqual(script.status_code, 200)
         self.assertIn("previewNewlyCompletedPage", script.text)
-        self.assertIn('if (ext === ".pdf")', script.text)
+        self.assertIn('Upload and inspect page count immediately for both PDF and image input.', script.text)
+        self.assertNotIn('if (ext === ".pdf")', script.text)
         self.assertIn('startJobFlow("html")', script.text)
         self.assertIn('structuredWorkspace.generate()', script.text)
         self.assertIn('htmlWorkspace.loadStructuredHtml()', script.text)
+        self.assertFalse(JobStartRequest().include_page_numbers)
 
     def test_api_schedules_more_than_one_batch(self):
         job_id = self._upload("06.pdf")

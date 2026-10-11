@@ -32,6 +32,7 @@
     epubPreviewRevision: null,
     activeEpubSubtab: "preview",
     postOcrDestination: null,
+    translationResultRevision: null,
   };
 
   // DOM Elements
@@ -39,6 +40,8 @@
     themeToggle: document.getElementById("btn-theme-toggle"),
     aiStatusBadge: document.getElementById("ai-status-badge"),
     aiStatusText: document.getElementById("ai-status-text"),
+    cliHeaderStatusBadge: document.getElementById("cli-header-status-badge"),
+    cliHeaderStatusText: document.getElementById("cli-header-status-text"),
     btnTestAiConnection: document.getElementById("btn-test-ai-connection"),
     aiAvailableBadge: document.getElementById("ai-available-badge"),
     modeOcrAi: document.getElementById("mode-ocr-ai"),
@@ -197,15 +200,18 @@
   const structuredWorkspace = createStructuredWorkspace({state, el});
   const htmlWorkspace = createHtmlWorkspace({state, el, loadEpubExportStatus});
   const {switchHtmlSubtab, loadHtmlExportStatus, generateHtmlExport, saveFinalHtml} = htmlWorkspace;
+  const translationWorkspace = createTranslationWorkspace({state, activateMainTab, loadEpubExportStatus});
 
   function init() {
     setupTheme();
     htmlWorkspace.init();
     structuredWorkspace.init();
+    translationWorkspace.init();
     setupDropzone();
     setupEventListeners();
     activateMainTab("upload");
     checkAiStatus();
+    loadCachedCliStatus();
     loadJobHistory();
     const pendingHtmlAiJob = sessionStorage.getItem("htmlAiJobId");
     if (pendingHtmlAiJob) {
@@ -276,6 +282,27 @@
     el.btnTestAiConnection.textContent = state.aiConnected ? "เชื่อมต่อแล้ว" : "ทดสอบอีกครั้ง";
   }
 
+  async function loadCachedCliStatus() {
+    try {
+      const res=await fetch("/api/ai/cli/status",{cache:"no-store"});
+      if(!res.ok)throw new Error("CLI status unavailable");
+      const data=await res.json(),ready=(data.adapters||[]).filter(item=>item.status==="ready");
+      if(!data.checked_at){
+        el.cliHeaderStatusBadge.className="status-badge status-checking";
+        el.cliHeaderStatusText.textContent="AI CLI: ยังไม่ตรวจ";
+      }else if(ready.length){
+        el.cliHeaderStatusBadge.className="status-badge status-online";
+        el.cliHeaderStatusText.textContent=`AI CLI: ${ready.map(item=>item.label.replace(" CLI","")).join(", ")}`;
+      }else{
+        el.cliHeaderStatusBadge.className="status-badge status-offline";
+        el.cliHeaderStatusText.textContent="AI CLI: ไม่มีตัวที่พร้อม";
+      }
+    }catch{
+      el.cliHeaderStatusBadge.className="status-badge status-offline";
+      el.cliHeaderStatusText.textContent="AI CLI: อ่านสถานะไม่ได้";
+    }
+  }
+
   /* ==========================================================================
      File Upload & Dropzone
      ========================================================================== */
@@ -342,15 +369,12 @@
     if (el.btnStartJobHtml) el.btnStartJobHtml.disabled = true;
     el.pageOptions.classList.add("hidden");
 
-    // PDF page count is needed before the user can choose a range, so upload
-    // and inspect it immediately after selection rather than waiting for a click.
-    if (ext === ".pdf") {
-      uploadSelectedFileAndPrepare().catch(err => {
-        alert(`ตรวจสอบ PDF ไม่สำเร็จ: ${err.message}`);
-        el.btnStartJob.disabled = false;
-        el.btnStartJob.innerHTML = "<span>ตรวจสอบจำนวนหน้า</span>";
-      });
-    }
+    // Upload and inspect page count immediately for both PDF and image input.
+    uploadSelectedFileAndPrepare().catch(err => {
+      alert(`ตรวจสอบจำนวนหน้าไม่สำเร็จ: ${err.message}`);
+      el.btnStartJob.disabled = false;
+      el.btnStartJob.innerHTML = "<span>ตรวจสอบจำนวนหน้า</span>";
+    });
   }
 
   function resetFileSelection() {
@@ -539,7 +563,7 @@
   }
 
   function activateMainTab(tabName) {
-    const validTabs = new Set(["upload", "progress", "html", "epub", "structured", "history"]);
+    const validTabs = new Set(["upload", "progress", "html", "epub", "structured", "translation", "history"]);
     if (!validTabs.has(tabName)) return;
 
     state.activeMainTab = tabName;
@@ -559,6 +583,7 @@
     }
     if (tabName === "epub") loadEpubExportStatus();
     if (tabName === "structured") structuredWorkspace.loadStatus();
+    if (tabName === "translation") translationWorkspace.refresh();
     const hasJob = Boolean(state.currentJobId);
     el.tabProgressEmpty.classList.toggle("hidden", tabName !== "progress" || hasJob);
     if (tabName === "history") loadJobHistory();
@@ -1109,6 +1134,7 @@
     loadHtmlExportStatus();
     loadEpubExportStatus();
     structuredWorkspace.syncJob();
+    if (state.activeMainTab === "translation") translationWorkspace.refresh();
 
     // Warning banner if failed or partial
     const hasFailures = job.failed_pages > 0 || job.status === "partial" || job.status === "failed" || job.status === "cancelled";

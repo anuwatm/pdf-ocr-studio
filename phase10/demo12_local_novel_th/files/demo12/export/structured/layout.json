@@ -1,0 +1,879 @@
+{
+  "layout_schema_version": "1.0.0",
+  "job_id": "demo12",
+  "ocr_schema_version": "2.0.0",
+  "pages": [
+    {
+      "layout_schema_version": "1.0.0",
+      "page_id": 1,
+      "source_revision": "9f65e2786765cde8",
+      "blocks": [
+        {
+          "block_id": "p1_b0_l0",
+          "type": "paragraph",
+          "text": "With this first Linear, we're asking for 128 neurons to have their internal parameters",
+          "bbox": {
+            "x1": 17.0,
+            "y1": 19.0,
+            "x2": 710.0,
+            "y2": 20.0,
+            "x3": 710.0,
+            "y3": 42.0,
+            "x4": 17.0,
+            "y4": 41.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l1",
+          "type": "paragraph",
+          "text": "randomly initialized. Often, the question I'll get asked at this point is \"Why 128?\"",
+          "bbox": {
+            "x1": 17.0,
+            "y1": 43.0,
+            "x2": 708.0,
+            "y2": 43.0,
+            "x3": 708.0,
+            "y3": 66.0,
+            "x4": 17.0,
+            "y4": 66.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l2",
+          "type": "paragraph",
+          "text": "This is entirely arbitrary-there's no fixed rule for the number of neurons to use. As",
+          "bbox": {
+            "x1": 16.0,
+            "y1": 67.0,
+            "x2": 709.0,
+            "y2": 67.0,
+            "x3": 709.0,
+            "y3": 89.0,
+            "x4": 16.0,
+            "y4": 90.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l3",
+          "type": "paragraph",
+          "text": "you design the layers, you want to pick the appropriate number of values to enable",
+          "bbox": {
+            "x1": 17.0,
+            "y1": 92.0,
+            "x2": 710.0,
+            "y2": 91.0,
+            "x3": 710.0,
+            "y3": 114.0,
+            "x4": 17.0,
+            "y4": 116.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l4",
+          "type": "paragraph",
+          "text": "your model to actually learn. More neurons means it will run more slowly, as it has to",
+          "bbox": {
+            "x1": 15.0,
+            "y1": 117.0,
+            "x2": 708.0,
+            "y2": 116.0,
+            "x3": 708.0,
+            "y3": 139.0,
+            "x4": 16.0,
+            "y4": 140.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l5",
+          "type": "paragraph",
+          "text": "learn more parameters. More neurons could also lead to a network that is great at",
+          "bbox": {
+            "x1": 15.0,
+            "y1": 141.0,
+            "x2": 708.0,
+            "y2": 141.0,
+            "x3": 708.0,
+            "y3": 162.0,
+            "x4": 15.0,
+            "y4": 163.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l6",
+          "type": "paragraph",
+          "text": "recognizing the training data but not so good at recognizing data that it hasn't previ-",
+          "bbox": {
+            "x1": 15.0,
+            "y1": 165.0,
+            "x2": 706.0,
+            "y2": 164.0,
+            "x3": 706.0,
+            "y3": 187.0,
+            "x4": 15.0,
+            "y4": 188.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l7",
+          "type": "paragraph",
+          "text": "ously seen. (This is known as overfitting, and we'll discuss it later in this chapter). On",
+          "bbox": {
+            "x1": 16.0,
+            "y1": 189.0,
+            "x2": 708.0,
+            "y2": 189.0,
+            "x3": 708.0,
+            "y3": 211.0,
+            "x4": 16.0,
+            "y4": 211.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l8",
+          "type": "paragraph",
+          "text": "the other hand, fewer neurons means that the model might not have sufficient",
+          "bbox": {
+            "x1": 17.0,
+            "y1": 212.0,
+            "x2": 709.0,
+            "y2": 212.0,
+            "x3": 709.0,
+            "y3": 235.0,
+            "x4": 17.0,
+            "y4": 235.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l9",
+          "type": "paragraph",
+          "text": "parameters to learn.",
+          "bbox": {
+            "x1": 16.0,
+            "y1": 239.0,
+            "x2": 180.0,
+            "y2": 237.0,
+            "x3": 180.0,
+            "y3": 258.0,
+            "x4": 16.0,
+            "y4": 260.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l10",
+          "type": "paragraph",
+          "text": "You will need to explore this trade-off between speed of learning and accuracy of",
+          "bbox": {
+            "x1": 17.0,
+            "y1": 272.0,
+            "x2": 712.0,
+            "y2": 272.0,
+            "x3": 712.0,
+            "y3": 296.0,
+            "x4": 17.0,
+            "y4": 294.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l11",
+          "type": "paragraph",
+          "text": "learning and do some experimentation over time to pick the right values. This pro-",
+          "bbox": {
+            "x1": 16.0,
+            "y1": 297.0,
+            "x2": 707.0,
+            "y2": 297.0,
+            "x3": 707.0,
+            "y3": 320.0,
+            "x4": 16.0,
+            "y4": 319.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l12",
+          "type": "paragraph",
+          "text": "cess is typically called hyperparameter tuning. In ML, a hyperparameter is a value that",
+          "bbox": {
+            "x1": 17.0,
+            "y1": 321.0,
+            "x2": 709.0,
+            "y2": 320.0,
+            "x3": 709.0,
+            "y3": 344.0,
+            "x4": 17.0,
+            "y4": 344.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l13",
+          "type": "paragraph",
+          "text": "is used to control the training, as opposed to the internal values of the neurons that",
+          "bbox": {
+            "x1": 16.0,
+            "y1": 345.0,
+            "x2": 710.0,
+            "y2": 344.0,
+            "x3": 710.0,
+            "y3": 366.0,
+            "x4": 16.0,
+            "y4": 367.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l14",
+          "type": "paragraph",
+          "text": "get trained/learned, which are referred to as parameters.",
+          "bbox": {
+            "x1": 16.0,
+            "y1": 368.0,
+            "x2": 467.0,
+            "y2": 368.0,
+            "x3": 467.0,
+            "y3": 391.0,
+            "x4": 16.0,
+            "y4": 390.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l15",
+          "type": "paragraph",
+          "text": "When you're defining a neural network with PyTorch and using the Sequential, you",
+          "bbox": {
+            "x1": 17.0,
+            "y1": 405.0,
+            "x2": 709.0,
+            "y2": 405.0,
+            "x3": 709.0,
+            "y3": 428.0,
+            "x4": 17.0,
+            "y4": 428.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l16",
+          "type": "paragraph",
+          "text": "don't just define the layers of the network and what types of neurons they may use.",
+          "bbox": {
+            "x1": 17.0,
+            "y1": 429.0,
+            "x2": 707.0,
+            "y2": 430.0,
+            "x3": 707.0,
+            "y3": 453.0,
+            "x4": 17.0,
+            "y4": 451.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l17",
+          "type": "paragraph",
+          "text": "You can also define functions that execute on the data while it flows between the neu-",
+          "bbox": {
+            "x1": 17.0,
+            "y1": 453.0,
+            "x2": 706.0,
+            "y2": 453.0,
+            "x3": 706.0,
+            "y3": 475.0,
+            "x4": 17.0,
+            "y4": 475.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l18",
+          "type": "paragraph",
+          "text": "ral network layers. These are typically called activation functions, and an activation",
+          "bbox": {
+            "x1": 17.0,
+            "y1": 477.0,
+            "x2": 709.0,
+            "y2": 477.0,
+            "x3": 709.0,
+            "y3": 500.0,
+            "x4": 17.0,
+            "y4": 501.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l19",
+          "type": "paragraph",
+          "text": "function is the next thing you see specified in the code as nn. ReLU(). An activation",
+          "bbox": {
+            "x1": 16.0,
+            "y1": 503.0,
+            "x2": 708.0,
+            "y2": 503.0,
+            "x3": 708.0,
+            "y3": 526.0,
+            "x4": 16.0,
+            "y4": 526.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l20",
+          "type": "paragraph",
+          "text": "function is code that will execute on each neuron in the layer. PyTorch supports a",
+          "bbox": {
+            "x1": 16.0,
+            "y1": 528.0,
+            "x2": 709.0,
+            "y2": 528.0,
+            "x3": 709.0,
+            "y3": 551.0,
+            "x4": 16.0,
+            "y4": 549.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l21",
+          "type": "paragraph",
+          "text": "number of activation functions out of the box, and a very common one in middle lay-",
+          "bbox": {
+            "x1": 15.0,
+            "y1": 552.0,
+            "x2": 707.0,
+            "y2": 552.0,
+            "x3": 707.0,
+            "y3": 576.0,
+            "x4": 15.0,
+            "y4": 574.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l22",
+          "type": "paragraph",
+          "text": "ers is ReLU, which stands for rectified linear unit. It's a simple function that returns a",
+          "bbox": {
+            "x1": 16.0,
+            "y1": 576.0,
+            "x2": 708.0,
+            "y2": 577.0,
+            "x3": 708.0,
+            "y3": 599.0,
+            "x4": 16.0,
+            "y4": 598.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l23",
+          "type": "paragraph",
+          "text": "value only if it's greater than 0. In this case, we don't want negative values being",
+          "bbox": {
+            "x1": 16.0,
+            "y1": 600.0,
+            "x2": 709.0,
+            "y2": 601.0,
+            "x3": 709.0,
+            "y3": 623.0,
+            "x4": 16.0,
+            "y4": 623.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l24",
+          "type": "paragraph",
+          "text": "passed to the next layer to potentially impact the summing function, so instead of",
+          "bbox": {
+            "x1": 17.0,
+            "y1": 625.0,
+            "x2": 711.0,
+            "y2": 625.0,
+            "x3": 711.0,
+            "y3": 647.0,
+            "x4": 17.0,
+            "y4": 648.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l25",
+          "type": "paragraph",
+          "text": "writing a lot of if- then code, we can simply activate the layer with ReLU.",
+          "bbox": {
+            "x1": 17.0,
+            "y1": 650.0,
+            "x2": 602.0,
+            "y2": 649.0,
+            "x3": 602.0,
+            "y3": 672.0,
+            "x4": 17.0,
+            "y4": 672.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l26",
+          "type": "paragraph",
+          "text": "Finally, there's another Linear layer, which will be the output layer. If you look at the",
+          "bbox": {
+            "x1": 16.0,
+            "y1": 686.0,
+            "x2": 709.0,
+            "y2": 686.0,
+            "x3": 709.0,
+            "y3": 709.0,
+            "x4": 16.0,
+            "y4": 708.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l27",
+          "type": "paragraph",
+          "text": "defined shape of (128, 10) and think of it through that \"input size, output size\" frame-",
+          "bbox": {
+            "x1": 17.0,
+            "y1": 710.0,
+            "x2": 708.0,
+            "y2": 710.0,
+            "x3": 708.0,
+            "y3": 733.0,
+            "x4": 17.0,
+            "y4": 733.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l28",
+          "type": "paragraph",
+          "text": "work, you'll see that it has 128 \"inputs\" (i.e., the number of neurons in the layer",
+          "bbox": {
+            "x1": 16.0,
+            "y1": 734.0,
+            "x2": 707.0,
+            "y2": 734.0,
+            "x3": 707.0,
+            "y3": 757.0,
+            "x4": 16.0,
+            "y4": 757.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l29",
+          "type": "paragraph",
+          "text": "above) and 10 \"outputs.\" What are these 10? Recall that Fashion MNIST has 10 classes",
+          "bbox": {
+            "x1": 16.0,
+            "y1": 759.0,
+            "x2": 709.0,
+            "y2": 759.0,
+            "x3": 709.0,
+            "y3": 781.0,
+            "x4": 16.0,
+            "y4": 781.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l30",
+          "type": "paragraph",
+          "text": "of clothing. Each of these neurons is effectively assigned one class, and it will end up",
+          "bbox": {
+            "x1": 15.0,
+            "y1": 784.0,
+            "x2": 708.0,
+            "y2": 784.0,
+            "x3": 708.0,
+            "y3": 806.0,
+            "x4": 15.0,
+            "y4": 806.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l31",
+          "type": "paragraph",
+          "text": "with a probability that the input pixels match that class, so our job is to determine",
+          "bbox": {
+            "x1": 15.0,
+            "y1": 808.0,
+            "x2": 708.0,
+            "y2": 808.0,
+            "x3": 708.0,
+            "y3": 830.0,
+            "x4": 15.0,
+            "y4": 830.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l32",
+          "type": "paragraph",
+          "text": "which one has the highest value. You might wonder how these assignments happen:",
+          "bbox": {
+            "x1": 18.0,
+            "y1": 831.0,
+            "x2": 709.0,
+            "y2": 831.0,
+            "x3": 709.0,
+            "y3": 854.0,
+            "x4": 18.0,
+            "y4": 853.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l33",
+          "type": "paragraph",
+          "text": "where is the code that says one neuron is for a shoe and another is for a shirt? To",
+          "bbox": {
+            "x1": 18.0,
+            "y1": 856.0,
+            "x2": 708.0,
+            "y2": 855.0,
+            "x3": 708.0,
+            "y3": 877.0,
+            "x4": 18.0,
+            "y4": 878.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l34",
+          "type": "paragraph",
+          "text": "answer that question, recall the y = 2x - 1 example in Chapter 1, where we had a set of",
+          "bbox": {
+            "x1": 16.0,
+            "y1": 880.0,
+            "x2": 710.0,
+            "y2": 879.0,
+            "x3": 710.0,
+            "y3": 902.0,
+            "x4": 16.0,
+            "y4": 903.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l35",
+          "type": "paragraph",
+          "text": "input data and a set of known, correct answers that is sometimes called the ground",
+          "bbox": {
+            "x1": 16.0,
+            "y1": 904.0,
+            "x2": 710.0,
+            "y2": 903.0,
+            "x3": 710.0,
+            "y3": 926.0,
+            "x4": 16.0,
+            "y4": 926.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l36",
+          "type": "paragraph",
+          "text": "truth. Fashion MNIST will work in the same way. When training the network, we",
+          "bbox": {
+            "x1": 17.0,
+            "y1": 927.0,
+            "x2": 708.0,
+            "y2": 927.0,
+            "x3": 708.0,
+            "y3": 950.0,
+            "x4": 17.0,
+            "y4": 950.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l37",
+          "type": "paragraph",
+          "text": "provide the input images and their known answers as a set of what we want the out-",
+          "bbox": {
+            "x1": 15.0,
+            "y1": 953.0,
+            "x2": 706.0,
+            "y2": 952.0,
+            "x3": 707.0,
+            "y3": 973.0,
+            "x4": 15.0,
+            "y4": 975.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l38",
+          "type": "paragraph",
+          "text": "put neurons to look like. Thus, the network will \"learn\" that when it sees a shoe, the",
+          "bbox": {
+            "x1": 16.0,
+            "y1": 977.0,
+            "x2": 709.0,
+            "y2": 976.0,
+            "x3": 709.0,
+            "y3": 997.0,
+            "x4": 16.0,
+            "y4": 999.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l39",
+          "type": "paragraph",
+          "text": "output neurons that don't represent that shoe should have a zero value and the ones",
+          "bbox": {
+            "x1": 14.0,
+            "y1": 1002.0,
+            "x2": 709.0,
+            "y2": 1001.0,
+            "x3": 709.0,
+            "y3": 1022.0,
+            "x4": 14.0,
+            "y4": 1024.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        },
+        {
+          "block_id": "p1_b0_l40",
+          "type": "paragraph",
+          "text": "that do should have a \"1\" value.",
+          "bbox": {
+            "x1": 16.0,
+            "y1": 1025.0,
+            "x2": 272.0,
+            "y2": 1024.0,
+            "x3": 272.0,
+            "y3": 1044.0,
+            "x4": 16.0,
+            "y4": 1045.0
+          },
+          "source": "ocr",
+          "confidence": null,
+          "evidence": [
+            "legacy_block_fallback"
+          ],
+          "style": {}
+        }
+      ],
+      "unresolved_count": 0,
+      "text_variants": {},
+      "has_manual_or_corrected_text": false
+    }
+  ],
+  "source_revision": "5914010dde4039b6"
+}

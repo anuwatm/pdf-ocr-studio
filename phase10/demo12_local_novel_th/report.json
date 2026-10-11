@@ -1,0 +1,38 @@
+{
+  "date": "2026-10-09",
+  "input": "demo/12.png",
+  "input_bytes": 403285,
+  "ocr_status": "completed",
+  "ocr_characters": 3350,
+  "ocr_pages": 1,
+  "translation_config": {
+    "source_variant": "structured",
+    "source_language": "en",
+    "target_language": "th",
+    "style": "novel",
+    "provider": "local",
+    "cloud_consent": false,
+    "manual_strategy": "reset",
+    "preserve_manual_final": false,
+    "translate_toc": true
+  },
+  "resume": true,
+  "translation_status": "completed",
+  "translation_error": null,
+  "detected_language": "en",
+  "language_confidence": 1.0,
+  "segments": 41,
+  "warnings": [],
+  "timings": {
+    "ocr_seconds": 0.0,
+    "structured_seconds": 0.0,
+    "total_seconds": 191.03728369999953
+  },
+  "artifacts": {
+    "ocr": "C:\\LocalDevine\\www\\OCR\\phase10\\demo12_local_novel_th\\files\\demo12\\ocr.json",
+    "source_text": "C:\\LocalDevine\\www\\OCR\\phase10\\demo12_local_novel_th\\files\\demo12\\raw.txt",
+    "translation": "C:\\LocalDevine\\www\\OCR\\phase10\\demo12_local_novel_th\\files\\demo12\\export\\translation\\translation.json",
+    "translated_text": "C:\\LocalDevine\\www\\OCR\\phase10\\demo12_local_novel_th\\files\\demo12\\export\\translation\\translated.txt",
+    "translated_html": "C:\\LocalDevine\\www\\OCR\\phase10\\demo12_local_novel_th\\files\\demo12\\export\\translation\\translated.html"
+  }
+}

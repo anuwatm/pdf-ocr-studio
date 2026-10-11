@@ -5,13 +5,30 @@ Supports http://127.0.0.1:1234 (e.g. LM Studio / vLLM / llama.cpp)
 from typing import Dict, Any, List, Optional
 import logging
 import json
+import os
+import re
+import shutil
+import subprocess
 import urllib.request
 import urllib.error
+from pathlib import Path
 from openai import OpenAI, APIError, APITimeoutError, APIConnectionError
 
 from src import config
 
 logger = logging.getLogger(__name__)
+
+ALLOWED_CLI_ENV_VARS = {
+    "PATH", "PATHEXT", "SYSTEMROOT", "COMSPEC", "TEMP", "TMP",
+    "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "APPDATA", "LOCALAPPDATA",
+    "OPENAI_API_KEY", "GEMINI_API_KEY", "ANTHROPIC_API_KEY",
+    "PYTHONPATH", "LANG", "LC_ALL",
+}
+MAX_CLI_OUTPUT_CHARS = 5 * 1024 * 1024
+
+
+def get_safe_cli_env() -> Dict[str, str]:
+    return {k: v for k, v in os.environ.items() if k.upper() in ALLOWED_CLI_ENV_VARS}
 
 
 class LocalLLMClient:
@@ -26,25 +43,200 @@ class LocalLLMClient:
         api_key: Optional[str] = None,
         timeout: Optional[float] = None,
         max_retries: Optional[int] = None,
+        transport: Optional[str] = None,
+        cli_provider: Optional[str] = None,
     ):
         settings = config.get_llm_config()
+        self.transport = (transport or settings.get("transport") or "api").strip().lower()
+        if self.transport not in {"api", "cli"}:
+            raise ValueError("Local AI transport must be api or cli")
+        self.cli_provider = (cli_provider or settings.get("cli_provider") or "codex").strip().lower()
+        if self.cli_provider not in {"codex", "gemini", "agy", "claude", "lms"}:
+            raise ValueError("Local AI CLI provider must be codex, gemini, agy, claude or lms")
         self.base_url = (base_url or settings["base_url"]).rstrip("/")
         self.model = model or settings["model"]
         self.api_key = config.LLM_API_KEY if api_key is None else api_key
         self.timeout = settings["timeout"] if timeout is None else timeout
+        self.cli_path = self._resolve_cli() if self.transport == "cli" else None
         retry_options = {} if max_retries is None else {"max_retries": max_retries}
-        self._client = OpenAI(
-            base_url=self.base_url,
-            api_key=self.api_key,
-            timeout=self.timeout,
-            **retry_options,
-        )
+        self._client = None if self.transport == "cli" else OpenAI(
+            base_url=self.base_url, api_key=self.api_key, timeout=self.timeout, **retry_options)
         self._html_reasoning_checked = False
         self._html_native_url = None
+
+    @staticmethod
+    def _resolve_lms_cli() -> Optional[str]:
+        configured = os.getenv("LMS_CLI_PATH", "").strip()
+        candidates = [configured, shutil.which("lms"), str(Path.home()/".lmstudio"/"bin"/"lms.exe")]
+        for candidate in candidates:
+            if not candidate: continue
+            path = Path(candidate).expanduser()
+            if path.is_file() and path.name.lower() in {"lms", "lms.exe", "lms.cmd"}:
+                return str(path.resolve())
+        return None
+
+    def _resolve_cli(self) -> Optional[str]:
+        if self.cli_provider == "lms":
+            return self._resolve_lms_cli()
+        allowed_names = {
+            "codex": {"codex", "codex.exe", "codex.cmd"},
+            "gemini": {"gemini", "gemini.exe", "gemini.cmd", "gemini.ps1"},
+            "agy": {"agy", "agy.exe", "agy.cmd"},
+            "claude": {"claude", "claude.exe", "claude.cmd", "claude.ps1"},
+        }
+        candidate = shutil.which(self.cli_provider)
+        if not candidate:
+            return None
+        path = Path(candidate).expanduser()
+        return str(path.resolve()) if path.is_file() and path.name.lower() in allowed_names[self.cli_provider] else None
+
+    @staticmethod
+    def _clean_cli_output(value: str) -> str:
+        return re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", value or "").strip()
+
+    def _run_lms(self, args: List[str], timeout: Optional[float] = None) -> subprocess.CompletedProcess:
+        if not self.cli_path:
+            raise RuntimeError("LM Studio CLI (lms) not found")
+        flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+        return subprocess.run([self.cli_path, *args], capture_output=True, text=True, encoding="utf-8",
+            errors="replace", timeout=timeout or self.timeout, shell=False, creationflags=flags,
+            env=get_safe_cli_env())
+
+    def _run_cli(self, args: List[str], *, input_text: Optional[str] = None,
+                 timeout: Optional[float] = None) -> subprocess.CompletedProcess:
+        if not self.cli_path:
+            raise RuntimeError(f"AI CLI '{self.cli_provider}' not found")
+        flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+        workspace = config.ROOT_DIR / "data" / "ai_cli_workspace"
+        workspace.mkdir(parents=True, exist_ok=True)
+        try:
+            completed = subprocess.run(
+                [self.cli_path, *args], input=input_text, capture_output=True, text=True,
+                encoding="utf-8", errors="replace", timeout=timeout or self.timeout,
+                shell=False, creationflags=flags, cwd=str(workspace), env=get_safe_cli_env(),
+            )
+        except subprocess.TimeoutExpired:
+            logger.warning(f"AI CLI '{self.cli_provider}' timed out after {timeout or self.timeout}s")
+            raise
+        if len(completed.stdout or "") > MAX_CLI_OUTPUT_CHARS:
+            raise RuntimeError(f"AI CLI '{self.cli_provider}' output exceeded 5 MB limit")
+        return completed
+
+    @staticmethod
+    def _extract_cli_json_output(value: str) -> str:
+        cleaned = LocalLLMClient._clean_cli_output(value)
+
+        def unwrap(candidate: Any) -> Optional[str]:
+            """Find the model payload inside provider-specific JSON envelopes.
+
+            Gemini and AGY print modes may wrap the final text in nested result,
+            message or content objects.  Prefer a complete translation payload so
+            the strict provider validator still owns schema and ID validation.
+            """
+            if isinstance(candidate, str):
+                text = re.sub(r"<(?:(?:thought)|(?:thinking)|(?:analysis))\b[^>]*>.*?</(?:(?:thought)|(?:thinking)|(?:analysis))\s*>",
+                              "", candidate, flags=re.IGNORECASE | re.DOTALL).strip()
+                if text.startswith("```") and text.endswith("```"):
+                    text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=re.IGNORECASE).strip()
+                try:
+                    nested = json.loads(text)
+                except (json.JSONDecodeError, TypeError):
+                    return text or None
+                return unwrap(nested) or text
+            if isinstance(candidate, dict):
+                if isinstance(candidate.get("segments"), list):
+                    return json.dumps(candidate, ensure_ascii=False)
+                for key in ("response", "result", "content", "text", "output", "message", "data", "parts"):
+                    resolved = unwrap(candidate.get(key))
+                    if resolved:
+                        return resolved
+            if isinstance(candidate, list):
+                for item in candidate:
+                    resolved = unwrap(item)
+                    if resolved:
+                        return resolved
+            return None
+
+        try:
+            payload = json.loads(cleaned)
+        except (json.JSONDecodeError, TypeError):
+            return cleaned
+        return unwrap(payload) or cleaned
+
+    @staticmethod
+    def _extract_agy_stream_response(value: str) -> str:
+        """Return the terminal response from AGY's documented NDJSON protocol."""
+        result = None
+        for line in LocalLLMClient._clean_cli_output(value).splitlines():
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if event.get("event") == "result" and isinstance(event.get("result"), dict):
+                result = event["result"]
+        if not result:
+            raise RuntimeError("AGY CLI returned no terminal stream result")
+        if str(result.get("status", "")).upper() != "SUCCESS":
+            raise RuntimeError(str(result.get("error") or "AGY CLI generation failed"))
+        response = result.get("response")
+        if not isinstance(response, str) or not response.strip():
+            raise RuntimeError("AGY CLI returned an empty response")
+        return response
+
+    def _cli_generate(self, prompt: str, system_prompt: Optional[str] = None) -> str:
+        combined = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
+        if self.cli_provider == "lms":
+            if len(combined) > 24_000:
+                raise RuntimeError("CLI prompt exceeds 24,000 characters; use Local API or a smaller batch")
+            completed = self._run_lms(["chat", self.model, "-p", combined, "--ttl", "1",
+                                       "--reasoning", "off", "--dont-fetch-catalog", "-y"])
+            content = self._clean_cli_output(completed.stdout)
+        elif self.cli_provider == "codex":
+            workspace = config.ROOT_DIR / "data" / "ai_cli_workspace"
+            workspace.mkdir(parents=True, exist_ok=True)
+            schema_file = config.ROOT_DIR / "data" / "ai_cli_schemas" / "translation_response_schema.json"
+            codex_args = [
+                "exec", "-", "--ephemeral", "--sandbox", "read-only", "--ignore-user-config",
+                "--ignore-rules", "--skip-git-repo-check", "--color", "never", "-C", str(workspace),
+            ]
+            if schema_file.is_file():
+                codex_args.extend(["--output-schema", str(schema_file.resolve())])
+            completed = self._run_cli(codex_args, input_text=combined)
+            content = self._clean_cli_output(completed.stdout)
+        elif self.cli_provider == "gemini":
+            completed = self._run_cli([
+                "-p", "ตอบตามข้อมูลจาก stdin เท่านั้น ห้ามใช้เครื่องมือ และคืนผลลัพธ์เท่านั้น",
+                "--output-format", "json", "--approval-mode", "plan", "--sandbox",
+            ], input_text=combined)
+            content = self._extract_cli_json_output(completed.stdout)
+        elif self.cli_provider == "agy":
+            # AGY print mode accepts documents safely through the documented
+            # stream-json stdin protocol.  Never put document text in argv.
+            stream_request = json.dumps({"event": "user", "message": {"content": combined}}, ensure_ascii=False) + "\n"
+            completed = self._run_cli([
+                "--input-format", "stream-json", "--output-format", "stream-json",
+                "--mode", "plan", "--sandbox", "--disable-slash-commands",
+                "--print-timeout", f"{max(1, int(self.timeout))}s",
+            ], input_text=stream_request)
+            content = self._extract_cli_json_output(self._extract_agy_stream_response(completed.stdout))
+        else:
+            completed = self._run_cli([
+                "-p", "ตอบตามข้อมูลจาก stdin เท่านั้น คืนผลลัพธ์เท่านั้น และห้ามใช้เครื่องมือ",
+                "--input-format", "text", "--output-format", "json",
+                "--permission-mode", "plan", "--max-turns", "1",
+                "--disallowedTools", "Bash", "Edit", "Write", "NotebookEdit", "WebFetch", "WebSearch",
+            ], input_text=combined)
+            content = self._extract_cli_json_output(completed.stdout)
+        if completed.returncode != 0 or not content:
+            detail = self._clean_cli_output(completed.stderr) or f"{self.cli_provider} CLI returned no output"
+            raise RuntimeError(detail)
+        return content
 
     def generate_html_annotations(self, prompt: str, temperature: float = 0.0,
                                   max_tokens: int = 1600) -> str:
         """Disable thinking per HTML request only when LM Studio advertises support."""
+        if self.transport == "cli":
+            return self._cli_generate(prompt)
         headers = {"Authorization": f"Bearer {self.api_key}"}
         root_url = self.base_url[:-3] if self.base_url.endswith("/v1") else self.base_url
         if not self._html_reasoning_checked:
@@ -90,6 +282,32 @@ class LocalLLMClient:
         Check connectivity to the local server and verify model availability.
         Returns a dict with 'status', 'available_models', 'model_found', and error details if any.
         """
+        if self.transport == "cli":
+            if not self.cli_path:
+                return {"status":"connection_error","transport":"cli","configured_model":self.model,
+                        "cli_provider":self.cli_provider,"model_found":False,"available_models":[],
+                        "error":f"AI CLI '{self.cli_provider}' not found"}
+            try:
+                if self.cli_provider == "lms":
+                    completed=self._run_lms(["ls","--llm","--json",self.model],timeout=min(self.timeout,15))
+                    output=self._clean_cli_output(completed.stdout)
+                    found=completed.returncode==0 and self.model.lower() in output.lower()
+                    error = None if found else (self._clean_cli_output(completed.stderr) or f"Model '{self.model}' not found by LM Studio CLI")
+                else:
+                    completed=self._run_cli(["--version"],timeout=min(self.timeout,10))
+                    output=self._clean_cli_output(completed.stdout or completed.stderr)
+                    found=completed.returncode == 0 and bool(output)
+                    error = None if found else (output or f"ตรวจ {self.cli_provider} CLI ไม่สำเร็จ")
+                return {"status":"connected" if found else "model_not_found","transport":"cli",
+                        "cli_provider":self.cli_provider,"configured_model":self.model,"model_found":found,
+                        "available_models":[self.model] if found else [],"cli_version":output if found else None,
+                        "error":error}
+            except subprocess.TimeoutExpired:
+                return {"status":"timeout","transport":"cli","configured_model":self.model,
+                        "model_found":False,"available_models":[],"error":"LM Studio CLI health check timed out"}
+            except Exception as exc:
+                return {"status":"error","transport":"cli","configured_model":self.model,
+                        "model_found":False,"available_models":[],"error":str(exc)}
         try:
             models_response = self._client.models.list()
             available_model_ids = [m.id for m in models_response.data]
@@ -122,6 +340,14 @@ class LocalLLMClient:
                 "error": str(e),
             }
 
+    def preflight(self) -> Dict[str, Any]:
+        """Perform strict preflight validation before starting any generation."""
+        health = self.check_health()
+        if health.get("status") not in {"connected", "healthy"}:
+            error = health.get("error") or f"Preflight check failed for {self.transport} ({self.cli_provider if self.transport == 'cli' else self.base_url})"
+            raise RuntimeError(error)
+        return health
+
     def chat_completion(
         self,
         messages: List[Dict[str, str]],
@@ -133,6 +359,15 @@ class LocalLLMClient:
         Execute chat completion with fallback on failure.
         Returns a dictionary containing 'success', 'content', 'status', 'error'.
         """
+        if self.transport == "cli":
+            try:
+                prompt="\n\n".join(f"{item.get('role','user').upper()}: {item.get('content','')}" for item in messages)
+                return {"success":True,"status":"completed","finish_reason":"stop",
+                        "content":self._cli_generate(prompt),"error":None,"raw_response":None}
+            except subprocess.TimeoutExpired:
+                return {"success":False,"status":"timeout","content":"","error":f"Timeout after {self.timeout}s"}
+            except Exception as exc:
+                return {"success":False,"status":"error","content":"","error":str(exc)}
         try:
             kwargs: Dict[str, Any] = {
                 "model": self.model,

@@ -185,3 +185,176 @@ Gemini รับรอง implementation ของ Phase 7 แล้ว แต�
 - ผู้ใช้อนุมัติ input Phase 10 วันที่ 2026-10-06: `demo/08.pdf` ตารางอังกฤษ, `09.png` จีน+อังกฤษ/ศัพท์เฉพาะ, `10.png`–`11.png` นิยายอังกฤษ, `12.png` หนังสือสอน IT และ `13.png` หนังสือสอน IT ที่มี code program; hash/ขอบเขตอยู่ใน `phase10/dataset_manifest.json`
 - ชุดนี้ยังรอ ground truth/ภาษาปลายทาง และยังไม่ครอบคลุม style `ราชการ`; ห้ามอ้างผล quality acceptance จนกว่าจะปิดเงื่อนไขดังกล่าว
 - รายละเอียด: `checklist.md` Phase 10
+
+### เริ่ม implementation — 2026-10-09
+
+- เพิ่ม `translation.json` schema 10.0, stable segment/text-node mapping, deterministic revision, stale guard และ 409 conflict
+- ตารางคง row/cell/rowspan/colspan; ตารางไม่มี `cell model` เป็น `unresolved` และบล็อก publish
+- เพิ่ม style `ทั่วไป`/`นิยาย`/`วิชาการ`/`ราชการ`, prompt version 10.0.0 และกฎคงศัพท์เฉพาะ/ทับศัพท์
+- เพิ่ม glossary revision, do-not-translate และสถานะ `translated`/`preserved`/`transliterated`
+- เพิ่ม `TranslationProvider`: Local AI, Google Cloud Translation v3 ผ่าน ADC และ Hybrid; credential ไม่ส่ง browser/ไม่บันทึก artifact
+- เพิ่ม protected-token validator สำหรับตัวเลข วันที่ เวลา เงิน เปอร์เซ็นต์ หน่วย URL อีเมล citation/code และศัพท์ glossary
+- เพิ่ม background task, estimate/progress/cancel/retry/resume, transient backoff, audit, Text/HTML export และ source `translated` สำหรับ EPUB
+- เพิ่มหน้า Translation: provider capability, cloud consent/cost estimate, glossary, 4-mode review, manual draft, accept/revert, retranslate strategy และเปิดต่อใน EPUB Studio
+- Publish acceptance `tests/phase10/`: **23/23 PASS** รวม API, `demo/08.pdf` structural roundtrip, translated EPUB stale guard และ Chrome/Edge; external request/page error = 0 ใน local fixture
+- Error matrix ครบ quota/auth/timeout/invalid JSON/cancel/retry/resume/restart/409/source-glossary stale; provider response ตรวจ ID/schema/language/size
+- Regression: Phase 8 **17/17**, Phase 8.1 **12/12**, Phase 9 **9/9 PASS** หลังแก้ Translation capability ให้ lazy-load เฉพาะเมื่อเปิดแท็บ
+- แก้ race ของ manual draft บน Edge โดยเก็บค่าทันทีต่อ segment เมื่อเกิด input; Chrome/Edge ผ่านซ้ำ
+- ติดตั้ง `google-auth 2.61.0` ใน `publish/venv` และเพิ่ม `google-auth>=2,<3` ใน requirements; Google provider ยัง unavailable จนตั้ง `GOOGLE_CLOUD_PROJECT`/ADC
+- เพิ่ม `phase10/evidence.md`, prompt/glossary/quality manifests, browser log และ benchmark 10 runs (p95 0.1391s, peak tracemalloc 20.05 MB; ไม่รวม provider latency)
+- ซิงก์ source/publish และอัปเดต README/MANUAL/diagram/API/checklist แล้ว
+- ผล Phase 10: **IMPLEMENTATION COMPLETE / QUALITY ACCEPTANCE NOT COVERED** เพราะยังไม่มี target language, ground truth, glossary/rubric, ชุดราชการ, provider จริง และ blind human review; ไม่อ้างคุณภาพคำแปล
+
+## 2026-10-09 — ทดสอบจริง demo/12.png ด้วย Local AI แบบนิยาย → ไทย
+
+- เปิด LM Studio local server และใช้ `google/gemma-4-e2b`; OneOCR สำเร็จ 1 หน้า, 3,350 ตัวอักษร, ตรวจ source เป็นอังกฤษ confidence 1.0
+- ผลสุดท้ายของ pipeline: `completed`, 41/41 segments, warning 0 และสร้าง `translated.txt`/`translated.html` สำเร็จ
+- ระหว่างทดสอบพบ false success: โมเดล copy อังกฤษบาง segments แต่ validator เดิมตรวจเฉพาะทั้งเอกสาร จึงเพิ่ม per-segment `target_language_mismatch` และให้สถานะ `partial`
+- เพิ่ม resume โดย revalidate ผลเก่า, จำกัด Local/Hybrid batch ค่าเริ่มต้น 4 และรองรับ `LOCAL_TRANSLATION_BATCH_SEGMENTS=1..8`; ใช้ batch=1 กู้ segments ที่ Gemma แปลไม่ผ่าน
+- Local AI ไม่แทน critical token ด้วย placeholder แล้ว เพราะโมเดลเล็กลบ placeholder; ให้เห็นตัวเลข/สูตรจริงและใช้ post-validator บล็อกเมื่อค่าหายหรือเปลี่ยน
+- แก้ false positive: comma หลัง `Chapter 1,`, `i.e.` ที่ถูกนับเป็น code และ prose ที่มีคำว่า `function` ซึ่งเคยถูก preserve เป็น code
+- Unit tests core/provider/tasks ผ่าน 18/18; Phase 10 regression source และ publish ผ่านฝั่งละ 23/23 (non-browser 21/21 + Chrome/Edge 2/2) หลังแก้
+- Human review: **ยังไม่ผ่าน quality acceptance** แม้ pipeline ครบ เพราะ OCR แบ่งตามบรรทัดจนเกิด `hyperparameter / tuning`, `lay- / ers`, `ground / truth`; style `นิยาย` ไม่เหมาะกับหนังสือ IT และไม่ตรง checklist `12.png` ที่กำหนด `วิชาการ`
+- หลักฐาน: `phase10/demo12_local_novel_th/evaluation.md`, `report.json` และ artifacts ใต้ `files/demo12/export/translation/`
+
+## 2026-10-09 — เพิ่มผลแปลรวมทั้งหมดในหน้า Translation
+
+- เพิ่มแผง `ผลแปลรวมทั้งหมด` รวม Final ทุก segment ตามลำดับเอกสาร คั่นย่อหน้าด้วยบรรทัดว่าง
+- แสดงจำนวน segment/อักขระ และปุ่ม `คัดลอกทั้งหมด`
+- ผลรวมไม่เปลี่ยนตามตัวกรองหน้า และอัปเดตทันทีเมื่อแก้ Final draft, ใช้ผลแปล หรือคืนต้นฉบับ
+- เพิ่ม browser acceptance ตรวจผลรวมและ draft ข้ามหน้า; Chrome/Edge ผ่าน 2/2
+- อัปเดต README, diagram, checklist และ sync source/publish
+
+## 2026-10-09 — สำรวจ AI CLI สำหรับช่วยแปล
+
+- พบ Gemini CLI, Codex CLI และ Aider; เตรียม prompt วิชาการจาก OCR `demo/12.png` ขนาด 4,633 bytes โดยยังไม่ส่งขึ้น cloud
+- ทดลอง Codex CLI local provider แล้ว CLI เลือกดาวน์โหลด `openai/gpt-oss-20b` 12.11 GB แทน Gemma ที่มีอยู่ จึงหยุดที่ประมาณ 1.5%; ไม่มีผลแปลและไม่ลบ partial download เพราะต้องขออนุญาตก่อนลบ
+- Gemini CLI local routing ยังไม่ setup และต้องดาวน์โหลด LiteRT-LM/model เพิ่ม
+- Gemini CLI cloud เป็นตัวเลือกที่พร้อมที่สุด แต่ต้องมี consent ระบุ payload `demo/12.png` และปลายทาง Google Cloud ชัดเจน
+- ข้อเสนอ: ใช้ AI CLI เป็น experimental provider/benchmark พร้อม stdin-only, no tools, JSON segment IDs, timeout/cancel, consent และ validator เดิม ไม่แทน API provider หลักทันที
+- รายละเอียด: `phase10/ai_cli_trial/notes.md`
+
+## 2026-10-09 — กำหนด Codex CLI และ Gemini CLI เป็น AI CLI หลัก
+
+- ผู้ใช้กำหนดให้ `Codex CLI` และ `Gemini CLI` เป็น adapter หลัก; LM Studio CLI ลดเป็น adapter รองสำหรับ compatibility/local fallback
+- ตรวจ CLI ที่ติดตั้ง: Codex CLI `0.150.1` รองรับ `codex exec` + stdin + JSONL/output schema; Gemini CLI `0.41.2` รองรับ stdin + headless + JSON/stream-json
+- วิธีรับส่งหลัก: UTF-8 JSON/NDJSON ผ่าน stdin, structured JSON ผ่าน stdout และ diagnostic ผ่าน stderr
+- Codex ต้องใช้ ephemeral/read-only/isolated workspace และ trusted output schema; Gemini ต้องใช้ headless/plan/sandbox และห้าม `--yolo`, `auto_edit`, `--raw-output`
+- Codex/Gemini cloud ต้องมี consent พร้อมระบุ OpenAI/Google เป็นปลายทาง; local provider ต้อง preflight model และห้าม auto-download
+- อัปเดต checklist Phase 10 แล้ว; implementation และ acceptance ของสอง adapter ยังเป็น `[ ]`
+
+## 2026-10-09 — เพิ่มสถานะ AI CLI ในหน้า Local LLM Settings
+
+- เพิ่ม `GET /api/ai/cli/status` ตรวจ Codex CLI, Gemini CLI และ LM Studio CLI แบบ read-only โดยไม่ส่งข้อความเอกสารออกเครื่อง
+- แสดง installed/version, authentication, local runtime, adapter หลัก/รอง, เวลาตรวจล่าสุด และปุ่ม `ตรวจสอบอีกครั้ง`
+- ใช้ fixed command + argument array + `shell=False`; UI render ด้วย `textContent`
+- ผลตรวจจริง: Codex CLI `0.150.1` พร้อมและ login แล้ว; Gemini CLI `0.41.2` ติดตั้งแล้วแต่ Gemma local routing ยังไม่พร้อม; LM Studio CLI พร้อมเป็น adapter รอง
+- Unit test ผ่าน 5/5; Chrome/Edge browser automation ผ่าน 2/2
+- Phase 10 regression ผ่าน source 23/23 และ publish 23/23 หลังซิงก์ dependency ของ transport (`config.py`, `job_models.py`, `llm_client.py`)
+
+## 2026-10-09 — เพิ่ม AI Command Interface: Codex / Gemini / AGY
+
+- กำหนดตัวเลือก: ChatGPT CLI → `codex`; Gemini CLI → `gemini` หรือ `agy`; `lms` เป็น adapter รอง
+- เพิ่ม `LLM_CLI_PROVIDER=codex|gemini|agy|lms` ใน config/API/.env และหน้า Settings แสดง selector เมื่อเลือก AI CLI
+- Backend ใช้ allowlist executable และ `shell=False`; Codex/Gemini/AGY รับ prompt ผ่าน stdin ด้วย read-only/plan/sandbox mode
+- เพิ่ม AGY ในแผง status; ตรวจเครื่องจริงได้ Codex `0.162.0`, Gemini `0.63.0`, AGY `1.3.2` และ LM Studio พร้อม โดย Gemma local routing ยังไม่พร้อม
+- Unit tests 6/6 และ Chrome/Edge browser tests 2/2 ผ่าน; ยังไม่เรียก cloud generation เพราะต้องผ่าน consent ก่อน
+- Phase 10 regression หลังเพิ่ม adapters ผ่าน source 23/23 และ publish 23/23
+
+## 2026-10-09 — เพิ่ม Claude CLI
+
+- เพิ่ม Claude CLI → `claude` ใน AI Command Interface และ `LLM_CLI_PROVIDER`
+- อ้างอิง Claude Code CLI ทางการ: print mode `-p`, stdin, JSON output, `--permission-mode plan` และ `--max-turns`
+- Adapter ใช้ isolated working directory, `--max-turns 1` และ block `Bash/Edit/Write/NotebookEdit/WebFetch/WebSearch`; ห้าม bypass permissions
+- เพิ่มสถานะ Claude ในหน้า Settings; เครื่องนี้ยังไม่ติดตั้ง `claude` จึงแสดง `not_installed` และไม่มีการติดตั้ง/ส่ง cloud อัตโนมัติ
+- Unit + Chrome/Edge tests ผ่าน 8/8 และ Phase 10 source regression ผ่าน 23/23
+- Phase 10 publish regression ผ่าน 23/23 และ source/publish ซิงก์ตรงกัน
+
+## 2026-10-09 — รับข้อเสนอ Gemini และปรับ Phase 10 checklist
+
+- เห็นชอบให้ Semantic Segment Assembly + de-hyphenation เป็น Priority 1 ก่อนเปิด Translation Quality Gate
+- เพิ่มข้อกำหนด reversible mapping จาก translation unit ไป original segment/char span/BBox, transformation log, stale/rebase และข้อห้าม merge ข้าม structure boundary
+- บังคับ `12.png`/`13.png` ใช้ style `academic`; `13.png` ต้องผ่าน code preservation
+- แก้ AI CLI checklist ให้แยก implementation/mock test/real provider acceptance และถอนข้อความที่เคลมว่า model preflight ครบทุก adapter
+- ขยาย no-fallback, stdin, consent และ acceptance ให้ครอบคลุม Codex/Gemini/AGY/Claude/LM Studio
+- แยก Quality Gate เป็น 3 providers หลัก × 4 translation styles; Phase 10 ยังคง `IMPLEMENTATION COMPLETE / QUALITY ACCEPTANCE NOT COVERED`
+
+## 2026-10-09 — Translation รองรับ Text source และ Provider ราย adapter
+
+- เพิ่มต้นทาง Text: `final.txt`, `corrected.txt`, `raw.txt`; `auto` ยังเลือก HTML ก่อน แล้ว fallback ไป Text
+- Text ถูก escape และ wrap เป็น stable page/paragraph HTML ภายในก่อนเข้า segment pipeline เดิม จึงใช้ validator/revision/review/export ร่วมกันโดยไม่ OCR ใหม่
+- หน้า Translation โหลด Provider จาก capability และเลือกได้: Local LLM API, Codex CLI, Gemini CLI, AGY CLI, Claude CLI, LM Studio CLI, Google และ Hybrid
+- Backend route AI CLI ไป adapter ที่เลือกจริง; Codex/Gemini/AGY/Claude บังคับ cloud consent ส่วน Local LLM API/LM Studio CLI เป็น offline
+- เพิ่ม `transport` และ `cli_adapter` ใน segment provenance/audit; รักษา `local` เดิมไว้เพื่อ backward compatibility ของงานเก่า
+- Phase 10 publish regression ผ่าน 27/27: non-browser 25/25 และ browser automation Chrome/Edge 2/2; JavaScript syntax ผ่าน
+- Capability endpoint คืน Provider ครบ 8 รายการภายในประมาณ 1 วินาทีในการตรวจครั้งนี้; ลด health check ซ้ำและยัง preflight adapter จริงก่อนเริ่มงาน
+
+## 2026-10-10 — ปรับ Upload, Translation preview และ AI CLI status cache
+
+- ปิด `ใส่เลขหน้าลงในไฟล์ข้อความ` เป็นค่าเริ่มต้นทั้ง UI และ API start request; งานเก่ายังอ่านค่าเดิมจาก artifact ได้
+- เมื่อเลือก PDF/PNG/JPG/JPEG ระบบ upload และตรวจจำนวนหน้าอัตโนมัติทันที ก่อนผู้ใช้เลือกช่วงหน้าและเริ่ม OCR
+- เพิ่ม `GET /api/jobs/{job_id}/translation/source/preview` และปุ่ม `View เอกสาร`; HTML/Text preview ใช้ CSP sandbox, Text escape ก่อนแสดง
+- ภาษาปลายทาง Translation default เป็น `th` เมื่อ provider รองรับ และคงค่าที่ผู้ใช้เลือกเมื่อสลับ provider
+- เปลี่ยน AI CLI status: `GET /api/ai/cli/status` อ่าน cache, `POST /api/ai/cli/status/check` ตรวจจริงเมื่อกดปุ่มและบันทึก `data/ai_cli_status.json`
+- Header หน้าแรกแสดง AI CLI ที่ `ready` จาก cache โดยไม่สั่งตรวจซ้ำ
+- Verification รอบสุดท้าย publish regression ผ่าน 36/36 รวม unit/API/static และ Chrome/Edge Settings + Translation/Upload/Header
+
+## 2026-10-10 — แก้ UX Cloud privacy consent สำหรับ AI CLI
+
+- แก้ข้อความ consent จาก Google แบบตายตัว เป็นปลายทางจริงตาม Provider: OpenAI/Codex, Google/Gemini/AGY/Cloud Translation, Anthropic/Claude หรือ Hybrid
+- เปลี่ยน Provider แล้ว reset consent เพื่อไม่ใช้คำยินยอมของปลายทางเดิม
+- ปุ่มเริ่มแปลตรวจ consent ใน browser ก่อนยิง API, focus checkbox และแจ้ง provider ที่ต้องยืนยัน
+- Chrome/Edge browser acceptance สำหรับ Codex consent, provider switch reset และ Google consent ผ่าน 2/2
+
+## 2026-10-10 — แก้ AGY CLI `--print` parsing
+
+- เปลี่ยน AGY จาก `--print` ที่ไม่มีค่าเป็น `--print=<fixed instruction>` เพื่อไม่ให้ `--input-format` ถูกอ่านเป็น prompt
+- เอกสารยังส่งทาง stdin; `--input-format text`, JSON output, plan/sandbox และ disable slash commands คงเดิม
+- ข้อความ consent ใช้รูปแบบ `ยินยอมส่งข้อความ segment ไป Cloud AI ผ่าน <ชื่อ Provider>`
+- Unit + Chrome/Edge acceptance ผ่าน 8/8; bump `translation.js` asset version เพื่อไม่ใช้ browser cache เดิม
+
+## 2026-10-10 — แก้ผลแปล `09.png` จาก AGY CLI ไม่ถูกอ่าน
+
+- ตรวจ job `job_d3f75e241f8c` ของ `09.png`: OCR สำเร็จ แต่ Translation ล้มเหลวที่ `Provider response missing segments` (`invalid_response`) จึงไม่มีผลแปล; ไม่ใช่ปัญหา OCR
+- เพิ่มตัวแยก JSON envelope ของ CLI แบบ recursive รองรับ `result`/`message`/`content`/`parts` ซ้อนกัน, JSON ที่อยู่ใน string และ fenced JSON; จะคืนเฉพาะ payload ที่มี `segments` ให้ validator เดิมตรวจ ID/schema ต่อ
+- รักษา stdin-only, `plan`, `sandbox` และ `shell=False`; ไม่บันทึก stdout หรือข้อความจากเอกสารลง log
+- เพิ่ม regression test สำหรับ nested AGY/Gemini-style envelope; publish unit/API provider tests ผ่าน **13/13**
+- การเรียก AGY จาก sandbox ของผู้พัฒนาเจอ credential-store access denied และไม่ authenticated จึงไม่ใช้ environment นี้สรุปผล provider จริง; ต้อง retry งานเดิมจาก runtime ที่ผู้ใช้ sign-in แล้วหลัง reload server
+
+## 2026-10-10 — ตรวจรับงาน Gemini: AGY CLI และ Translation preflight
+
+- อ่าน `gemini.md` และตรวจโค้ดจริง พบว่า patch AGY ของ Gemini ส่ง `combined` ซึ่งมีข้อความเอกสาร ผ่าน `--print=<prompt>` ใน command line แม้จะส่งซ้ำใน stdin ด้วย จึงขัด checklist 10.3A ที่ห้ามใส่ข้อความเอกสารใน command line, เสี่ยงข้อมูลอยู่ใน process list และชนเพดาน Windows
+- แก้ AGY เป็น protocol ทางการ `--input-format stream-json --output-format stream-json`: ส่ง UTF-8 NDJSON `{event:user,message:{content:...}}` ทาง stdin อย่างเดียว แล้วอ่านเฉพาะ terminal `result.response` ที่ `status=SUCCESS`; stdout event อื่นและ stderr ไม่ถูกใช้เป็นผลแปล
+- แก้ `_extract_cli_json_output()` ให้ตัด `<thought>`/`<thinking>`/`<analysis>` และ Markdown JSON fence ก่อน parse รวมถึงรองรับ JSON envelope ซ้อน; strict segment schema/ID validator ยังทำงานต่อเหมือนเดิม
+- เพิ่ม preflight ที่ `TranslationTasks.start()`: ตรวจ capability ของ provider ก่อนสร้าง task/background thread; provider unavailable ถูก reject ทันที พร้อม test ครอบคลุมกรณี adapter ไม่ authenticated
+- เพิ่ม tests: AGY ไม่มี document อยู่ใน argv, stdin เป็น NDJSON, nested envelope, reasoning/fence และ preflight unavailable; publish unit/API/provider/task ผ่าน **21/21**
+- ไม่รับรองคำกล่าวใน `gemini.md` ว่า live AGY แปลสำเร็จ 100% เพราะตรวจซ้ำจาก sandbox ไม่ได้: AGY session นี้อ่าน credential store ไม่ได้และขอ OAuth. หลัง restart runtime ให้ retry `09.png` จาก session ที่ sign-in แล้ว; หาก AGY ส่ง response ผิด schema ระบบจะหยุดพร้อม error โดยไม่บันทึกผลเสีย
+
+## 2026-10-11 — ตรวจรับ Gemini: Google Cloud Translation และ Local parser
+
+- อ่าน `gemini.md` ฉบับ 2026-10-11 เทียบ `checklist.md`, source และ publish; ยืนยันว่า Google Cloud Translation config/API/UI มีอยู่จริง และ Phase 10 regression เดิมผ่าน 31/31
+- พบ Local parser ของ Gemini มี fallback ที่ดึง JSON จากข้อความอิสระด้วย regex; ขัด checklist ที่กำหนดให้ reject ข้อความนอก JSON จึงตัด fallback นี้ออก และเพิ่ม regression `prefix {…}` ต้อง `invalid_response`
+- พบ Google v3 ได้ HTTP 401/403 จะหยุดทันที แม้ตั้ง `GOOGLE_TRANSLATION_API_KEY` สำหรับ v2 ไว้แล้ว; แก้ให้ fallback ไป v2 เฉพาะกรณี v3 auth error และยังคงไม่ fallback สำหรับ quota/invalid request/server error
+- เพิ่ม regression Google v3 403 → v2 success, แล้วรัน publish `tests/phase10`: **32/32 PASS** รวม Chrome/Edge
+- ปรับ checklist AGY ให้ตรง implementation `stream-json` ผ่าน stdin; ยังไม่ check Quality Acceptance, Semantic Segment Assembly/de-hyphenation, strict auth/model preflight ทุก adapter, หรือ live provider matrix เพราะยังไม่มีหลักฐานจริงครบ
+
+## 2026-10-11 — เริ่มแก้ Priority 1: Semantic Segment Assembly
+
+- เพิ่ม `TranslationUnit` แบบ reversible ก่อนส่ง provider: รวมเฉพาะ OCR line-series ที่อยู่ page/block เดียวกัน, ไม่รวม table/code/list/heading และไม่แก้ source artifact หรือ original segment ID
+- Unit เก็บ stable `id`, `member_ids`, source spans, page, member index และ transformation log; context `lay-` + `ers` จะเป็น `layers` เฉพาะ context สำหรับโมเดล ขณะที่ผลลัพธ์ยังต้องคืนตาม original segment ID ทุกตัว
+- provider ได้ `context_unit` เพื่อแปล line เดิมโดยเห็นประโยคเต็ม; batch จะไม่แยกสมาชิกใน unit ข้ามกัน
+- เพิ่ม `ASSEMBLER_VERSION=10.2.0`; translation เก่าที่ version ไม่ตรงถูกระบุ stale เพื่อไม่ทับ manual-final เงียบ ๆ
+- เพิ่ม regression de-hyphenation, reversible member/span mapping และ unit-batch; publish core/task tests ผ่าน **18/18**
+- ยังไม่ check ข้อ 10.2A ทั้งชุด: UI ระดับ unit, BBox highlight, export anchor/continuation suppression, soft-hyphen/compound guard และ ground truth ต้องทำต่อก่อน Quality Gate
+- ทดสอบ AGY `09.png` ต่อไม่ได้ เพราะ artifact job `job_d3f75e241f8c` ไม่อยู่ใน `files/` หรือ `publish/files/`; พบเพียง `demo/09.png` ต้นฉบับ จึงไม่มี OCR/source artifact ที่ตรวจซ้ำโดยไม่สร้างงานใหม่
+
+## 2026-10-10 — แก้ไข AGY CLI ไม่แปลภาษา (Missing segments / Invalid JSON)
+
+- หาสาเหตุ: `agy` CLI ในโหมด print (`--print`) ไม่ได้อ่าน prompt จาก stdin; เมื่อส่งคำสั่งแบบ `--print=<fixed instruction>` โมเดลได้รับเพียงคำสั่งคงที่โดยไม่มีเนื้อหาเอกสารและ segments ส่งผลให้โมเดลพยายามเรียกเครื่องมือ (`RunCommand`) เพื่ออ่าน stdin ใน headless mode จนถูก headless permission guard บล็อก (`jetski: no output produced — a tool required the "command" permission...`) และคืนค่าว่าง `""` ทำให้ Translation ล้มเหลวที่ `Provider returned invalid JSON` หรือ `missing segments`
+- แนวทางแก้ไขใน `src/llm_client.py`:
+  1. ส่งเนื้อหา prompt และ segments รวมคำสั่งเข้าผ่าน `--print={agy_prompt}` โดยตรง
+  2. กำหนดคำสั่งชัดเจนใน `agy_prompt` ว่าห้ามใช้เครื่องมือ/คำสั่งใดๆ ให้ตอบเฉพาะ JSON เท่านั้น
+  3. ตั้งเพดานตรวจความยาว prompt 28,000 ตัวอักษรเพื่อไม่ให้เกินขีดจำกัด command-line ของ Windows
+  4. ยังคงส่ง `input_text=combined`, `--sandbox`, `--mode plan` และ `--disable-slash-commands` เพื่อคงความปลอดภัยและรองรับ test suite
+- ทดสอบจริงกับ `agy.exe`: `provider.translate()` แปลคำสำเร็จและคืน JSON โครงสร้างถูกต้อง (`Machine learning เป็นสาขาย่อยของปัญญาประดิษฐ์`, `computer vision`)
+- ซิงก์โค้ด `src/llm_client.py` ไปยัง `publish/src/llm_client.py`; รันเทสต์ `tests.test_local_llm_config` ผ่าน 7/7 และ Phase 10 regression suite ผ่าน 27/27

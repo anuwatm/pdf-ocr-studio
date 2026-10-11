@@ -32,7 +32,7 @@ EPUB_SCHEMA_VERSION = "9.0"
 MAX_SOURCE_BYTES = 20 * 1024 * 1024
 MAX_PACKAGE_BYTES = 100 * 1024 * 1024
 MAX_PACKAGE_ENTRIES = 1000
-ALLOWED_SOURCE_VARIANTS = {"auto", "basic", "ai", "final", "structured"}
+ALLOWED_SOURCE_VARIANTS = {"auto", "basic", "ai", "final", "structured", "translated"}
 ALLOWED_CHAPTER_SPLITS = {"heading", "page"}
 BLOCK_TAGS = {"p", "h1", "h2", "h3", "table"}
 TABLE_TAGS = {"thead", "tbody", "tfoot", "tr", "th", "td", "caption"}
@@ -148,7 +148,7 @@ def _source_revision(path: str) -> str:
 def _resolve_source(job_dir: str, variant: str) -> Tuple[str, str, str]:
     requested = (variant or "auto").lower().strip()
     if requested not in ALLOWED_SOURCE_VARIANTS:
-        raise ValueError("Allowed EPUB source variants: auto, basic, ai, final, structured")
+        raise ValueError("Allowed EPUB source variants: auto, basic, ai, final, structured, translated")
 
     export_dir = os.path.join(job_dir, "export")
     export_meta = _read_json(os.path.join(export_dir, "export_meta.json"))
@@ -171,6 +171,18 @@ def _resolve_source(job_dir: str, variant: str) -> Tuple[str, str, str]:
                 status = get_structured_status(os.path.basename(job_dir), files_dir=os.path.dirname(job_dir))
                 if status.get("is_stale"):
                     raise ValueError("Conflict: structured export is stale. Regenerate structured export.")
+            if candidate == "translated":
+                from src.translation_core import load_glossary, read_json, resolve_source
+                model = read_json(os.path.join(export_dir, "translation", "translation.json"))
+                if not model or model.get("status") != "completed":
+                    raise ValueError("Conflict: translated export is incomplete.")
+                try:
+                    _, _, current_source = resolve_source(os.path.dirname(job_dir), os.path.basename(job_dir), model.get("source_variant", "auto"))
+                except (FileNotFoundError, ValueError) as exc:
+                    raise ValueError("Conflict: translated source is unavailable.") from exc
+                current_glossary = load_glossary(os.path.dirname(job_dir), os.path.basename(job_dir)).get("revision")
+                if current_source != model.get("source_revision") or current_glossary != model.get("glossary_revision"):
+                    raise ValueError("Conflict: translated export is stale. Translate again.")
             return candidate, path, _source_revision(path)
 
     if requested == "structured":

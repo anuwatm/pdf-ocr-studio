@@ -25,7 +25,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query, Path, status, Request
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, JSONResponse, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
@@ -52,6 +52,9 @@ job_manager = JobManager(db_path=DEFAULT_DB_PATH, output_dir=DEFAULT_OUTPUT_DIR)
 from src.html_ai_tasks import HtmlAiTasks
 html_ai_tasks = HtmlAiTasks(db, job_manager, DEFAULT_OUTPUT_DIR)
 job_manager.html_ai_tasks = html_ai_tasks
+from src.translation_tasks import TranslationTasks
+translation_tasks = TranslationTasks(db, job_manager, DEFAULT_OUTPUT_DIR)
+job_manager.translation_tasks = translation_tasks
 
 JOB_ID_PATTERN = r"^[A-Za-z0-9_-]{1,64}$"
 JobId = Annotated[str, Path(pattern=JOB_ID_PATTERN, description="Unique job identifier")]
@@ -90,6 +93,7 @@ async def lifespan(app: FastAPI):
     db.recover_interrupted_jobs()
     yield
     # Shutdown
+    translation_tasks.shutdown()
     html_ai_tasks.shutdown()
     job_manager.shutdown()
 
@@ -199,7 +203,7 @@ def _validated_local_llm_config(payload: LocalLLMConfigRequest) -> dict:
     base_url = payload.base_url.strip().rstrip("/")
     parsed = urlparse(base_url)
     allowed_hosts = {"127.0.0.1", "::1", "localhost"}
-    if (
+    if payload.transport == "api" and (
         parsed.scheme not in {"http", "https"}
         or parsed.hostname not in allowed_hosts
         or parsed.username is not None
@@ -214,6 +218,8 @@ def _validated_local_llm_config(payload: LocalLLMConfigRequest) -> dict:
         "model": payload.model.strip(),
         "timeout": payload.timeout,
         "api_key": payload.api_key,
+        "transport": payload.transport,
+        "cli_provider": payload.cli_provider,
     }
 
 
@@ -221,6 +227,20 @@ def _validated_local_llm_config(payload: LocalLLMConfigRequest) -> dict:
 def get_ai_config():
     """Returns editable Local LLM settings without returning the secret key."""
     return get_llm_config()
+
+
+@app.get("/api/ai/cli/status")
+def get_ai_cli_adapter_status():
+    """Returns the last persisted AI CLI status without executing commands."""
+    from src.cli_status import load_ai_cli_status
+    return load_ai_cli_status()
+
+
+@app.post("/api/ai/cli/status/check")
+def check_ai_cli_adapter_status():
+    """Checks allowlisted AI CLI adapters on explicit user request and persists the result."""
+    from src.cli_status import check_and_store_ai_cli_status
+    return check_and_store_ai_cli_status()
 
 
 @app.post("/api/ai/config/test")
@@ -867,7 +887,7 @@ def serve_index():
     if os.path.exists(index_file):
         with open(index_file, encoding="utf-8") as source:
             markup = source.read()
-        for name in ("text", "html", "epub", "structured"):
+        for name in ("text", "html", "epub", "structured", "translation"):
             with open(os.path.join(STATIC_DIR, f"{name}.html"), encoding="utf-8") as partial:
                 markup = markup.replace(f"<!-- include:{name}.html -->", partial.read())
         return HTMLResponse(markup)
@@ -876,10 +896,10 @@ def serve_index():
 
 @app.get("/config.html", response_class=FileResponse)
 def serve_config():
-    """Serves the Local LLM configuration page from the static UI bundle."""
+    """Serves the configuration page from the static UI bundle."""
     config_file = os.path.join(STATIC_DIR, "config.html")
     if os.path.exists(config_file):
-        return FileResponse(config_file)
+        return FileResponse(config_file, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Configuration page not found")
 
 
@@ -921,6 +941,8 @@ def delete_job_endpoint(job_id: JobId, force: bool = Query(False)):
     from src.cleanup_service import delete_single_job
     if html_ai_tasks.is_active(job_id):
         raise HTTPException(status_code=409, detail="กรุณายกเลิกการสร้าง HTML ด้วย AI และรอให้หยุดก่อนลบงาน")
+    if translation_tasks.is_active(job_id):
+        raise HTTPException(status_code=409, detail="กรุณายกเลิกงานแปลและรอให้หยุดก่อนลบงาน")
     try:
         res = delete_single_job(
             job_id=job_id,
@@ -978,6 +1000,269 @@ class TocRegenerateRequest(BaseModel):
     base_preview_revision: Optional[str] = None
     source_variant: str = "auto"
     chapter_split: str = "heading"
+
+
+class TranslationConfigRequest(BaseModel):
+    source_variant: str = Field(default="auto", pattern=r"^(auto|basic|ai|final|structured|text_final|text_corrected|text_raw)$")
+    source_language: str = Field(default="auto", min_length=2, max_length=30)
+    target_language: str = Field(min_length=2, max_length=30)
+    style: str = Field(default="general", pattern=r"^(general|novel|academic|official)$")
+    provider: str = Field(default="local_api", pattern=r"^(local|local_api|cli_codex|cli_gemini|cli_agy|cli_claude|cli_lms|google|hybrid)$")
+    model: str = Field(default="", max_length=200)
+    translate_toc: bool = True
+    cloud_consent: bool = False
+    preserve_manual_final: bool = True
+    manual_strategy: str = Field(default="preserve", pattern=r"^(preserve|rebase|reset)$")
+
+
+class TranslationStartRequest(TranslationConfigRequest):
+    resume: bool = False
+
+
+class TranslationGlossaryRequest(BaseModel):
+    entries: List[Dict[str, Any]] = Field(default_factory=list, max_length=5000)
+    base_revision: Optional[str] = Field(default=None, max_length=100)
+    source_language: Optional[str] = Field(default=None, min_length=2, max_length=30)
+    target_language: Optional[str] = Field(default=None, min_length=2, max_length=30)
+
+
+class TranslationSaveFinalRequest(BaseModel):
+    edits: List[Dict[str, Any]] = Field(default_factory=list, max_length=50_000)
+    base_revision: str = Field(min_length=1, max_length=100)
+
+
+class GoogleConfigRequest(BaseModel):
+    project: Optional[str] = Field(default="", max_length=200)
+    location: Optional[str] = Field(default="global", max_length=100)
+    credentials_path: Optional[str] = Field(default=None, max_length=500)
+    api_key: Optional[str] = Field(default=None, max_length=500)
+
+
+# ------------------------------------------------------------------------------
+# Phase 10: Document Translation
+# ------------------------------------------------------------------------------
+
+@app.get("/api/translation/capabilities")
+def translation_capabilities_endpoint():
+    from src.translation_providers import capabilities
+    return capabilities()
+
+
+@app.get("/api/translation/google/config")
+def get_google_translation_config_endpoint():
+    from src.config import get_google_config
+    return get_google_config()
+
+
+@app.put("/api/translation/google/config")
+def save_google_translation_config_endpoint(payload: GoogleConfigRequest):
+    from src.config import update_google_config
+    return update_google_config(
+        project=payload.project or "",
+        location=payload.location or "global",
+        credentials_path=payload.credentials_path,
+        api_key=payload.api_key,
+    )
+
+
+@app.post("/api/translation/google/test")
+def test_google_translation_endpoint(payload: Optional[GoogleConfigRequest] = None):
+    from src.translation_providers import GoogleTranslationProvider
+    import os
+    env_override = {}
+    if payload:
+        if payload.project is not None and payload.project.strip():
+            env_override["GOOGLE_CLOUD_PROJECT"] = payload.project.strip()
+        if payload.location is not None and payload.location.strip():
+            env_override["GOOGLE_CLOUD_LOCATION"] = payload.location.strip()
+        if payload.credentials_path is not None and payload.credentials_path.strip():
+            env_override["GOOGLE_APPLICATION_CREDENTIALS"] = payload.credentials_path.strip()
+        if payload.api_key is not None and payload.api_key.strip():
+            env_override["GOOGLE_TRANSLATION_API_KEY"] = payload.api_key.strip()
+
+    from unittest.mock import patch
+    with patch.dict(os.environ, env_override):
+        provider = GoogleTranslationProvider()
+        cap = provider.capability()
+        if not cap.get("available"):
+            return {
+                "status": "error",
+                "error": cap.get("error") or "Google Cloud Translation is not configured",
+                "model": cap.get("model")
+            }
+        try:
+            res = provider.translate(
+                [{"id": "test_s1", "source_text": "Hello world"}],
+                {"cloud_consent": True, "target_language": "th", "source_language": "en"},
+                []
+            )
+            sample = res[0].get("text", "")
+            return {
+                "status": "connected",
+                "model": cap.get("model"),
+                "sample_translation": sample,
+                "message": f"เชื่อมต่อสำเร็จ: แปล 'Hello world' -> '{sample}'"
+            }
+        except Exception as exc:
+            return {
+                "status": "error",
+                "error": str(exc),
+                "model": cap.get("model")
+            }
+
+
+@app.get("/api/jobs/{job_id}/translation/glossary")
+def get_translation_glossary_endpoint(job_id: JobId):
+    if not db.get_job_status(job_id):
+        raise HTTPException(status_code=404, detail="Job not found")
+    from src.translation_core import load_glossary
+    return load_glossary(DEFAULT_OUTPUT_DIR, job_id)
+
+
+@app.put("/api/jobs/{job_id}/translation/glossary")
+def save_translation_glossary_endpoint(job_id: JobId, req: TranslationGlossaryRequest):
+    if not db.get_job_status(job_id):
+        raise HTTPException(status_code=404, detail="Job not found")
+    from src.translation_core import save_glossary
+    try:
+        return save_glossary(DEFAULT_OUTPUT_DIR, job_id, req.entries, req.base_revision,
+                             req.source_language, req.target_language)
+    except ValueError as exc:
+        raise HTTPException(status_code=409 if str(exc).startswith("Conflict:") else 422, detail=str(exc))
+
+
+@app.post("/api/jobs/{job_id}/translation/estimate")
+def estimate_translation_endpoint(job_id: JobId, req: TranslationConfigRequest):
+    if not db.get_job_status(job_id):
+        raise HTTPException(status_code=404, detail="Job not found")
+    from src.translation_tasks import estimate
+    try:
+        return estimate(DEFAULT_OUTPUT_DIR, job_id, req.model_dump())
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@app.post("/api/jobs/{job_id}/translation/start", status_code=202)
+def start_translation_endpoint(job_id: JobId, req: TranslationStartRequest):
+    if not db.get_job_status(job_id):
+        raise HTTPException(status_code=404, detail="Job not found")
+    try:
+        payload = req.model_dump(); resume = payload.pop("resume", False)
+        return translation_tasks.start(job_id, payload, resume=resume)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=409 if "กำลังทำงาน" in str(exc) else 422, detail=str(exc))
+
+
+@app.get("/api/jobs/{job_id}/translation/progress")
+def translation_progress_endpoint(job_id: JobId):
+    if not db.get_job_status(job_id):
+        raise HTTPException(status_code=404, detail="Job not found")
+    return translation_tasks.status(job_id)
+
+
+@app.post("/api/jobs/{job_id}/translation/cancel")
+def cancel_translation_endpoint(job_id: JobId):
+    if not db.get_job_status(job_id):
+        raise HTTPException(status_code=404, detail="Job not found")
+    return translation_tasks.cancel(job_id)
+
+
+@app.post("/api/jobs/{job_id}/translation/retry", status_code=202)
+def retry_translation_endpoint(job_id: JobId, req: TranslationConfigRequest):
+    if not db.get_job_status(job_id):
+        raise HTTPException(status_code=404, detail="Job not found")
+    try:
+        return translation_tasks.start(job_id, req.model_dump(), resume=True)
+    except (ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=409 if "กำลังทำงาน" in str(exc) else 422, detail=str(exc))
+
+
+@app.get("/api/jobs/{job_id}/translation/result")
+def translation_result_endpoint(job_id: JobId):
+    if not db.get_job_status(job_id):
+        raise HTTPException(status_code=404, detail="Job not found")
+    result = translation_tasks.result(job_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Translation result not found")
+    return result
+
+
+@app.put("/api/jobs/{job_id}/translation/final")
+def save_translation_final_endpoint(job_id: JobId, req: TranslationSaveFinalRequest):
+    if not db.get_job_status(job_id):
+        raise HTTPException(status_code=404, detail="Job not found")
+    try:
+        return translation_tasks.save_final(job_id, req.edits, req.base_revision)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=409 if str(exc).startswith("Conflict:") else 422, detail=str(exc))
+
+
+@app.get("/api/jobs/{job_id}/translation/export/{format_name}")
+def export_translation_endpoint(job_id: JobId, format_name: str = Path(pattern=r"^(text|html)$")):
+    job = db.get_job_status(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    model = translation_tasks.result(job_id)
+    if model.get("stale"):
+        raise HTTPException(status_code=409, detail=f"Translation is stale: {', '.join(model.get('stale_reasons', []))}")
+    if not model or model.get("status") != "completed":
+        raise HTTPException(status_code=409, detail="Translation has unresolved warnings or is not complete")
+    suffix, media = ("txt", "text/plain; charset=utf-8") if format_name == "text" else ("html", "text/html; charset=utf-8")
+    path = os.path.join(DEFAULT_OUTPUT_DIR, job_id, "export", "translation", f"translated.{suffix}")
+    if is_path_traversal(path, DEFAULT_OUTPUT_DIR) or not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail="Translated export not found")
+    from urllib.parse import quote
+    filename = quote(f"{os.path.splitext(job.filename)[0]}_translated.{suffix}")
+    return FileResponse(path, media_type=media, headers={"Content-Disposition":f"attachment; filename*=UTF-8''{filename}",
+        "X-Content-Type-Options":"nosniff","Cache-Control":"no-store"})
+
+
+@app.get("/api/jobs/{job_id}/translation/preview")
+def preview_translation_endpoint(job_id: JobId):
+    if not db.get_job_status(job_id):
+        raise HTTPException(status_code=404, detail="Job not found")
+    model = translation_tasks.result(job_id)
+    if model.get("stale"):
+        raise HTTPException(status_code=409, detail=f"Translation is stale: {', '.join(model.get('stale_reasons', []))}")
+    path = os.path.join(DEFAULT_OUTPUT_DIR, job_id, "export", "translation", "translated.html")
+    if is_path_traversal(path, DEFAULT_OUTPUT_DIR) or not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail="Translated HTML not found")
+    with open(path, encoding="utf-8") as handle: content = handle.read()
+    return Response(content, media_type="text/html; charset=utf-8", headers={
+        "Content-Security-Policy":"default-src 'none'; style-src 'unsafe-inline'; sandbox",
+        "X-Content-Type-Options":"nosniff","Cache-Control":"no-store"})
+
+
+@app.get("/api/jobs/{job_id}/translation/source/preview")
+def preview_translation_source_endpoint(
+    job_id: JobId,
+    source_variant: str = Query(default="auto",pattern=r"^(auto|basic|ai|final|structured|text_final|text_corrected|text_raw)$"),
+):
+    if not db.get_job_status(job_id):
+        raise HTTPException(status_code=404,detail="Job not found")
+    from src.translation_core import resolve_source
+    try:
+        variant,path,_=resolve_source(DEFAULT_OUTPUT_DIR,job_id,source_variant)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404,detail=str(exc))
+    with open(path,encoding="utf-8") as handle: content=handle.read()
+    if path.lower().endswith(".txt"):
+        import html
+        content=("<!doctype html><html><head><meta charset='utf-8'><title>"
+                 f"{html.escape(variant)}</title><style>body{{margin:2rem;font:16px/1.65 sans-serif}}"
+                 "pre{white-space:pre-wrap;overflow-wrap:anywhere}</style></head><body><pre>"
+                 f"{html.escape(content)}</pre></body></html>")
+    return Response(content,media_type="text/html; charset=utf-8",headers={
+        "Content-Security-Policy":"default-src 'none'; img-src data: blob:; style-src 'unsafe-inline'; font-src data:; sandbox",
+        "X-Content-Type-Options":"nosniff","Cache-Control":"no-store","Content-Disposition":"inline",
+        "X-Translation-Source-Variant":variant,
+    })
 
 
 # ------------------------------------------------------------------------------
@@ -1270,7 +1555,7 @@ def get_epub_preview_endpoint(job_id: JobId):
 @app.get("/api/jobs/{job_id}/export/epub/toc")
 def get_epub_toc_endpoint(
     job_id: JobId,
-    source_variant: str = Query("auto", pattern=r"^(auto|basic|ai|final|structured)$"),
+    source_variant: str = Query("auto", pattern=r"^(auto|basic|ai|final|structured|translated)$"),
     chapter_split: str = Query("heading", pattern=r"^(heading|page)$"),
 ):
     if not db.get_job_status(job_id):

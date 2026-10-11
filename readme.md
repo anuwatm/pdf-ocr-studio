@@ -5,9 +5,9 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688.svg?logo=fastapi)](https://fastapi.tiangolo.com)
 [![Engine](https://img.shields.io/badge/OCR-OneOCR%20(ctypes)-critical.svg)](#จุดเด่นของระบบ-key-features)
 [![Local AI](https://img.shields.io/badge/AI-Local%20LLM%20%2F%20VLM-blueviolet.svg)](#การตั้งค่า-local-ai-ตรวจแก้)
-[![Security](https://img.shields.io/badge/Privacy-100%25%20Offline%20%2F%20Loopback-success.svg)](#จุดเด่นของระบบ-key-features)
+[![Security](https://img.shields.io/badge/Privacy-Local%20default%20%2F%20Cloud%20opt--in-success.svg)](#จุดเด่นของระบบ-key-features)
 
-เว็บแอปพลิเคชันสำหรับแปลงเอกสาร **PDF และภาพภาษาไทยเป็นข้อความ UTF-8** ขับเคลื่อนด้วย **OneOCR** (เอนจิน OCR ภาษาไทยแบบเนทีฟจาก Windows 11 Snipping Tool ผ่าน Python `ctypes`) พร้อมระบบจัดลำดับข้อความอัจฉริยะ (Smart Layout Assembly) และผสานพลัง **Local AI (LLM/VLM)** ช่วยตรวจแก้คำผิด สระ และวรรณยุกต์ โดยประมวลผล **ภายในเครื่อง 100% (Localhost Single-User)** โดยไม่ส่งข้อมูลออกนอกเครื่อง พร้อมหน้าเว็บ **Web Studio** สำหรับตรวจทาน เทียบภาพต้นฉบับ แก้ไข และส่งออกไฟล์
+เว็บแอปพลิเคชันสำหรับแปลงเอกสาร **PDF และภาพภาษาไทยเป็นข้อความ UTF-8** ด้วย **OneOCR** พร้อม Structured HTML, EPUB และ Document Translation หน้าเว็บทำงานบน localhost; OCR, Local AI และ Local Translation อยู่ในเครื่อง ส่วน Google/Hybrid Translation เป็น cloud opt-in ที่ต้องยืนยันก่อนส่งเฉพาะข้อความ segment ออกไป
 
 > [!IMPORTANT]
 > ระบบรองรับ Windows 10/11 แบบ 64-bit เท่านั้น เพราะใช้ OneOCR DLL แบบ 64-bit และออกแบบให้ใช้งานจาก `127.0.0.1` บนเครื่องเดียว
@@ -58,7 +58,7 @@
   - [7. EPUB preview, package และดาวน์โหลด](#7-epub-preview-package-และดาวน์โหลด)
   - [8. Structured OCR และหน้าตรวจเทียบ](#8-structured-ocr-และหน้าตรวจเทียบ)
   - [9. Editable TOC และ stable targets](#9-editable-toc-และ-stable-targets)
-  - [10. งานแปลเอกสารที่กำลังวางแผน](#10-งานแปลเอกสารที่กำลังวางแผน)
+  - [10. Document Translation](#10-document-translation)
 - [การติดตั้งและเริ่มต้นใช้งาน (Getting Started)](#การติดตั้งและเริ่มต้นใช้งาน-getting-started)
   - [ความต้องการของระบบ](#ความต้องการของระบบ-prerequisites)
   - [วิธีที่ 1: รันด่วนด้วยชุดติดตั้งพร้อมแจกจ่าย (`publish/`)](#วิธีที่-1-รันด่วนด้วยชุดติดตั้งพร้อมแจกจ่าย-publish)
@@ -99,9 +99,9 @@
 6. **Data Retention & Anti-Resurrection:**
    - หน้า **งาน OCR ก่อนหน้า** เปิดดู ดาวน์โหลด หรือลบงานทีละรายการได้ และลบงานที่เก่ากว่าจำนวนวันที่ผู้ใช้กำหนดได้; **ลบงานทั้งหมด** ยกเลิก OCR ที่ค้างแล้วลบทุกงาน พร้อมรายงานงานที่ลบไม่สำเร็จ
    - ป้องกันสภาวะ Race Condition: หากงานถูกลบไปแล้ว Worker จะยุติการเขียนไฟล์กลับคืนทันที (0 Resurrection)
-7. **ความเป็นส่วนตัวและ Offline 100% สำหรับฟีเจอร์ที่ใช้งานได้ปัจจุบัน:**
+7. **ความเป็นส่วนตัวแบบ Local default และ Cloud opt-in:**
    - เซิร์ฟเวอร์ผูกเข้ากับ `127.0.0.1` (Loopback Only) ปฏิเสธการเข้าถึงจาก IP ภายนอกด้วย HTTP 403 Forbidden
-   - ประมวลผลและเก็บข้อมูลบนเครื่องของผู้ใช้เท่านั้น ไม่ส่งข้อมูลใด ๆ ออกนอกเครือข่าย
+   - OCR/Local AI/Local Translation ไม่ส่งเอกสารออกนอกเครื่อง; Google/Hybrid ส่งเฉพาะข้อความ segment เมื่อผู้ใช้เลือก provider และติ๊ก consent
 8. **ส่งออกผลลัพธ์และภาพ PDF:**
    - ดาวน์โหลด `raw.txt`, `corrected.txt`, `final.txt` และ ZIP ผลลัพธ์ได้ แม้งานถูกยกเลิก โดยระบบคงข้อความหน้าที่ทำสำเร็จแล้วไว้
    - สำหรับไฟล์ PDF สามารถกด **"ดาวน์โหลดภาพแต่ละหน้า (ZIP)"** ได้ทันทีในแท็บอัปโหลดเอกสาร (PNG 200 DPI ตามช่วงหน้าที่เลือก) โดยไม่ต้องสั่งเริ่มทำ OCR
@@ -112,30 +112,33 @@
    - **Editable TOC & Stable Targets:** สตูดิโอแก้ไขสารบัญ EPUB ปรับแต่งชื่อ (Label), สลับลำดับ (Reorder), จัดโครงสร้างชั้นลำดับ (Level 1–3), เลือกลิงก์ปลายทาง (Target) จากต้นบทหรือหัวข้อ h1–h3 พร้อม stable target ID ป้องกันลิงก์เลื่อนหลุด และระบบ Re-match อัตโนมัติเมื่อเนื้อหา HTML เปลี่ยนแปลง
 10. **Minimal Web Studio และ Visual Editor แบบ Word:**
     - Light theme เป็นค่าเริ่มต้น สลับ Dark ได้ พร้อม icon ปุ่ม, focus state และ responsive layout
-    - แยกพื้นที่ทำงานเป็น 6 แท็บอิสระ: **อัปโหลดเอกสาร**, **ผลข้อความ**, **HTML**, **ส่งออก EPUB**, **Structured OCR**, และ **งาน OCR ก่อนหน้า**
+    - แยกพื้นที่ทำงานเป็น 7 แท็บอิสระ: **อัปโหลดเอกสาร**, **ผลข้อความ**, **HTML**, **ส่งออก EPUB**, **Structured OCR**, **แปลเอกสาร**, และ **งาน OCR ก่อนหน้า**
     - ในแท็บ HTML มีระบบแก้ไขสองโหมด: **CodeMirror 5.65.21** สำหรับแก้ไขโค้ด HTML โดยตรง และ **Visual Editor แบบ Word** (WYSIWYG: ตัวหนา, ตัวเอียง, ขีดเส้นใต้, หัวข้อ H1–H3, รายการจุด/ตัวเลข, ลิงก์, Undo/Redo) พร้อมซิงก์สองฝั่งอัตโนมัติ
     - ระบบบันทึกแบบแมนนวล (Ctrl+S / ปุ่มบันทึก ปราศจาก Autosave) ป้องกันข้อผิดพลาด draft สูญหาย รองรับ Revision Conflict (HTTP 409) และแก้ปัญหา Title leak (`OCR Document - ...`) ไม่ให้ปนเปื้อนลงใน `<body>`
 11. **Structured OCR และการตรวจเทียบตำแหน่งต้นฉบับ:**
     - ตรวจจับโครงสร้างตาราง (Vector Geometry ตรวจเส้นจริงจาก PDF และ Scanned Projection ตรวจตารางสแกน) และรายการ (List bullet/numbered)
     - ส่งออกเป็น Structured Text (tab-separated) และ Semantic HTML (table/thead/tbody/tr/th/td, ul/ol/li) จาก `ocr.json` เดิมโดยไม่ต้องรัน OCR หรือ AI ซ้ำ
     - หน้าตรวจเทียบต้นฉบับแบบแยก 2 ฝั่ง (Original vs Text/HTML) พร้อมระบบซูม 50%–200%, ไฮไลต์ Bounding Box อัตโนมัติเมื่อคลิกเซลล์หรือบล็อกข้อความ รองรับทั้งเมาส์ คีย์บอร์ด และอุปกรณ์มือถือ
-12. **Document Translation (กำลังวางแผน):**
-    - วางแผนให้เลือกภาษาต้นทาง/ปลายทาง, style `ทั่วไป`/`นิยาย`/`วิชาการ`/`ราชการ` และ provider Google/Local AI/Hybrid
-    - รักษา segment, ตาราง, TOC, ศัพท์เฉพาะ และ code program พร้อม diff และ human review ก่อนส่งออก Text/HTML/EPUB
-    - ยังไม่มี Translation tab/API/worker ในระบบปัจจุบัน และยังไม่ถือเป็นฟีเจอร์พร้อมใช้งาน
+12. **Document Translation:**
+    - เลือกต้นทางจาก HTML หรือ `final.txt`/`corrected.txt`/`raw.txt` โดยไม่ OCR ใหม่ พร้อมภาษาต้นทาง/ปลายทางและ style `ทั่วไป`/`นิยาย`/`วิชาการ`/`ราชการ`
+    - เปิดดูต้นทางที่เลือกใน sandboxed preview ก่อนแปลได้ และภาษาปลายทางเริ่มต้นเป็นภาษาไทย
+    - เลือก provider ได้ตรงเส้นทาง: Local LLM API, Codex CLI, Gemini CLI, AGY CLI, Claude CLI, LM Studio CLI, Google หรือ Hybrid
+    - รักษา stable segment, ตาราง, TOC, critical token และ code พร้อม glossary/do-not-translate และสถานะ `translated`/`preserved`/`transliterated`
+    - ตรวจ source/Google baseline/AI/final แก้มือได้ พร้อมส่วน **ผลแปลรวมทั้งหมด** ที่รวม Final ทุก segment ตามลำดับเอกสาร อัปเดตตาม draft และคัดลอกได้
+    - ส่งออก Text/HTML หรือเปิด translated HTML ต่อใน EPUB Studio
 
 ---
 
 ## สถาปัตยกรรมและแผนภาพการทำงาน (Architecture & Diagrams)
 
-อัปเดตวันที่ 2026-10-09: อัปโหลด PDF/PNG/JPG/JPEG ได้สูงสุด 300 MB, OCR ใช้ subprocess, Structured OCR เปิดแก้ใน HTML Studio ได้ และ EPUB รองรับหน้าปกทั้งไฟล์อัปโหลดกับหน้า PDF ต้นฉบับพร้อมภาพตัวอย่างขนาดใหญ่ งานถัดไปคือ Document Translation ซึ่งยังไม่มี tab/API/worker ใช้งานจริง
+อัปเดตวันที่ 2026-10-10: ระบบตรวจจำนวนหน้าทันทีหลังเลือก PDF/ภาพ, ปิด page marker เป็นค่าเริ่มต้น, เก็บผลตรวจ AI CLI และแสดงใน header; Translation รองรับ preview ต้นทาง HTML/Text และใช้ภาษาไทยเป็นค่าปลายทางเริ่มต้น
 
 ### 1. สถาปัตยกรรมระบบ
 
 ```mermaid
 flowchart LR
-    UI["Browser: 6 tabs / Upload สูงสุด 300 MB"] --> API["FastAPI / 127.0.0.1"]
-    API --> Templates["index + text + html + epub + structured partials"]
+    UI["Browser: 7 tabs / Upload สูงสุด 300 MB"] --> API["FastAPI / 127.0.0.1"]
+    API --> Templates["index + text + html + epub + structured + translation partials"]
     API --> Upload["Streaming upload / format-size-page validation"]
     API --> Manager["JobManager / queue supervisor"]
     Manager --> Worker["OCR worker subprocess"]
@@ -151,7 +154,12 @@ flowchart LR
     EPUB --> CoverUX["Cover thumbnail / large modal / selected-saved status"]
     API --> TOC["TOC Editor / stable targets validator"]
     API --> Structured["Layout schema / Text-HTML renderer"]
-    API --> Translation["PLANNED / translation provider-validator-review"]
+    API --> Translation["TranslationTasks / provider-validator-review"]
+    API --> CLIStatus[("data/ai_cli_status.json / ตรวจเมื่อกดปุ่ม")]
+    CLIStatus --> UI
+    Translation --> Cloud["Google Cloud v3 / ADC / explicit consent"]
+    Translation --> CLI["AI CLI: Codex / Gemini / AGY / Claude / LM Studio"]
+    Translation --> LLM
     API --> Cleanup["Retention / single delete / delete all"]
     Manager --> DB[("data/jobs.db / SQLite WAL")]
     Worker --> DB
@@ -163,7 +171,7 @@ flowchart LR
     TOC --> Books[("export/epub: preview / payload / toc.json / metadata / book.epub")]
     CoverUX --> Books
     Structured --> Layouts[("export/structured: layout.json / structured.txt / structured.html")]
-    Translation --> Translated[("PLANNED: translation.json / translated Text-HTML-EPUB")]
+    Translation --> Translated[("translation.json / translated Text-HTML / EPUB source")]
 ```
 
 ### 2. OCR และการจัดเส้นทางเอกสาร
@@ -173,7 +181,7 @@ flowchart TD
     Upload["เลือก PDF / PNG / JPG / JPEG"] --> Limit{"ชนิดถูกต้องและไม่เกิน 300 MB?"}
     Limit -->|No| Reject["Frontend block หรือ Backend HTTP 413"]
     Limit -->|Yes| Stream["Streaming upload 64 KB/chunk; create queued job"]
-    Stream --> Count["Read page count; choose page range"]
+    Stream --> Count["Read page count automatically; choose page range"]
     Count --> Choice{"Action"}
     Choice -->|PDF images ZIP| Images["Render PNG 200 DPI; download ZIP without OCR"]
     Choice -->|OCR เป็น Text| Queue["Dispatch one OCR job to supervisor queue"]
@@ -196,9 +204,11 @@ flowchart TD
     Final --> Output{"Selected output"}
     Output -->|Text| TextOut["Text Studio / downloads"]
     Output -->|HTML| StructuredOut["Generate Structured HTML from saved artifacts"]
+    TextOut --> Translation2["Optional Translation Studio"]
+    StructuredOut --> Translation2
 ```
 
-งานถูกสร้างตั้งแต่อัปโหลด แต่เริ่ม worker เมื่อกดเริ่มแปลงหน้า แบ่ง OCR ละ 200 หน้าเพื่อคืนทรัพยากรระหว่าง batch; preview ไม่ทับข้อความแก้มือที่ยังไม่บันทึก
+งานถูกสร้างและตรวจจำนวนหน้าอัตโนมัติทันทีหลังเลือกไฟล์ แต่เริ่ม worker เมื่อกดเริ่มแปลงหน้า แบ่ง OCR ละ 200 หน้าเพื่อคืนทรัพยากรระหว่าง batch; `ใส่เลขหน้าลงในไฟล์ข้อความ` ปิดเป็นค่าเริ่มต้น
 
 ### 3. การตรวจทานข้อความและ HTML Studio
 
@@ -230,7 +240,7 @@ flowchart TD
     Structured --> OpenStudio["Open Structured HTML in HTML Studio"]
     OpenStudio --> Code
     Structured --> EPUB
-    TextSave --> Translation["Planned translation; see diagram 10"]
+    TextSave --> Translation["Translation Studio; see diagram 10"]
     Structured --> Translation
 ```
 
@@ -248,8 +258,8 @@ flowchart TD
     Done --> Retry["Retry / resume unfinished pages"]
     Retry --> Start
     History["History actions"] --> Action{"Deletion mode"}
-    Action -->|Retention cleanup| Retention["Select expired finalized jobs; skip queued / running / active HTML AI"]
-    Action -->|Single delete| Single["Check active work / force policy; active HTML AI returns 409"]
+    Action -->|Retention cleanup| Retention["Select expired finalized jobs; skip queued / running / active HTML AI or translation"]
+    Action -->|Single delete| Single["Check active work / force policy; active HTML AI or translation returns 409"]
     Action -->|Delete all| Lock{"Shared AI lock available"}
     Lock -->|No| Busy["409: wait for AI work to stop"]
     Lock -->|Yes| Stop["Cancel queued/running OCR; wait for worker exit"]
@@ -280,9 +290,10 @@ flowchart LR
     Structured --> Studio["Open Structured HTML in HTML Studio"]
     Studio --> HTML
     Structured --> EPUB
-    Open --> History["Tab 6: previous jobs / retention / delete all"]
+    Open --> Translation["Tab 6: language/style/provider/glossary/review"]
+    Translation --> EPUB
+    Open --> History["Tab 7: previous jobs / retention / delete all"]
     History --> Text
-    Open --> Translation["Planned Translation tab; not implemented"]
 ```
 
 ### 6. HTML AI เบื้องหลังและ progress
@@ -291,7 +302,7 @@ flowchart LR
 flowchart TD
     Start["POST /api/jobs/job_id/export/html/ai/start"] --> Lock{"Shared AI lock available?"}
     Lock -->|No| Busy["Return current task or busy status"]
-    Lock -->|Yes| Task["Start HtmlAiTasks background thread"]
+    Lock -->|Yes| Task["Start HtmlAiTasks background thread; lock shared with Local/Hybrid translation"]
     Task --> Capability{"Local LLM and model available?"}
     Capability -->|Yes| Batch["Send next annotation batch"]
     Batch --> Validate{"Batch JSON and tags valid?"}
@@ -323,7 +334,7 @@ LM Studio ที่แจ้ง capability รองรับ `reasoning: off` �
 
 ```mermaid
 flowchart TD
-    Source["Choose source: basic / ai / final / structured"] --> Config["Metadata / chapter split"]
+    Source["Choose source: basic / ai / final / structured / translated"] --> Config["Metadata / chapter split"]
     Config --> Cover{"Cover source"}
     Cover -->|Upload| CoverFile["PNG/JPEG สูงสุด 10 MB"]
     Cover -->|PDF page| PdfInfo["Read source PDF page count"]
@@ -382,6 +393,8 @@ flowchart TD
     Interactive --> Highlight["Highlight exact BBox overlay on source PDF / image"]
     HTML --> Studio["Open in HTML Studio: CodeMirror or Visual Editor"]
     Studio --> FinalHTML["Sanitize + revision guard -> final.html"]
+    HTML --> Translation8["Translation Studio: keep cell/block/target IDs"]
+    FinalHTML --> Translation8
     HTML --> EPUBPipe["Structured XHTML export to EPUB pipeline"]
     FinalHTML --> EPUBPipe
 ```
@@ -392,7 +405,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    HTML["Sanitized HTML h1-h3 IDs & chapter starts"] --> Targets["Stable targets: preserved ID or content hash"]
+    HTML["Sanitized or translated HTML h1-h3 IDs & chapter starts"] --> Targets["Stable targets: preserved ID or content hash"]
     Targets --> Auto["Automatic TOC generation"]
     Auto --> Editor["TOC Studio: edit label / reorder / nest level 1-3 / pick target"]
     Editor --> Validate{"Valid label, hierarchy, unique target?"}
@@ -409,29 +422,40 @@ flowchart TD
 
 TOC editor รองรับจัดลำดับและย่อหน้าได้สูงสุด 3 ระดับ เลือกลิงก์ปลายทางจากหัวข้อหรือต้นบท และสร้าง href อัตโนมัติจาก BookModel งานเก่าที่ไม่มี `toc.json` ยังใช้สารบัญอัตโนมัติได้ตามปกติ รูปปกรองรับทั้งการลากวาง PNG/JPEG สูงสุด 10 MB และการเลือกหน้า PDF ต้นฉบับเพื่อแปลงเป็นภาพปก โดยไม่เรียก OCR ซ้ำ
 
-### 10. งานแปลเอกสารที่กำลังวางแผน
+### 10. Document Translation
 
 ```mermaid
 flowchart TD
-    Planned["PLANNED: no Translation tab/API/worker yet"] --> Source["Saved final or structured artifact"]
-    Source --> Segment["Stable block, cell and target segments"]
-    Segment --> Config["Source-target language, style and glossary"]
+    Source{"Choose saved source"} --> HTML["final / structured / AI / basic HTML"]
+    Source --> Text["final / corrected / raw Text"]
+    Source --> View["Sandboxed source preview"]
+    HTML --> Segment["Stable text-node segments / source revision"]
+    Text --> Wrap["Escape + stable page/paragraph wrapper"]
+    Wrap --> Segment
+    Segment --> Config["Source-target language (default Thai), style and glossary"]
     Config --> Style["Style: general / novel / academic / official"]
     Style --> Provider{"Choose provider"}
     Provider --> Google["Google Cloud Translation baseline"]
-    Provider --> Local["Local AI translation"]
+    Provider --> Local["Local LLM API"]
+    Provider --> CLI["Codex / Gemini / AGY / Claude / LM Studio CLI"]
     Google --> Hybrid{"Use Hybrid polish?"}
     Hybrid -->|Yes| Polish["Local AI style polish"]
     Hybrid -->|No| Validate["Structure and critical-token validator"]
     Local --> Validate
+    CLI --> Consent{"Cloud CLI? explicit consent"}
+    Consent --> Validate
     Polish --> Validate
-    Validate --> Terms["Keep technical terms when needed: translated / preserved / transliterated"]
+    Validate -->|Warning| Review
+    Validate -->|Pass| Terms["Terms: translated / preserved / transliterated"]
     Terms --> Review["Compare source, baseline, AI and manual final"]
-    Review --> Preview["Translated XHTML Quick Preview"]
-    Preview --> Export["Translated Text, HTML and EPUB"]
+    Review --> Combined["Combined final translation / copy all"]
+    Combined --> Save["Manual final + base revision / stale guard"]
+    Save --> Export["Translated Text / semantic HTML"]
+    Export --> Preview["EPUB Studio: XHTML Quick Preview"]
+    Preview --> Package["TOC / cover / validator guards → EPUB"]
 ```
 
-diagram นี้เป็นแบบออกแบบของงานถัดไปเท่านั้น ยังไม่มี Translation tab/API/worker ในระบบปัจจุบัน
+Google/Hybrid และ Codex/Gemini/AGY/Claude CLI ต้องติ๊ก `ยินยอมส่งข้อความ segment ไป Cloud AI ผ่าน <ชื่อ Provider>` ก่อนส่งข้อความออกเครื่อง และเปลี่ยน provider แล้วต้องยืนยันใหม่ Credential ใช้ฝั่ง backend เท่านั้น Local LLM API และ LM Studio CLI เป็น offline; Provider ที่ไม่พร้อมยังแสดงในรายการพร้อมสถานะจริง
 
 ---
 
@@ -506,7 +530,7 @@ diagram นี้เป็นแบบออกแบบของงานถั
 
 ## การตั้งค่า Local AI ตรวจแก้
 
-ระบบรองรับการเชื่อมต่อกับ **Local LLM / VLM** ผ่าน OpenAI-compatible API (เช่น [LM Studio](https://lmstudio.ai/) หรือ [Ollama](https://ollama.com/)) โดยมีขั้นตอนดังนี้:
+ระบบรองรับการเชื่อมต่อกับ **Local LLM / VLM** ผ่าน OpenAI-compatible API (เช่น [LM Studio](https://lmstudio.ai/) หรือ [Ollama](https://ollama.com/)) และมี LM Studio CLI เป็น transport ทดลอง โดยมีขั้นตอนดังนี้:
 
 1. เปิดโปรแกรม Local LLM และโหลดโมเดลที่ต้องการ (เช่น `google/gemma-3-1b` หรือโมเดลภาษาไทยอื่น ๆ)
 2. เริ่มการทำงานของ Local Server ที่ `http://127.0.0.1:1234/v1`
@@ -517,6 +541,10 @@ diagram นี้เป็นแบบออกแบบของงานถั
    - **Timeout:** ค่าเริ่มต้น `60.0` วินาที
 5. กดปุ่ม **"ทดสอบการเชื่อมต่อ"** เมื่อขึ้นสถานะพร้อมใช้งาน ให้กด **"บันทึกการตั้งค่า"**
 6. ค่าจะถูกบันทึกลง `.env` และมีผลกับงาน OCR+AI รอบถัดไปทันที
+
+เมื่อเลือก `AI CLI` สามารถเลือก **AI Command Interface** ได้เป็น ChatGPT CLI → `codex`, Gemini CLI → `gemini` หรือ `agy`, Claude CLI → `claude`; `lms` เป็น adapter รอง ค่าเลือกถูกบันทึกใน `LLM_CLI_PROVIDER` ระบบส่ง prompt ผ่าน stdin และเรียกด้วย safe mode ของแต่ละ CLI
+
+หน้าเดียวกันมีแผง **สถานะ AI CLI** สำหรับ Codex, Gemini, AGY, Claude และ LM Studio CLI การเปิดหน้าจะอ่านผลล่าสุดจาก `data/ai_cli_status.json` โดยไม่เรียก CLI; ตรวจจริงและบันทึกใหม่เมื่อกด **ตรวจสอบสถานะ** เท่านั้น Header หน้าแรกแสดง adapter ที่พร้อมจาก cache เดียวกัน การตรวจไม่ส่งข้อความเอกสารออกเครื่อง
 
 ---
 
@@ -636,15 +664,19 @@ Correct only OCR spelling mistakes in this text. original_text must be copied ex
 |---|---|---|---|
 | `GET` | `/api/ai/status` | - | ตรวจสอบว่า Local LLM พร้อมใช้งานหรือไม่ (`healthy` / `offline`) |
 | `GET` | `/api/ai/config` | - | ดึงค่าคอนฟิกปัจจุบัน (`base_url`, `model`, `timeout`) โดยซ่อน API Key |
-| `POST` | `/api/ai/config/test` | JSON: `{ base_url, model, timeout, api_key? }` | ทดสอบเชื่อมต่อไปยัง endpoint โดยยังไม่บันทึก |
-| `PUT` | `/api/ai/config` | JSON: `{ base_url, model, timeout, api_key? }` | บันทึกการตั้งค่าลง `.env` และมีผลกับงานถัดไปทันที |
+| `GET` | `/api/ai/cli/status` | - | อ่านผลตรวจ AI CLI ล่าสุดที่บันทึกไว้ โดยไม่เรียก command |
+| `POST` | `/api/ai/cli/status/check` | - | ตรวจ installed/version/auth/runtime เมื่อผู้ใช้กดปุ่ม แล้วบันทึกผลลงระบบ |
+| `POST` | `/api/ai/config/test` | JSON: `{ transport, cli_provider, base_url, model, timeout, api_key? }` | ทดสอบ Local API หรือ AI CLI ที่เลือกโดยยังไม่บันทึก |
+| `PUT` | `/api/ai/config` | JSON: `{ transport, cli_provider, base_url, model, timeout, api_key? }` | บันทึกการตั้งค่า รวม `LLM_CLI_PROVIDER=codex|gemini|agy|claude|lms` และมีผลกับงานถัดไปทันที |
+
+งานแปลด้วย Local AI/Hybrid ใช้ batch เริ่มต้น 4 segments เพื่อให้โมเดลขนาดเล็กรักษา JSON และภาษาปลายทางได้เสถียรขึ้น ปรับได้ด้วย `LOCAL_TRANSLATION_BATCH_SEGMENTS=1..8`; ค่าน้อยลงช้ากว่าแต่เหมาะกับโมเดลที่ copy ต้นฉบับหรือลบ protected token
 
 ### 3. หมวดจัดการวงจรงาน OCR (Job Lifecycle)
 
 | Method | Endpoint | พารามิเตอร์ / Body | คำอธิบาย |
 |---|---|---|---|
 | `POST` | `/api/upload` | Multipart/form-data:<br>• `file`: ไฟล์ PDF / รูปภาพ สูงสุด 300 MB<br>• `max_pages_limit`: (optional)<br>• `max_size_limit`: (optional; ลดเพดานลงได้) | อัปโหลดแบบ streaming และตรวจสอบไฟล์ ตรวจสอบความปลอดภัย สร้าง `job_id`; เกินเพดานคืน 413 |
-| `POST` | `/api/jobs/{job_id}/start` | JSON: `{ enable_ai: true, page_start?: 1, page_end?: N, include_page_numbers?: true }` | นำงานเข้าคิวประมวลผล OneOCR / Local AI |
+| `POST` | `/api/jobs/{job_id}/start` | JSON: `{ enable_ai: true, page_start?: 1, page_end?: N, include_page_numbers?: false }` | นำงานเข้าคิวประมวลผล OneOCR / Local AI; page marker ปิดเป็นค่าเริ่มต้น |
 | `GET` | `/api/jobs/{job_id}/status` | Path: `job_id` | เช็คสถานะงานโดยละเอียดระดับหน้าและ latency |
 | `POST` | `/api/jobs/{job_id}/cancel` | Path: `job_id` | ยกเลิกงานที่กำลังรันหรือรอคิว พร้อมหยุด Worker ทันที |
 | `POST` | `/api/jobs/{job_id}/retry` | JSON: `{ retry_mode: "failed_only" \| "ai_only" \| "full" \| "full_text_ai" }` | ประมวลผลซ้ำเฉพาะหน้าที่ล้มเหลว หรือรันซ้ำเฉพาะ AI |
@@ -712,6 +744,23 @@ HTML export ใช้ฟอนต์ระบบในเครื่องแ�
 
 Quick Preview ใช้ XHTML ชุดข้อมูลเดียวกับ chapter XHTML ใน EPUB และไม่ใช้ EPUB renderer ระหว่างสร้าง EPUB ระบบไม่เรียก Local LLM เพิ่มเอง; ถ้าต้องการ semantic structure จาก AI ให้เลือก `ai.html` ที่ผ่าน validator แล้ว
 
+### 7.1 หมวดแปลเอกสาร (Document Translation)
+
+| Method | Endpoint | พารามิเตอร์ / Body | คำอธิบาย |
+|---|---|---|---|
+| `GET` | `/api/translation/capabilities` | - | provider, ภาษาที่รองรับ, cloud/offline state และ prompt version |
+| `GET/PUT` | `/api/jobs/{job_id}/translation/glossary` | entries และ `base_revision` | อ่าน/บันทึก glossary, do-not-translate และ transliteration พร้อม 409 guard |
+| `POST` | `/api/jobs/{job_id}/translation/estimate` | source/languages/style/provider | จำนวนอักขระ, batch และ cost estimate ก่อนเริ่ม |
+| `POST` | `/api/jobs/{job_id}/translation/start` | config, consent และ manual strategy | เริ่ม background translation; HTTP 202 |
+| `GET` | `/api/jobs/{job_id}/translation/progress` | Path: `job_id` | queued/running/cancelling/completed/partial/failed/cancelled, batch และ elapsed |
+| `POST` | `/api/jobs/{job_id}/translation/cancel` | Path: `job_id` | ยกเลิกที่ checkpoint |
+| `POST` | `/api/jobs/{job_id}/translation/retry` | config | ทำต่อเฉพาะ batch/segment ที่ยังไม่สำเร็จ |
+| `GET` | `/api/jobs/{job_id}/translation/result` | Path: `job_id` | source/baseline/AI/final, warnings, term states และ stale reasons |
+| `PUT` | `/api/jobs/{job_id}/translation/final` | edits และ `base_revision` | บันทึก manual final; revision ไม่ตรงคืน 409 |
+| `GET` | `/api/jobs/{job_id}/translation/export/{format}` | `text` หรือ `html` | ดาวน์โหลดเมื่อ validator ผ่านและผลไม่ stale |
+| `GET` | `/api/jobs/{job_id}/translation/preview` | Path: `job_id` | sandboxed translated HTML preview |
+| `GET` | `/api/jobs/{job_id}/translation/source/preview` | `source_variant` | เปิดดู HTML/Text ต้นทางที่เลือกด้วย CSP sandbox ก่อนเริ่มแปล |
+
 ### 8. หมวดบริหารจัดการและล้างข้อมูล (Admin & Retention Cleanup)
 
 | Method | Endpoint | พารามิเตอร์ / Body | คำอธิบาย |
@@ -754,6 +803,7 @@ OCR/
 │   ├── oneocr_wrapper.py   # OneOCR ctypes Wrapper & ABI Definitions
 │   ├── diff_engine.py      # Character-level Diff & Proposal Engine
 │   ├── llm_client.py       # Local LLM client / capability-based HTML reasoning off
+│   ├── cli_status.py       # Read-only Codex/Gemini/LM Studio CLI discovery
 │   ├── html_ai_tasks.py    # Background thread, progress persistence และ cancellation
 │   ├── html_exporter.py    # Structured HTML Export & Strict Allowlist Sanitizer
 │   ├── structured_layout.py # Layout Schema 1.0.0, ตาราง (Vector/Scan) และรายการ
@@ -767,7 +817,7 @@ OCR/
 │   ├── html.html           # แท็บ HTML Studio (CodeMirror + Visual Editor + Preview)
 │   ├── epub.html           # แท็บ EPUB Studio (XHTML Quick Preview + Packager + TOC Editor + Cover)
 │   ├── structured.html     # แท็บ Structured OCR (ตาราง/รายการ + หน้าตรวจเทียบ BBox)
-│   ├── config.html         # หน้าจอตั้งค่า Local LLM
+│   ├── config.html         # ตั้งค่า Local LLM และแสดงสถานะ AI CLI
 │   ├── app.js              # ตัวจัดการสถานะกลางและประสานงานแท็บ (App Controller)
 │   ├── text.js             # ตัวควบคุมแท็บผลข้อความ (Text Controller)
 │   ├── html.js             # ตัวควบคุมแท็บ HTML และ CodeMirror (HTML Controller)
@@ -797,9 +847,9 @@ OCR/
 
 ## ผลการทดสอบและเกณฑ์ตรวจรับ (Verification & Benchmarks)
 
-เอกสารอัปเดต 2026-10-09; ตารางตรวจรับคงผลตามหลักฐานจริง การเพิ่มเพดาน Upload 300 MB และหน้าปก EPUB 2 แหล่งพร้อมภาพตัวอย่างขนาดใหญ่ผ่านการตรวจระดับโค้ด/API แล้ว แต่ยังไม่เพิ่มผล browser acceptance ใหม่ลงในตารางเดิม งานแปลเอกสารยังไม่ถือว่าผ่านก่อนมี implementation กับ quality acceptance
+เอกสารอัปเดต 2026-10-09; Document Translation ผ่าน implementation และ automated acceptance แล้ว แต่ยังไม่ผ่าน quality acceptance จนกว่าจะมีภาษาปลายทาง/ground truth/glossary/ชุดราชการและผลทดสอบ provider จริง
 
-### การตรวจล่าสุด 2026-10-07
+### การตรวจล่าสุด 2026-10-09
 
 - **Structured OCR:** ใช้งานได้แล้ว รองรับ Layout Schema 1.0.0, ตารางจาก PDF Vector Geometry และภาพสแกน, รายการ, Structured Text/HTML และหน้าตรวจเทียบต้นฉบับ:
   - Source/publish automated tests ผ่าน 12/12 PASS
@@ -812,7 +862,7 @@ OCR/
   - บันทึก `export/epub/toc.json`, คำนวณ `toc_revision`, ตรวจจับความขัดแย้ง (Conflict HTTP 409), Stale Guard เมื่อ HTML ต้นทางเปลี่ยน และ Auto Re-match
   - Source/publish ผ่านฝั่งละ 9/9; EPUB regression ผ่าน 17/17 พร้อม EPUBCheck 5.3.0, epub.js/Foliate และ benchmark
 - **HTML AI & Local LLM:** มี regression tests สำหรับ reasoning off, HTML AI batches/progress, ลบทุกงาน, cleanup selection และ EPUB automatic download
-- **งานปัจจุบัน:** กำลังออกแบบระบบแปลเอกสาร ล็อก input `demo/08.pdf`–`13.png` แล้ว แต่ยังไม่มี implementation, ground truth, ชุดราชการ หรือ quality acceptance
+- **Document Translation:** implementation/API/UI/translated EPUB ผ่าน automated tests; Chrome/Edge ผ่าน ไม่มี external request ใน local fixture คุณภาพคำแปลจริงยังรอ target language, ground truth, glossary, ชุดราชการ และ provider ที่พร้อม
 - ตัวอย่างรันจาก root ด้วย PowerShell (ใช้ environment ที่ติดตั้ง dependencies แล้ว):
 
 ```powershell
@@ -857,19 +907,20 @@ OCR/
 | HTML Export precision / recall | **NOT TESTED** | manifest ปัจจุบันมีเพียงยอดรวม ต้องมีเฉลยระดับ element ที่ผู้ตรวจรับรองก่อนคำนวณ |
 | Browser automation หลังปรับ offline/XSS/download/409 | **PENDING** | โค้ดและ syntax ตรวจแล้ว; รอรัน integration suite ใน workspace แยกเพื่อเก็บหลักฐานใหม่ |
 | EPUB Export & XHTML Quick Preview | **PASSED: 44-PAGE SCOPE** | ผ่านชุดจริง 44 หน้า: roundtrip, EPUBCheck 5.3.0 0 errors/warnings, Chrome/Edge, reader engines 2 ตัว และ benchmark; edge cases จำลองรอข้อยกเว้นชุดข้อมูล |
+| Document Translation implementation | **PASSED: AUTOMATED SCOPE** | publish Phase 10 23/23 รวม Chrome/Edge ผ่าน; quality จริงยัง NOT COVERED |
+| Document Translation quality | **NOT COVERED** | ยังไม่มี target language/ground truth/glossary/ชุดราชการ และ provider จริงยังไม่พร้อม |
 | การยอมรับข้อจำกัดก่อนใช้งานจริง | **PENDING** | รอเจ้าของงานตรวจผลและยอมรับข้อจำกัดที่ระบุไว้ |
 
 ## สถานะปัจจุบันและงานถัดไป
 
-ปัจจุบันระบบรองรับไฟล์ต้นฉบับสูงสุด 300 MB, OCR ครั้งเดียวแล้วเลือก Text/Structured HTML, เปิด Structured HTML ใน HTML Studio, สร้าง XHTML Quick Preview และ EPUB พร้อม Editable TOC หน้าปก EPUB เลือกอัปโหลดรูปหรือ render หน้า PDF ต้นฉบับได้ Thumbnail เปิดดูภาพใหญ่ได้ และแสดงสถานะเลือกแล้ว/บันทึกแล้วแยกกัน งานที่กำลังทำต่อคือออกแบบระบบแปลเอกสาร โดยล็อก input `demo/08.pdf`–`13.png` สำหรับตารางอังกฤษ, จีน+อังกฤษพร้อมศัพท์เฉพาะ, นิยายอังกฤษ และหนังสือสอน IT ที่มี code program
+ปัจจุบันระบบมี Document Translation ครบสาย implementation: เลือกภาษา/style/provider, glossary, cloud consent/estimate, background progress/cancel/retry, 4-mode review, validator, Text/HTML และส่ง translated HTML เข้า EPUB Studio
 
 งานถัดไป:
 
-1. สร้าง translation model, provider interface, background worker, API และ Translation tab
-2. รองรับ Google Cloud Translation, Local AI และ Hybrid พร้อม consent, cost estimate และ retry/cancel
-3. รักษา segment/table/TOC/code และแยกศัพท์เป็น `translated`, `preserved` หรือ `transliterated`
-4. สร้าง glossary, do-not-translate, ground truth และเพิ่มตัวอย่างเอกสารราชการ
-5. ตรวจ diff ด้วยคน แล้วทดสอบ Text/HTML/EPUB, Chrome/Edge, EPUBCheck และ reader ก่อนประกาศพร้อมใช้งาน
+1. ผู้ใช้ยืนยันภาษาปลายทาง, glossary, ground truth และ style rubric ของ `demo/08.pdf`–`13.png`
+2. เพิ่มตัวอย่างเอกสารราชการที่อนุมัติ
+3. เปิด Local LLM และตั้ง `GOOGLE_CLOUD_PROJECT`/ADC เพื่อรัน Google, Local และ Hybrid จริง
+4. ทำ blind human review, cost/latency benchmark, EPUBCheck และ reader matrix กับคำแปลจริง
 
 ## การแก้ปัญหาล่าสุด
 

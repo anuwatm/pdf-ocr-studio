@@ -1,0 +1,57 @@
+<section id="section-translation" class="card export-card main-tab-hidden" data-main-panel="translation">
+  <div class="card-header"><h2 class="card-title">แปลเอกสาร</h2><span data-export-job>ยังไม่ได้เลือกงาน</span></div>
+  <p data-export-empty>เปิดงานที่มี HTML หรือ Text บันทึกแล้วก่อนเริ่มแปล</p>
+  <fieldset data-export-controls disabled>
+    <div class="translation-config-grid">
+      <div class="translation-source-control"><label>ต้นทาง<select id="translation-source"><option value="auto">อัตโนมัติ (HTML ก่อน Text)</option><optgroup label="HTML"><option value="final">final.html</option><option value="structured">structured.html</option><option value="ai">ai.html</option><option value="basic">basic.html</option></optgroup><optgroup label="Text"><option value="text_final">final.txt</option><option value="text_corrected">corrected.txt</option><option value="text_raw">raw.txt</option></optgroup></select></label><button id="btn-view-translation-source" class="btn btn-outline btn-xs" type="button">View เอกสาร</button></div>
+      <label>ภาษาต้นทาง<select id="translation-source-language"><option value="auto">ตรวจอัตโนมัติ</option></select></label>
+      <label>ภาษาปลายทาง<select id="translation-target-language"><option value="">เลือกภาษา</option></select></label>
+      <label>รูปแบบ<select id="translation-style"><option value="general">ทั่วไป</option><option value="novel">นิยาย</option><option value="academic">วิชาการ</option><option value="official">ราชการ</option></select></label>
+      <label>Provider<select id="translation-provider"><option value="local_api">กำลังโหลด Provider</option></select></label>
+      <label>เมื่อแปลซ้ำ<select id="translation-manual-strategy"><option value="preserve">เก็บคำแก้มือ (ค่าเริ่มต้น)</option><option value="rebase">เก็บไว้และให้ตรวจ rebase</option><option value="reset">เริ่มใหม่และล้างคำแก้มือ</option></select></label>
+      <label class="translation-check"><input id="translation-toc" type="checkbox" checked>แปลชื่อสารบัญ โดยคง target ID/href</label>
+      <label id="translation-consent-wrap" class="translation-check hidden"><input id="translation-cloud-consent" type="checkbox"><span id="translation-consent-text">ยินยอมส่งเฉพาะข้อความ segment ไป Cloud</span></label>
+    </div>
+    <div class="translation-provider-row"><span id="translation-provider-badge" class="badge badge-neutral">กำลังตรวจ capability</span><a id="btn-config-google-link" class="btn btn-outline btn-xs" href="/config.html#google-config-card" target="_blank" title="ไปหน้าตั้งค่า Google Cloud Translation">⚙ ตั้งค่า Google Cloud Translation</a><span id="translation-estimate" class="text-muted text-xs">ยังไม่ได้ประเมินจำนวนอักขระ</span></div>
+    <details class="translation-glossary"><summary>Glossary / Do not translate</summary>
+      <p class="text-muted text-xs">รูปแบบ: <code>source =&gt; target</code>, <code>~source =&gt; คำทับศัพท์</code> หรือ <code>!term</code> เพื่อคงคำเดิม</p>
+      <textarea id="translation-glossary-editor" rows="6" placeholder="API => API&#10;!OpenAI"></textarea>
+      <div class="html-action-buttons"><button id="btn-load-translation-glossary" class="btn btn-outline btn-xs" type="button">โหลด Glossary</button><button id="btn-save-translation-glossary" class="btn btn-outline btn-xs" type="button">บันทึก Glossary</button><span id="translation-glossary-status" class="text-muted text-xs"></span></div>
+    </details>
+    <div class="html-action-buttons translation-actions">
+      <button id="btn-estimate-translation" class="btn btn-outline btn-sm" type="button">ประเมินก่อนเริ่ม</button>
+      <button id="btn-start-translation" class="btn btn-primary btn-sm" type="button">เริ่มแปล</button>
+      <button id="btn-cancel-translation" class="btn btn-outline btn-danger btn-sm" type="button" disabled>ยกเลิก</button>
+      <button id="btn-retry-translation" class="btn btn-outline btn-warning btn-sm hidden" type="button">ลองต่อจาก batch ที่ค้าง</button>
+      <span id="translation-status-badge" class="badge badge-neutral">idle</span>
+    </div>
+    <div class="progress-bar-container"><div id="translation-progress-fill" class="progress-bar-fill" style="width:0%"></div></div>
+    <p id="translation-progress-text" class="text-muted text-xs" aria-live="polite">ยังไม่ได้เริ่ม</p>
+    <p id="translation-language-status" class="text-muted text-xs" aria-live="polite"></p>
+
+    <section class="translation-review" aria-labelledby="translation-review-title">
+      <div class="translation-review-header"><div><h3 id="translation-review-title">ตรวจคำแปล</h3><p class="text-muted text-xs">แก้ไขในช่อง Final แล้วกดบันทึก ระบบป้องกัน revision conflict</p></div>
+        <div class="translation-review-filters"><label>หน้า<select id="translation-page-filter"><option value="all">ทุกหน้า</option></select></label><label>เทียบกับ<select id="translation-review-mode"><option value="source">Source</option><option value="google">Google baseline</option><option value="ai" selected>AI result</option><option value="final">Final</option></select></label></div>
+      </div>
+      <div id="translation-segments" class="translation-segments"><p class="text-muted">ยังไม่มีผลแปล</p></div>
+      <div class="html-action-buttons"><button id="btn-accept-translation-page" class="btn btn-outline btn-sm" type="button" disabled>ใช้ผลแปลทั้งหน้าที่เลือก</button><button id="btn-revert-translation-page" class="btn btn-outline btn-sm" type="button" disabled>คืนต้นฉบับทั้งหน้าที่เลือก</button><button id="btn-save-translation-final" class="btn btn-primary btn-sm" type="button" disabled>บันทึกคำแปล Final</button></div>
+    </section>
+
+    <details id="translation-combined-panel" class="translation-combined" open>
+      <summary><span>ผลแปลรวมทั้งหมด</span><span id="translation-combined-summary" class="text-muted text-xs">ยังไม่มีผลแปล</span></summary>
+      <p class="text-muted text-xs">รวม Final ทุก segment ตามลำดับเอกสาร และรวมคำแก้ที่กำลังพิมพ์ไว้ด้วย</p>
+      <textarea id="translation-combined-text" rows="16" readonly aria-label="ผลแปลรวมทั้งหมด" placeholder="ผลแปลรวมจะแสดงที่นี่เมื่อแปลเสร็จ"></textarea>
+      <div class="html-action-buttons">
+        <button id="btn-copy-translation-combined" class="btn btn-outline btn-sm" type="button" disabled>คัดลอกทั้งหมด</button>
+        <span id="translation-combined-copy-status" class="text-muted text-xs" aria-live="polite"></span>
+      </div>
+    </details>
+
+    <div class="translation-output-row">
+      <a id="btn-download-translation-text" class="btn btn-outline btn-sm hidden" href="#" download>ดาวน์โหลด Text</a>
+      <a id="btn-download-translation-html" class="btn btn-outline btn-sm hidden" href="#" download>ดาวน์โหลด HTML</a>
+      <button id="btn-open-translated-epub" class="btn btn-outline btn-sm hidden" type="button">เปิดใน EPUB Studio</button>
+    </div>
+    <iframe id="translation-preview-frame" sandbox="" class="html-preview-iframe hidden" title="ตัวอย่าง HTML ฉบับแปล"></iframe>
+  </fieldset>
+</section>
