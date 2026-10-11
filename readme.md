@@ -59,6 +59,7 @@
   - [8. Structured OCR และหน้าตรวจเทียบ](#8-structured-ocr-และหน้าตรวจเทียบ)
   - [9. Editable TOC และ stable targets](#9-editable-toc-และ-stable-targets)
   - [10. Document Translation](#10-document-translation)
+  - [11. AI CLI Protocol, Security Sandbox และ Validation Lifecycle](#11-ai-cli-protocol-security-sandbox-และ-validation-lifecycle)
 - [การติดตั้งและเริ่มต้นใช้งาน (Getting Started)](#การติดตั้งและเริ่มต้นใช้งาน-getting-started)
   - [ความต้องการของระบบ](#ความต้องการของระบบ-prerequisites)
   - [วิธีที่ 1: รันด่วนด้วยชุดติดตั้งพร้อมแจกจ่าย (`publish/`)](#วิธีที่-1-รันด่วนด้วยชุดติดตั้งพร้อมแจกจ่าย-publish)
@@ -131,7 +132,7 @@
 
 ## สถาปัตยกรรมและแผนภาพการทำงาน (Architecture & Diagrams)
 
-อัปเดตวันที่ 2026-10-10: ระบบตรวจจำนวนหน้าทันทีหลังเลือก PDF/ภาพ, ปิด page marker เป็นค่าเริ่มต้น, เก็บผลตรวจ AI CLI และแสดงใน header; Translation รองรับ preview ต้นทาง HTML/Text และใช้ภาษาไทยเป็นค่าปลายทางเริ่มต้น
+อัปเดตวันที่ 2026-10-11: Phase 10 Document Translation Engine สมบูรณ์ (47/47 tests PASS), รองรับ Semantic Segment Assembly, English de-hyphenation, CLI Protocol/Sandbox/Preflight สำหรับ AI CLI (Codex/Gemini/AGY/Claude/LM Studio), รองรับ Translation Styles (นิยาย, วิชาการ, ทั่วไป), Glossary & Terminology policy, Strict schema validation และโครงสร้าง Isolated Child Process
 
 ### 1. สถาปัตยกรรมระบบ
 
@@ -154,12 +155,16 @@ flowchart LR
     EPUB --> CoverUX["Cover thumbnail / large modal / selected-saved status"]
     API --> TOC["TOC Editor / stable targets validator"]
     API --> Structured["Layout schema / Text-HTML renderer"]
-    API --> Translation["TranslationTasks / provider-validator-review"]
-    API --> CLIStatus[("data/ai_cli_status.json / ตรวจเมื่อกดปุ่ม")]
+    API --> Translation["TranslationTasks / background thread"]
+    API --> CLIStatus[("data/ai_cli_status.json / ตรวจผ่าน UI & API")]
     CLIStatus --> UI
-    Translation --> Cloud["Google Cloud v3 / ADC / explicit consent"]
-    Translation --> CLI["AI CLI: Codex / Gemini / AGY / Claude / LM Studio"]
-    Translation --> LLM
+    Translation --> Core["Translation Core: Semantic Segment Assembly & De-hyphenation"]
+    Core --> Providers["Translation Providers / Preflight Checks"]
+    Providers --> Cloud["Google Cloud v3 / ADC / explicit consent"]
+    Providers --> Sandbox["Isolated CLI Sandbox: data/ai_cli_workspace"]
+    Sandbox --> CLI["AI CLI: Codex (--output-schema) / Gemini / AGY / Claude / LM Studio"]
+    Providers --> LLM
+    Translation --> Lock
     API --> Cleanup["Retention / single delete / delete all"]
     Manager --> DB[("data/jobs.db / SQLite WAL")]
     Worker --> DB
@@ -171,7 +176,7 @@ flowchart LR
     TOC --> Books[("export/epub: preview / payload / toc.json / metadata / book.epub")]
     CoverUX --> Books
     Structured --> Layouts[("export/structured: layout.json / structured.txt / structured.html")]
-    Translation --> Translated[("translation.json / translated Text-HTML / EPUB source")]
+    Translation --> TransOut[("export/translation: translation.json / progress.json / audit.json / translated HTML-Text")]
 ```
 
 ### 2. OCR และการจัดเส้นทางเอกสาร
@@ -429,33 +434,76 @@ flowchart TD
     Source{"Choose saved source"} --> HTML["final / structured / AI / basic HTML"]
     Source --> Text["final / corrected / raw Text"]
     Source --> View["Sandboxed source preview"]
-    HTML --> Segment["Stable text-node segments / source revision"]
-    Text --> Wrap["Escape + stable page/paragraph wrapper"]
-    Wrap --> Segment
-    Segment --> Config["Source-target language (default Thai), style and glossary"]
+    HTML --> Assembly["Semantic Segment Assembly"]
+    Text --> Assembly
+    Assembly --> Dehyphen["English de-hyphenation (line-break word healing)"]
+    Dehyphen --> Segment["Stable segments with data-block-id & revision"]
+    Segment --> Config["Source-target language (default Thai), style & glossary"]
     Config --> Style["Style: general / novel / academic / official"]
     Style --> Provider{"Choose provider"}
     Provider --> Google["Google Cloud Translation baseline"]
-    Provider --> Local["Local LLM API"]
-    Provider --> CLI["Codex / Gemini / AGY / Claude / LM Studio CLI"]
+    Provider --> Local["Local LLM API (loopback)"]
+    Provider --> CLI["AI CLI: Codex / Gemini / AGY / Claude / LM Studio; see diagram 11"]
     Google --> Hybrid{"Use Hybrid polish?"}
     Hybrid -->|Yes| Polish["Local AI style polish"]
-    Hybrid -->|No| Validate["Structure and critical-token validator"]
-    Local --> Validate
+    Hybrid -->|No| Preflight["Preflight Check: model ready & auto-download blocked"]
+    Local --> Preflight
     CLI --> Consent{"Cloud CLI? explicit consent"}
-    Consent --> Validate
-    Polish --> Validate
+    Consent --> Preflight
+    Polish --> Preflight
+    Preflight --> Validate["Strict schema, segment ID & critical-token validator"]
     Validate -->|Warning| Review
     Validate -->|Pass| Terms["Terms: translated / preserved / transliterated"]
     Terms --> Review["Compare source, baseline, AI and manual final"]
     Review --> Combined["Combined final translation / copy all"]
-    Combined --> Save["Manual final + base revision / stale guard"]
+    Combined --> Save["Manual final + base revision / stale guard (409)"]
     Save --> Export["Translated Text / semantic HTML"]
     Export --> Preview["EPUB Studio: XHTML Quick Preview"]
-    Preview --> Package["TOC / cover / validator guards → EPUB"]
+    Preview --> Package["TOC / cover / validator guards -> EPUB"]
 ```
 
 Google/Hybrid และ Codex/Gemini/AGY/Claude CLI ต้องติ๊ก `ยินยอมส่งข้อความ segment ไป Cloud AI ผ่าน <ชื่อ Provider>` ก่อนส่งข้อความออกเครื่อง และเปลี่ยน provider แล้วต้องยืนยันใหม่ Credential ใช้ฝั่ง backend เท่านั้น Local LLM API และ LM Studio CLI เป็น offline; Provider ที่ไม่พร้อมยังแสดงในรายการพร้อมสถานะจริง
+
+### 11. AI CLI Protocol, Security Sandbox และ Validation Lifecycle
+
+```mermaid
+sequenceDiagram
+    participant UI as Browser / Translation Studio
+    participant API as FastAPI / TranslationTasks
+    participant Guard as Preflight & Env Guard
+    participant Sub as Child Subprocess
+    participant Sand as data/ai_cli_workspace
+    participant Val as Schema & Token Validator
+    participant Audit as export/translation/audit.json
+
+    UI->>API: POST /api/jobs/{id}/translation/start
+    API->>Guard: Preflight check (installed, model verified, cloud consent)
+    alt Preflight failed or model uninstalled
+        Guard-->>API: Error (block auto-download / missing auth)
+        API-->>UI: 400 / 422 with preflight reason
+    else Preflight ready
+        Guard->>Sand: Ensure isolated directory & empty stdin
+        Guard->>Sub: Spawn CLI with ALLOWED_CLI_ENV_VARS filter
+        Note over Sub,Sand: Codex: --ephemeral --sandbox read-only --output-schema<br/>Gemini/AGY/Claude: isolated cwd, no terminal UI<br/>LM Studio: loopback / CLI ready
+        Sub->>Sub: Execute inference with timeout & process tree guard
+        Sub-->>API: Stdout stream (enforce 5 MB max limit)
+        API->>Val: Strip progress/thinking tokens; parse JSON schema
+        Val->>Val: Verify segment IDs, 100% critical tokens, glossary terms
+        alt Schema or critical token mismatch
+            Val-->>API: Validation warning / fallback to baseline
+        else Valid structured output
+            Val-->>API: Segments accepted
+        end
+        API->>Audit: Record transport, adapter, version, exit code, latency, SHA-256 (no credentials)
+        API-->>UI: Progress update via polling / completed
+    end
+```
+
+สถาปัตยกรรมความปลอดภัยสำหรับ AI CLI:
+- **Child Process Sandbox:** เรียกคำสั่งในไดเรกทอรีเฉพาะแยกขาด `data/ai_cli_workspace/` เพื่อป้องกันไม่ให้อแดปเตอร์เข้าถึงไฟล์งานอื่น
+- **Environment Allowlist:** กรองเฉพาะตัวแปรระบบที่จำเป็นผ่าน `ALLOWED_CLI_ENV_VARS` (`PATH`, `SYSTEMROOT`, `TEMP`, API Keys) ไม่อนุญาตให้ส่งผ่านตัวแปรไม่พึงประสงค์
+- **Output Limit & Structured Schema:** บังคับขนาดข้อความตอบกลับไม่เกิน 5 MB สกัดเฉพาะ JSON schema `segments[{id, text, status, warnings}]` โดยตัด token thinking/progress ที่ปะปนออก
+- **Audit Logging:** บันทึกหลักฐานลง `export/translation/audit.json` เก็บค่า transport, adapter, CLI version, model, exit code, latency, SHA-256 hash โดยไม่บันทึก credentials หรือข้อความต้นฉบับเต็มลงในล็อก
 
 ---
 
@@ -641,6 +689,12 @@ Correct only OCR spelling mistakes in this text. original_text must be copied ex
 | **`export/epub/toc.json`** | สารบัญแก้มือ schema 9.0 พร้อม source/TOC revision และ stable target identity |
 | **`export/epub/book.epub`** | EPUB แบบ reflowable ที่ผ่าน structural validator ภายในระบบ |
 | **`export/epub/epub_meta.json`** | สถานะ EPUB, source/TOC/preview revision, hash, validation result และขนาดไฟล์ |
+| **`export/translation/translation.json`** | ผลแปลทุก segment (id, source text, baseline, ai, final, status, warnings) |
+| **`export/translation/progress.json`** | สถานะงานแปล background (status, provider, stage, progress counts, timestamps) |
+| **`export/translation/audit.json`** | บันทึกความปลอดภัย (transport, adapter, version, model, latency, hash, exit code) |
+| **`export/translation/translated.html`** | HTML ฉบับแปลที่คงแท็ก element, table, list, headings และ target ID ครบถ้วน |
+| **`export/translation/translated.txt`** | ข้อความล้วนฉบับแปลตามลำดับเอกสาร |
+| **`data/ai_cli_status.json`** | แคชผลตรวจสถานะการติดตั้ง, version และความพร้อมของ AI CLI แต่ละตัว |
 
 ---
 
@@ -657,6 +711,8 @@ Correct only OCR spelling mistakes in this text. original_text must be copied ex
 | Method | Endpoint | คำอธิบาย |
 |---|---|---|
 | `GET` | `/api/health` | ตรวจสอบสถานะเซิร์ฟเวอร์ ข้อมูลคิวงาน (`queue_info`) และการเชื่อมต่อฐานข้อมูล |
+| `GET` | `/api/ai-cli/status` | อ่านผลตรวจสถานะการติดตั้ง, version และความพร้อมใช้งานของ AI CLI ล่าสุด |
+| `POST` | `/api/ai-cli/check` | สั่งสแกนตรวจสถานะ AI CLI (Codex, Gemini, AGY, Claude, LM Studio) ทันที และบันทึกผล |
 
 ### 2. หมวดตั้งค่า Local AI (Local LLM Configuration)
 
@@ -804,6 +860,9 @@ OCR/
 │   ├── diff_engine.py      # Character-level Diff & Proposal Engine
 │   ├── llm_client.py       # Local LLM client / capability-based HTML reasoning off
 │   ├── cli_status.py       # Read-only Codex/Gemini/LM Studio CLI discovery
+│   ├── translation_core.py # Semantic Segment Assembly, De-hyphenation & Document Translation Core
+│   ├── translation_providers.py # Provider Implementations (Google Cloud, Local LLM, AI CLI Adapters)
+│   ├── translation_tasks.py # Background Translation Tasks, Cancellation, Progress & Audit
 │   ├── html_ai_tasks.py    # Background thread, progress persistence และ cancellation
 │   ├── html_exporter.py    # Structured HTML Export & Strict Allowlist Sanitizer
 │   ├── structured_layout.py # Layout Schema 1.0.0, ตาราง (Vector/Scan) และรายการ
@@ -824,13 +883,17 @@ OCR/
 │   ├── epub.js             # ตัวควบคุมแท็บ EPUB, Quick Preview และ TOC Editor (EPUB Controller)
 │   ├── structured.js       # ตัวควบคุมแท็บ Structured OCR และ BBox Overlay (Structured Controller)
 │   ├── visual.js           # ตัวควบคุม Visual Editor แบบ Word (WYSIWYG Controller)
+│   ├── translation.html    # แท็บ Document Translation Studio
+│   ├── translation.js      # ตัวควบคุมแท็บแปลเอกสาร (Multi-Mode Review, Preview, Terms & Consent)
 │   ├── vendor/codemirror/  # ไลบรารี CodeMirror 5.65.21 สำหรับใช้งานแบบ Offline
 │   ├── minimal.css         # Minimal Light/Dark, icons, responsive และ accessibility
 │   └── app.css             # ดีไซน์และชุดแต่ง Modern Dark/Light Theme
 ├── oneOCR/                 # OneOCR Binary DLL & Model Runtime (64-bit)
 ├── publish/                # ชุดติดตั้งสำเร็จรูปสำหรับ Deploy บนเครื่องอื่น (ขนาด ~145 MB)
 ├── demo/                   # ชุดเอกสารทดสอบที่ได้รับอนุมัติ (01.pdf–08.pdf, 01.png–02.png, 09.png–13.png)
+├── phase10/                # ข้อกำหนด Manifests, Prompt, Benchmark & Evidence ของ Phase 10
 ├── tests/                  # ชุดทดสอบอัตโนมัติ (Unit / Regression / Benchmarks)
+│   ├── phase10/                           # ชุดทดสอบ Phase 10 Document Translation (47 tests PASS)
 │   ├── test_gemini_acceptance_09.py       # ชุดทดสอบตรวจรับ UI, Visual Editor และ EPUB
 │   ├── test_studio_workspace.py           # Playwright UI & Cross-Browser Automation
 │   ├── test_visual_html.py                # ทดสอบความปลอดภัยและการแปลง Visual HTML
@@ -907,7 +970,7 @@ OCR/
 | HTML Export precision / recall | **NOT TESTED** | manifest ปัจจุบันมีเพียงยอดรวม ต้องมีเฉลยระดับ element ที่ผู้ตรวจรับรองก่อนคำนวณ |
 | Browser automation หลังปรับ offline/XSS/download/409 | **PENDING** | โค้ดและ syntax ตรวจแล้ว; รอรัน integration suite ใน workspace แยกเพื่อเก็บหลักฐานใหม่ |
 | EPUB Export & XHTML Quick Preview | **PASSED: 44-PAGE SCOPE** | ผ่านชุดจริง 44 หน้า: roundtrip, EPUBCheck 5.3.0 0 errors/warnings, Chrome/Edge, reader engines 2 ตัว และ benchmark; edge cases จำลองรอข้อยกเว้นชุดข้อมูล |
-| Document Translation implementation | **PASSED: AUTOMATED SCOPE** | publish Phase 10 23/23 รวม Chrome/Edge ผ่าน; quality จริงยัง NOT COVERED |
+| **Document Translation implementation** | **PASSED: AUTOMATED SCOPE** | **47/47 PASS** รวม Semantic Segment Assembly, English de-hyphenation, CLI Protocol/Sandbox/Preflight (Codex/Gemini/AGY/Claude/LM Studio), ชุดทดสอบ approved demo/08.pdf–13.png และ Cross-browser automation Chrome & Edge |
 | Document Translation quality | **NOT COVERED** | ยังไม่มี target language/ground truth/glossary/ชุดราชการ และ provider จริงยังไม่พร้อม |
 | การยอมรับข้อจำกัดก่อนใช้งานจริง | **PENDING** | รอเจ้าของงานตรวจผลและยอมรับข้อจำกัดที่ระบุไว้ |
 
