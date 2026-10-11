@@ -132,7 +132,7 @@
 
 ## สถาปัตยกรรมและแผนภาพการทำงาน (Architecture & Diagrams)
 
-อัปเดตวันที่ 2026-10-11: Phase 10 Document Translation Engine สมบูรณ์ (47/47 tests PASS), รองรับ Semantic Segment Assembly, English de-hyphenation, CLI Protocol/Sandbox/Preflight สำหรับ AI CLI (Codex/Gemini/AGY/Claude/LM Studio), รองรับ Translation Styles (นิยาย, วิชาการ, ทั่วไป), Glossary & Terminology policy, Strict schema validation และโครงสร้าง Isolated Child Process
+อัปเดตวันที่ 2026-10-12: Phase 10 มี implementation และ automated regression ล่าสุด **32/32 PASS**. ระบบเพิ่ม Semantic Segment Assembly แบบ context-only และ English de-hyphenation โดยคง original segment ID ไว้; คุณภาพแปลจริง, UI ระดับ Translation Unit, strict auth/model preflight ทุก adapter และ provider matrix ยังไม่ผ่านการตรวจรับ
 
 ### 1. สถาปัตยกรรมระบบ
 
@@ -159,10 +159,10 @@ flowchart LR
     API --> CLIStatus[("data/ai_cli_status.json / ตรวจผ่าน UI & API")]
     CLIStatus --> UI
     Translation --> Core["Translation Core: Semantic Segment Assembly & De-hyphenation"]
-    Core --> Providers["Translation Providers / Preflight Checks"]
-    Providers --> Cloud["Google Cloud v3 / ADC / explicit consent"]
+    Core --> Providers["Translation Providers / availability preflight"]
+    Providers --> Cloud["Google Cloud v3 ADC / v2 API key fallback / explicit consent"]
     Providers --> Sandbox["Isolated CLI Sandbox: data/ai_cli_workspace"]
-    Sandbox --> CLI["AI CLI: Codex (--output-schema) / Gemini / AGY / Claude / LM Studio"]
+    Sandbox --> CLI["AI CLI: Codex / Gemini / AGY stream-json / Claude / LM Studio"]
     Providers --> LLM
     Translation --> Lock
     API --> Cleanup["Retention / single delete / delete all"]
@@ -434,10 +434,10 @@ flowchart TD
     Source{"Choose saved source"} --> HTML["final / structured / AI / basic HTML"]
     Source --> Text["final / corrected / raw Text"]
     Source --> View["Sandboxed source preview"]
-    HTML --> Assembly["Semantic Segment Assembly"]
+    HTML --> Assembly["Semantic context assembly (original IDs retained)"]
     Text --> Assembly
     Assembly --> Dehyphen["English de-hyphenation (line-break word healing)"]
-    Dehyphen --> Segment["Stable segments with data-block-id & revision"]
+    Dehyphen --> Segment["Stable original segments + reversible unit mapping"]
     Segment --> Config["Source-target language (default Thai), style & glossary"]
     Config --> Style["Style: general / novel / academic / official"]
     Style --> Provider{"Choose provider"}
@@ -446,7 +446,7 @@ flowchart TD
     Provider --> CLI["AI CLI: Codex / Gemini / AGY / Claude / LM Studio; see diagram 11"]
     Google --> Hybrid{"Use Hybrid polish?"}
     Hybrid -->|Yes| Polish["Local AI style polish"]
-    Hybrid -->|No| Preflight["Preflight Check: model ready & auto-download blocked"]
+    Hybrid -->|No| Preflight["Availability preflight before background task"]
     Local --> Preflight
     CLI --> Consent{"Cloud CLI? explicit consent"}
     Consent --> Preflight
@@ -477,17 +477,17 @@ sequenceDiagram
     participant Audit as export/translation/audit.json
 
     UI->>API: POST /api/jobs/{id}/translation/start
-    API->>Guard: Preflight check (installed, model verified, cloud consent)
-    alt Preflight failed or model uninstalled
-        Guard-->>API: Error (block auto-download / missing auth)
+    API->>Guard: Consent + provider availability preflight
+    alt Provider unavailable or consent missing
+        Guard-->>API: Error before background task
         API-->>UI: 400 / 422 with preflight reason
     else Preflight ready
-        Guard->>Sand: Ensure isolated directory & empty stdin
-        Guard->>Sub: Spawn CLI with ALLOWED_CLI_ENV_VARS filter
-        Note over Sub,Sand: Codex: --ephemeral --sandbox read-only --output-schema<br/>Gemini/AGY/Claude: isolated cwd, no terminal UI<br/>LM Studio: loopback / CLI ready
-        Sub->>Sub: Execute inference with timeout & process tree guard
-        Sub-->>API: Stdout stream (enforce 5 MB max limit)
-        API->>Val: Strip progress/thinking tokens; parse JSON schema
+        Guard->>Sand: Ensure isolated working directory
+        Guard->>Sub: Spawn allowlisted CLI via argument array and shell=False
+        Note over Sub,Sand: AGY: stream-json stdin/stdout<br/>อื่น: stdin prompt + safe mode ที่รองรับ
+        Sub->>Sub: Execute inference with configured timeout
+        Sub-->>API: stdout response / stderr diagnostic
+        API->>Val: Parse strict JSON schema
         Val->>Val: Verify segment IDs, 100% critical tokens, glossary terms
         alt Schema or critical token mismatch
             Val-->>API: Validation warning / fallback to baseline
@@ -501,9 +501,9 @@ sequenceDiagram
 
 สถาปัตยกรรมความปลอดภัยสำหรับ AI CLI:
 - **Child Process Sandbox:** เรียกคำสั่งในไดเรกทอรีเฉพาะแยกขาด `data/ai_cli_workspace/` เพื่อป้องกันไม่ให้อแดปเตอร์เข้าถึงไฟล์งานอื่น
-- **Environment Allowlist:** กรองเฉพาะตัวแปรระบบที่จำเป็นผ่าน `ALLOWED_CLI_ENV_VARS` (`PATH`, `SYSTEMROOT`, `TEMP`, API Keys) ไม่อนุญาตให้ส่งผ่านตัวแปรไม่พึงประสงค์
-- **Output Limit & Structured Schema:** บังคับขนาดข้อความตอบกลับไม่เกิน 5 MB สกัดเฉพาะ JSON schema `segments[{id, text, status, warnings}]` โดยตัด token thinking/progress ที่ปะปนออก
-- **Audit Logging:** บันทึกหลักฐานลง `export/translation/audit.json` เก็บค่า transport, adapter, CLI version, model, exit code, latency, SHA-256 hash โดยไม่บันทึก credentials หรือข้อความต้นฉบับเต็มลงในล็อก
+- **stdin-first:** AGY ใช้ UTF-8 NDJSON `stream-json`; เอกสารไม่อยู่ใน command line. Adapter อื่นยังอยู่ในขอบเขต protocol hardening ตาม checklist
+- **Structured schema:** ผลลัพธ์ต้องเป็น JSON `segments[{id,text}]`; validator ตรวจ ID, glossary และ critical token ก่อนบันทึก
+- **Audit Logging:** `export/translation/audit.json` เก็บ provider/transport/adapter/model/เวลา/consent โดยไม่บันทึก credential หรือข้อความต้นฉบับเต็ม
 
 ---
 
@@ -849,19 +849,19 @@ curl -O http://127.0.0.1:8000/api/jobs/abc123xyz/download/final.txt
 ## โครงสร้างโฟลเดอร์ (Repository Structure)
 
 ```text
-OCR/
+OCR/ (หรือ publish/ สำหรับชุดแจกจ่าย)
 ├── src/                    # ซอร์สโค้ดหลักของ Backend และ OCR Pipeline
 │   ├── server.py           # FastAPI Web Application & REST Endpoints
 │   ├── pipeline.py         # OCR & Assembly Processing Pipeline
-│   ├── worker_process.py   # OCR Subprocess Worker (โหลด oneocr.dll แยก)
+│   ├── worker_process.py   # OCR Subprocess Worker (โหลด oneocr.dll แยกอิสระ)
 │   ├── job_manager.py      # Job Supervisor & Process Queue Manager
-│   ├── database.py         # SQLite WAL Database Handler
+│   ├── database.py         # SQLite WAL Database Handler (JobDatabase)
 │   ├── oneocr_wrapper.py   # OneOCR ctypes Wrapper & ABI Definitions
 │   ├── diff_engine.py      # Character-level Diff & Proposal Engine
-│   ├── llm_client.py       # Local LLM client / capability-based HTML reasoning off
-│   ├── cli_status.py       # Read-only Codex/Gemini/LM Studio CLI discovery
-│   ├── translation_core.py # Semantic Segment Assembly, De-hyphenation & Document Translation Core
-│   ├── translation_providers.py # Provider Implementations (Google Cloud, Local LLM, AI CLI Adapters)
+│   ├── llm_client.py       # Local LLM client & Prompt Templates
+│   ├── cli_status.py       # ตรวจสอบสถานะ Local AI CLI (Codex, Gemini, Claude, LMS)
+│   ├── translation_core.py # Semantic Segment Assembly, De-hyphenation & Document Translation
+│   ├── translation_providers.py # ผู้ให้บริการแปลภาษา (Local LLM, AI CLI Adapters, Google Cloud)
 │   ├── translation_tasks.py # Background Translation Tasks, Cancellation, Progress & Audit
 │   ├── html_ai_tasks.py    # Background thread, progress persistence และ cancellation
 │   ├── html_exporter.py    # Structured HTML Export & Strict Allowlist Sanitizer
@@ -870,47 +870,45 @@ OCR/
 │   ├── epub_exporter.py    # XHTML Quick Preview, EPUB 3 Packaging & Validator
 │   ├── job_artifact_guard.py # Guard ตรวจสอบความถูกต้องของ artifact และ revision
 │   └── cleanup_service.py  # ลบงานตามคำสั่งจากหน้า History / API
-├── static/                 # หน้าเว็บและส่วนติดต่อผู้ใช้ (Frontend แยก 6 แท็บ)
+├── static/                 # หน้าเว็บและส่วนติดต่อผู้ใช้ (Frontend Web Studio)
 │   ├── index.html          # โครงหลัก Web Studio และ Template Partials Container
 │   ├── text.html           # แท็บผลข้อความ Dual-Pane Studio
 │   ├── html.html           # แท็บ HTML Studio (CodeMirror + Visual Editor + Preview)
 │   ├── epub.html           # แท็บ EPUB Studio (XHTML Quick Preview + Packager + TOC Editor + Cover)
 │   ├── structured.html     # แท็บ Structured OCR (ตาราง/รายการ + หน้าตรวจเทียบ BBox)
 │   ├── config.html         # ตั้งค่า Local LLM และแสดงสถานะ AI CLI
+│   ├── translation.html    # แท็บ Document Translation Studio
 │   ├── app.js              # ตัวจัดการสถานะกลางและประสานงานแท็บ (App Controller)
 │   ├── text.js             # ตัวควบคุมแท็บผลข้อความ (Text Controller)
 │   ├── html.js             # ตัวควบคุมแท็บ HTML และ CodeMirror (HTML Controller)
 │   ├── epub.js             # ตัวควบคุมแท็บ EPUB, Quick Preview และ TOC Editor (EPUB Controller)
 │   ├── structured.js       # ตัวควบคุมแท็บ Structured OCR และ BBox Overlay (Structured Controller)
 │   ├── visual.js           # ตัวควบคุม Visual Editor แบบ Word (WYSIWYG Controller)
-│   ├── translation.html    # แท็บ Document Translation Studio
 │   ├── translation.js      # ตัวควบคุมแท็บแปลเอกสาร (Multi-Mode Review, Preview, Terms & Consent)
-│   ├── vendor/codemirror/  # ไลบรารี CodeMirror 5.65.21 สำหรับใช้งานแบบ Offline
-│   ├── minimal.css         # Minimal Light/Dark, icons, responsive และ accessibility
-│   └── app.css             # ดีไซน์และชุดแต่ง Modern Dark/Light Theme
-├── oneOCR/                 # OneOCR Binary DLL & Model Runtime (64-bit)
-├── publish/                # ชุดติดตั้งสำเร็จรูปสำหรับ Deploy บนเครื่องอื่น (ขนาด ~145 MB)
-├── demo/                   # ชุดเอกสารทดสอบที่ได้รับอนุมัติ (01.pdf–08.pdf, 01.png–02.png, 09.png–13.png)
-├── phase10/                # ข้อกำหนด Manifests, Prompt, Benchmark & Evidence ของ Phase 10
-├── tests/                  # ชุดทดสอบอัตโนมัติ (Unit / Regression / Benchmarks)
-│   ├── phase10/                           # ชุดทดสอบ Phase 10 Document Translation (47 tests PASS)
-│   ├── test_gemini_acceptance_09.py       # ชุดทดสอบตรวจรับ UI, Visual Editor และ EPUB
-│   ├── test_studio_workspace.py           # Playwright UI & Cross-Browser Automation
-│   ├── test_visual_html.py                # ทดสอบความปลอดภัยและการแปลง Visual HTML
-│   ├── test_clean_installation.py          # สคริปต์ตรวจรับ Clean Environment
-│   └── test_browser_automation_chrome_edge.py # Playwright Cross-browser Automation
-├── checklist.md            # จุดตรวจบังคับและเกณฑ์การตรวจรับ
+│   ├── vendor/codemirror/  # ไลบรารี CodeMirror สำหรับแก้ไขโค้ดแบบ Offline
+│   ├── minimal.css         # สไตล์พื้นฐาน, responsive และ accessibility
+│   └── app.css             # ธีมหลัก Modern Dark/Light Theme
+├── oneOCR/                 # OneOCR Native Runtime (64-bit DLLs & Model)
+│   ├── oneocr.dll          # OneOCR Engine DLL
+│   ├── oneocr.onemodel     # โมเดลตรวจจับและรู้จำอักขระ OneOCR
+│   └── onnxruntime.dll     # ONNX Runtime Engine
+├── data/                   # โฟลเดอร์เก็บฐานข้อมูล SQLite (jobs.db)
+├── files/                  # โฟลเดอร์เก็บไฟล์และผลลัพธ์ของแต่ละงาน OCR
+├── install.cmd             # สคริปต์สร้าง venv และติดตั้ง Python dependencies อัตโนมัติ
+├── run_server.cmd          # สคริปต์เริ่มเซิร์ฟเวอร์แบบ Localhost (127.0.0.1:8000)
+├── run_remote_server.cmd   # สคริปต์เริ่มเซิร์ฟเวอร์แบบเปิดให้เข้าถึงผ่าน LAN
+├── stop_server.cmd         # สคริปต์หยุดเซิร์ฟเวอร์อย่างปลอดภัย
+├── requirements.txt        # รายการ Python dependencies ที่จำเป็นต่อระบบ
+├── .env.example            # ตัวอย่างไฟล์ตั้งค่าคอนฟิกูเรชันระบบ
 ├── manual.md               # คู่มือการติดตั้ง เริ่ม/หยุดระบบ และการบำรุงรักษา
-├── gemini.md               # บันทึกความเห็นและการออกแบบสถาปัตยกรรม (Read-only)
-├── gpt.md                  # บันทึกข้อเสนอ ประเด็นคงค้าง และการตรวจรับ
-└── readme.md               # เอกสารภาพรวมและขอบเขตของโครงการ (หน้านี้)
+└── readme.md               # เอกสารแนะนำและภาพรวมของโครงการ
 ```
 
 ---
 
 ## ผลการทดสอบและเกณฑ์ตรวจรับ (Verification & Benchmarks)
 
-เอกสารอัปเดต 2026-10-09; Document Translation ผ่าน implementation และ automated acceptance แล้ว แต่ยังไม่ผ่าน quality acceptance จนกว่าจะมีภาษาปลายทาง/ground truth/glossary/ชุดราชการและผลทดสอบ provider จริง
+เอกสารอัปเดต 2026-10-12; Document Translation ผ่าน automated regression **32/32** แต่ยังไม่ผ่าน quality acceptance จนกว่าจะมีภาษาปลายทาง/ground truth/glossary/ชุดราชการและผลทดสอบ provider จริง
 
 ### การตรวจล่าสุด 2026-10-09
 
@@ -970,20 +968,22 @@ OCR/
 | HTML Export precision / recall | **NOT TESTED** | manifest ปัจจุบันมีเพียงยอดรวม ต้องมีเฉลยระดับ element ที่ผู้ตรวจรับรองก่อนคำนวณ |
 | Browser automation หลังปรับ offline/XSS/download/409 | **PENDING** | โค้ดและ syntax ตรวจแล้ว; รอรัน integration suite ใน workspace แยกเพื่อเก็บหลักฐานใหม่ |
 | EPUB Export & XHTML Quick Preview | **PASSED: 44-PAGE SCOPE** | ผ่านชุดจริง 44 หน้า: roundtrip, EPUBCheck 5.3.0 0 errors/warnings, Chrome/Edge, reader engines 2 ตัว และ benchmark; edge cases จำลองรอข้อยกเว้นชุดข้อมูล |
-| **Document Translation implementation** | **PASSED: AUTOMATED SCOPE** | **47/47 PASS** รวม Semantic Segment Assembly, English de-hyphenation, CLI Protocol/Sandbox/Preflight (Codex/Gemini/AGY/Claude/LM Studio), ชุดทดสอบ approved demo/08.pdf–13.png และ Cross-browser automation Chrome & Edge |
+| **Document Translation implementation** | **PARTIAL: AUTOMATED SCOPE** | **32/32 PASS** ล่าสุด รวม API/core/provider/task และ Chrome/Edge; Semantic Assembly เป็น context-only, strict auth/model preflight ทุก adapter และ live provider matrix ยังไม่ครบ |
 | Document Translation quality | **NOT COVERED** | ยังไม่มี target language/ground truth/glossary/ชุดราชการ และ provider จริงยังไม่พร้อม |
 | การยอมรับข้อจำกัดก่อนใช้งานจริง | **PENDING** | รอเจ้าของงานตรวจผลและยอมรับข้อจำกัดที่ระบุไว้ |
 
 ## สถานะปัจจุบันและงานถัดไป
 
-ปัจจุบันระบบมี Document Translation ครบสาย implementation: เลือกภาษา/style/provider, glossary, cloud consent/estimate, background progress/cancel/retry, 4-mode review, validator, Text/HTML และส่ง translated HTML เข้า EPUB Studio
+ปัจจุบันระบบมี Document Translation สำหรับเลือกภาษา/style/provider, glossary, cloud consent/estimate, background progress/cancel/retry, 4-mode review, validator, Text/HTML และส่ง translated HTML เข้า EPUB Studio. Semantic assembly ส่งบริบทแบบ reversible ให้ provider โดยไม่เปลี่ยน source artifact.
 
 งานถัดไป:
 
 1. ผู้ใช้ยืนยันภาษาปลายทาง, glossary, ground truth และ style rubric ของ `demo/08.pdf`–`13.png`
 2. เพิ่มตัวอย่างเอกสารราชการที่อนุมัติ
-3. เปิด Local LLM และตั้ง `GOOGLE_CLOUD_PROJECT`/ADC เพื่อรัน Google, Local และ Hybrid จริง
-4. ทำ blind human review, cost/latency benchmark, EPUBCheck และ reader matrix กับคำแปลจริง
+3. ปิด UI ระดับ Translation Unit, BBox highlight, safe de-hyphenation guard และ export mapping ก่อนอ้างว่า Semantic Assembly ครบ
+4. ทำ strict auth/model preflight และ negative tests สำหรับ AI CLI ทุก adapter
+5. เปิด Local LLM และตั้ง `GOOGLE_CLOUD_PROJECT`/ADC เพื่อรัน Google, Local และ Hybrid จริง
+6. ทำ blind human review, cost/latency benchmark, EPUBCheck และ reader matrix กับคำแปลจริง
 
 ## การแก้ปัญหาล่าสุด
 

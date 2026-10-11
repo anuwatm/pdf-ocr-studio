@@ -1,9 +1,0 @@
-{
-  "schema_version": "10.0",
-  "prompt_version": "10.0.0",
-  "styles": ["general", "novel", "academic", "official"],
-  "free_form_system_prompt": false,
-  "response_schema": {"segments": [{"id": "stable segment ID", "text": "translated text"}]},
-  "common_rule": "Do not force every term to be translated; preserve or transliterate technical terms according to glossary and context.",
-  "protected_tokens": ["number", "date", "time", "money", "percentage", "unit", "URL", "email", "citation", "code", "glossary"]
-}

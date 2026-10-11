@@ -1,8 +1,0 @@
-{
-  "date": "2026-10-09",
-  "chrome": "PASS",
-  "edge": "PASS",
-  "coverage": ["config", "estimate", "progress", "4-mode diff", "manual draft across pages", "save-final", "stale", "cloud consent", "mobile", "keyboard"],
-  "external_requests": 0,
-  "page_errors": 0
-}
