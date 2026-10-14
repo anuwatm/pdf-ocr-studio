@@ -100,13 +100,13 @@ window.createTranslationWorkspace = ({state, activateMainTab, loadEpubExportStat
     const payload={...config(),...(resume?{}:{resume:false})};
     const progress=await api(`/api/jobs/${state.currentJobId}/translation/${path}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); setStatus(progress); poll();
   }
-  function segmentText(segment,mode){return mode==="source"?segment.source_text:mode==="google"?(segment.baseline_text||segment.source_text):mode==="ai"?(segment.translated_text||segment.source_text):(segment.final_text||segment.translated_text||segment.source_text);}
+  function segmentText(segment,mode){return mode==="source"?segment.source_text:mode==="google"?(segment.baseline_text??segment.source_text):mode==="ai"?(segment.translated_text??segment.source_text):(segment.final_text??segment.translated_text??segment.source_text);}
   function draftMap(){if(!draftsByJob.has(state.currentJobId))draftsByJob.set(state.currentJobId,new Map());return draftsByJob.get(state.currentJobId);}
   function captureDrafts(){if(!state.currentJobId)return;const map=draftMap();for(const row of document.querySelectorAll(".translation-segment")){const editor=row.querySelector("[data-final]");if(editor)map.set(row.dataset.segmentId,editor.value);}}
   function combinedText(){
     const drafts=draftMap();
     return (result?.segments||[])
-      .filter(s=>!(s.translation_unit_id && s.translation_unit_member_index > 0 && s.translation_unit_enabled !== false && !drafts.has(s.id) && !s.manual_edited && (s.translated_text === "" || s.final_text === "")))
+      .filter(s=>!(s.translation_unit_id && s.translation_unit_member_index > 0 && s.translation_unit_enabled !== false && !drafts.has(s.id) && !s.manual_edited && segmentText(s,"final") === ""))
       .map(segment=>drafts.get(segment.id)??segmentText(segment,"final"))
       .join("\n\n");
   }

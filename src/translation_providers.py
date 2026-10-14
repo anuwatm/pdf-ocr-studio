@@ -29,6 +29,8 @@ class TranslationError(RuntimeError):
 class TranslationProvider(ABC):
     name = "base"
     cloud = False
+    def set_cancel_event(self, event):
+        self.cancel_event = event
     @abstractmethod
     def capability(self) -> Dict[str, Any]: ...
     @abstractmethod
@@ -50,7 +52,10 @@ def build_cli_protocol_envelope(segments: List[Dict[str, Any]], config: Dict[str
         "source_language": config.get("source_language", "auto"),
         "target_language": config.get("target_language", "th"),
         "style": config.get("style", "general"),
-        "segments": [{"id": s["id"], "text": s.get("baseline_text") or s["source_text"]} for s in segments],
+        "segments": [{"id": s["id"], "text": s.get("baseline_text") if s.get("baseline_text") is not None else s["source_text"],
+                      **({"context_unit": {"id":s["translation_unit_id"],"text":s.get("translation_unit_text", ""),
+                                            "member_ids":s.get("translation_unit_member_ids", [])}}
+                         if s.get("translation_unit_id") else {})} for s in segments],
         "glossary": glossary,
         "constraints": {
             "no_tools": True,
@@ -82,10 +87,17 @@ def _prompt(segments, config, glossary, baseline=False):
             f"Glossary: {json.dumps(glossary, ensure_ascii=False)}\nSegments: {json.dumps(compact, ensure_ascii=False)}")
 
 
+def _generation_prompt(client, segments, config, glossary, baseline=False):
+    prompt = _prompt(segments, config, glossary, baseline=baseline)
+    if getattr(client, "transport", None) != "cli":
+        return prompt
+    envelope = build_cli_protocol_envelope(segments, config, glossary)
+    envelope["instructions"] = prompt.split("\nGlossary: ", 1)[0]
+    return json.dumps(envelope, ensure_ascii=False)
+
+
 def _parse_response(content: str, expected: List[str]) -> List[Dict[str, Any]]:
     text = content.strip()
-    if text.startswith("```"):
-        text = text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
     try:
         payload = json.loads(text)
     except json.JSONDecodeError as exc:
@@ -185,6 +197,9 @@ class LocalTranslationProvider(TranslationProvider):
                 "transport":getattr(self.client,"transport",self.transport),
                 "cli_adapter":getattr(self.client,"cli_provider",self.cli_provider) if getattr(self.client,"transport",self.transport)=="cli" else None,
                 "model":getattr(self.client,"model",None),"languages":LANGUAGES,"error":health.get("error")}
+    def set_cancel_event(self, event):
+        super().set_cancel_event(event)
+        self.client.cancel_event = event
     def preflight(self):
         if hasattr(self.client, "preflight"):
             try:
@@ -199,11 +214,13 @@ class LocalTranslationProvider(TranslationProvider):
         # The post-translation validator still flags any changed critical token.
         protected,maps=_protect_segments(segments,glossary,protect_critical=False)
         try:
-            content = self.client.generate(_prompt(protected,config,glossary),temperature=0,max_tokens=4000)
+            prompt = _generation_prompt(self.client,protected,config,glossary)
+            content = self.client.generate(prompt,temperature=0,max_tokens=4000)
         except TranslationError:
             raise
         except Exception as exc:
-            raise TranslationError(str(exc), "transient", True) from exc
+            code = getattr(exc, "code", "transient")
+            raise TranslationError(str(exc), code, code in {"transient", "timeout", "connection_error"}) from exc
         return _restore_rows(_parse_response(content,[s["id"] for s in segments]),maps)
 
 
@@ -330,6 +347,10 @@ class HybridTranslationProvider(TranslationProvider):
     name, cloud = "hybrid", True
     def __init__(self, google=None, local=None):
         self.google=google or GoogleTranslationProvider(); self.local=local or LocalTranslationProvider()
+    def set_cancel_event(self, event):
+        super().set_cancel_event(event)
+        self.google.set_cancel_event(event)
+        self.local.set_cancel_event(event)
     def capability(self):
         google, local=self.google.capability(),self.local.capability()
         return {"provider":self.name,"cloud":True,"available":google["available"] and local["available"],
@@ -343,7 +364,9 @@ class HybridTranslationProvider(TranslationProvider):
         by_id={row["id"]:row["text"] for row in baseline}
         polished=[{**segment,"baseline_text":by_id[segment["id"]]} for segment in segments]
         protected,maps=_protect_segments(polished,glossary,baseline=True,protect_critical=False)
-        content=self.local.client.generate(_prompt(protected,config,glossary,baseline=True),temperature=0,max_tokens=4000)
+        if getattr(self, "cancel_event", None) is not None and self.cancel_event.is_set():
+            raise TranslationError("Translation cancelled", "cancelled")
+        content=self.local.client.generate(_generation_prompt(self.local.client,protected,config,glossary,baseline=True),temperature=0,max_tokens=4000)
         result=_restore_rows(_parse_response(content,[s["id"] for s in segments]),maps)
         for row in result: row["baseline_text"]=by_id[row["id"]]
         return result

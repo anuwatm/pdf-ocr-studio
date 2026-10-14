@@ -5,7 +5,9 @@ venv/
 .env
 data/*.db
 data/*.db-*
+data/ai_cli_workspace/
 files/*
 !files/.gitkeep
 !data/.gitkeep
 tests/artifacts/
+docs/

@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 from src.file_utils import atomic_write_json
 from src.translation_core import (batch_segments, classify_terms, create_model, digest, export_results,
     load_glossary, read_json, resolve_source, save_model, translation_dir, translation_revision, utc_now,
-    validate_translation, ASSEMBLER_VERSION)
+    validate_translation, ASSEMBLER_VERSION, segment_output_text)
 from src.translation_providers import TranslationError, capabilities, get_provider
 
 ACTIVE = {"queued", "running", "cancelling"}
@@ -113,6 +113,8 @@ class TranslationTasks:
                 acquired=self.job_manager.ai_lock.acquire(blocking=False)
                 if not acquired: raise TranslationError("Local AI กำลังทำงานอื่น กรุณาลองใหม่","busy",True)
             provider=get_provider(provider_name)
+            if hasattr(provider, "set_cancel_event"):
+                provider.set_cancel_event(task["cancel"])
             if hasattr(provider, "preflight"):
                 try:
                     provider.preflight()
@@ -130,10 +132,15 @@ class TranslationTasks:
                     self._update(job_id,task,status="cancelled",stage="cancelled"); return
                 result=None
                 for attempt in range(3):
+                    if task["cancel"].is_set():
+                        raise TranslationError("Translation cancelled", "cancelled")
                     try: result=provider.translate(batch,config,glossary); break
                     except TranslationError as exc:
                         if not exc.retryable or attempt==2: raise
-                        time.sleep((0.25,1.0,2.0)[attempt])
+                        if task["cancel"].wait((0.25,1.0,2.0)[attempt]):
+                            raise TranslationError("Translation cancelled", "cancelled")
+                if task["cancel"].is_set():
+                    raise TranslationError("Translation cancelled", "cancelled")
                 result_by_id={row["id"]:row for row in result or []}
                 if set(result_by_id)!=set(s["id"] for s in batch): raise TranslationError("Batch ID mismatch","invalid_response")
                 for source_segment in batch:
@@ -163,6 +170,8 @@ class TranslationTasks:
             current_glossary=load_glossary(self.output_dir,job_id).get("revision")
             if current_source!=model.get("source_revision") or current_glossary!=model.get("glossary_revision"):
                 raise TranslationError("Translation source or glossary changed during the task","stale")
+            if task["cancel"].is_set():
+                raise TranslationError("Translation cancelled", "cancelled")
             if model.get("translation_units"):
                 seg_by_id = {s["id"]: s for s in model["segments"]}
                 for unit in model["translation_units"]:
@@ -180,17 +189,22 @@ class TranslationTasks:
                         unit["final_text"] = head_seg.get("final_text")
             flagged=sum(s["status"] in {"flagged_for_human_review","unresolved"} or bool(s.get("warnings"))
                         for s in model["segments"])
-            model["status"]="partial" if flagged else "completed"; model["completed_at"]=utc_now()
-            if not flagged: export_results(self.output_dir,job_id,model)
-            save_model(self.output_dir,job_id,model)
-            self._update(job_id,task,status=model["status"],stage="review" if flagged else "completed",flagged_segments=flagged)
+            # Serialize the final publish with cancel: either cancellation wins,
+            # or the task is already completed when cancel acquires this lock.
+            with self._lock:
+                if task["cancel"].is_set():
+                    raise TranslationError("Translation cancelled", "cancelled")
+                model["status"]="partial" if flagged else "completed"; model["completed_at"]=utc_now()
+                if not flagged: export_results(self.output_dir,job_id,model)
+                save_model(self.output_dir,job_id,model)
+                self._update(job_id,task,status=model["status"],stage="review" if flagged else "completed",flagged_segments=flagged)
             latency = max(0.0, time.time() - task["state"]["started_at"])
             audit={"task_id":task["state"]["task_id"],"provider":provider_name,"model":capability.get("model"),
                    "transport":capability.get("transport"),"cli_adapter":capability.get("cli_adapter"),
                    "cli_version":capability.get("cli_version"),"prompt_version":"10.0.0","exit_code":0,
                    "latency_seconds":round(latency,3),"characters":task["state"]["characters"],
                    "input_hash":digest([s.get("source_text") for s in model["segments"]]),
-                   "output_hash":digest([s.get("final_text") or s.get("translated_text") for s in model["segments"]]),
+                   "output_hash":digest([segment_output_text(s) for s in model["segments"]]),
                    "validation_result":{
                        "total_segments":len(model["segments"]),
                        "flagged_segments":flagged,
@@ -235,6 +249,8 @@ class TranslationTasks:
             reasons.append("glossary_revision_changed")
         if model.get("assembler_version") != ASSEMBLER_VERSION:
             reasons.append("assembler_version_changed")
+        if model.get("translation_revision") != translation_revision(model):
+            reasons.append("translation_revision_changed")
         model["stale"]=bool(reasons); model["stale_reasons"]=reasons
         return model
 

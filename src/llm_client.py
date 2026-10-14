@@ -15,6 +15,7 @@ from pathlib import Path
 from openai import OpenAI, APIError, APITimeoutError, APIConnectionError
 
 from src import config
+from src.cli_process import run_cli_process, CliCancelledError, CliOutputError
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ ALLOWED_CLI_ENV_VARS = {
     "OPENAI_API_KEY", "GEMINI_API_KEY", "ANTHROPIC_API_KEY",
     "PYTHONPATH", "LANG", "LC_ALL",
 }
-MAX_CLI_OUTPUT_CHARS = 5 * 1024 * 1024
+MAX_CLI_OUTPUT_BYTES = 5 * 1024 * 1024
 
 
 def get_safe_cli_env() -> Dict[str, str]:
@@ -55,6 +56,8 @@ class LocalLLMClient:
             raise ValueError("Local AI CLI provider must be codex, gemini, agy, claude or lms")
         self.base_url = (base_url or settings["base_url"]).rstrip("/")
         self.model = model or settings["model"]
+        if self.transport == "cli":
+            self._validate_cli_model()
         self.api_key = config.LLM_API_KEY if api_key is None else api_key
         self.timeout = settings["timeout"] if timeout is None else timeout
         self.cli_path = self._resolve_cli() if self.transport == "cli" else None
@@ -63,6 +66,15 @@ class LocalLLMClient:
             base_url=self.base_url, api_key=self.api_key, timeout=self.timeout, **retry_options)
         self._html_reasoning_checked = False
         self._html_native_url = None
+
+    @staticmethod
+    def _model_name_is_safe(model: str) -> bool:
+        return bool(isinstance(model, str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9/_:.@+-]{0,199}", model))
+
+    def _validate_cli_model(self):
+        # Batch-file CLI shims must never receive shell metacharacters in model argv.
+        if not self._model_name_is_safe(self.model):
+            raise ValueError("AI CLI model must be a non-empty model identifier without shell metacharacters")
 
     @staticmethod
     def _resolve_lms_cli() -> Optional[str]:
@@ -97,29 +109,21 @@ class LocalLLMClient:
     def _run_lms(self, args: List[str], timeout: Optional[float] = None) -> subprocess.CompletedProcess:
         if not self.cli_path:
             raise RuntimeError("LM Studio CLI (lms) not found")
-        flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
-        return subprocess.run([self.cli_path, *args], capture_output=True, text=True, encoding="utf-8",
-            errors="replace", timeout=timeout or self.timeout, shell=False, creationflags=flags,
-            env=get_safe_cli_env())
+        return self._run_cli(args, timeout=timeout)
 
     def _run_cli(self, args: List[str], *, input_text: Optional[str] = None,
                  timeout: Optional[float] = None) -> subprocess.CompletedProcess:
         if not self.cli_path:
             raise RuntimeError(f"AI CLI '{self.cli_provider}' not found")
-        flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
         workspace = config.ROOT_DIR / "data" / "ai_cli_workspace"
         workspace.mkdir(parents=True, exist_ok=True)
         try:
-            completed = subprocess.run(
-                [self.cli_path, *args], input=input_text, capture_output=True, text=True,
-                encoding="utf-8", errors="replace", timeout=timeout or self.timeout,
-                shell=False, creationflags=flags, cwd=str(workspace), env=get_safe_cli_env(),
-            )
+            completed = run_cli_process([self.cli_path, *args], input_text=input_text,
+                timeout=timeout or self.timeout, cwd=str(workspace), env=get_safe_cli_env(),
+                cancel_event=getattr(self, "cancel_event", None), max_output_bytes=MAX_CLI_OUTPUT_BYTES)
         except subprocess.TimeoutExpired:
             logger.warning(f"AI CLI '{self.cli_provider}' timed out after {timeout or self.timeout}s")
             raise
-        if len(completed.stdout or "") > MAX_CLI_OUTPUT_CHARS:
-            raise RuntimeError(f"AI CLI '{self.cli_provider}' output exceeded 5 MB limit")
         return completed
 
     @staticmethod
@@ -134,10 +138,9 @@ class LocalLLMClient:
             the strict provider validator still owns schema and ID validation.
             """
             if isinstance(candidate, str):
-                text = re.sub(r"<(?:(?:thought)|(?:thinking)|(?:analysis))\b[^>]*>.*?</(?:(?:thought)|(?:thinking)|(?:analysis))\s*>",
-                              "", candidate, flags=re.IGNORECASE | re.DOTALL).strip()
-                if text.startswith("```") and text.endswith("```"):
-                    text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=re.IGNORECASE).strip()
+                text = candidate.strip()
+                if re.match(r"<(?:thought|thinking|analysis)\b|```", text, flags=re.I):
+                    raise CliOutputError("AI CLI returned reasoning or Markdown outside JSON")
                 try:
                     nested = json.loads(text)
                 except (json.JSONDecodeError, TypeError):
@@ -184,6 +187,7 @@ class LocalLLMClient:
         return response
 
     def _cli_generate(self, prompt: str, system_prompt: Optional[str] = None) -> str:
+        self._validate_cli_model()
         combined = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
         if self.cli_provider == "lms":
             if len(combined) > 24_000:
@@ -198,6 +202,7 @@ class LocalLLMClient:
             codex_args = [
                 "exec", "-", "--ephemeral", "--sandbox", "read-only", "--ignore-user-config",
                 "--ignore-rules", "--skip-git-repo-check", "--color", "never", "-C", str(workspace),
+                "--model", self.model,
             ]
             if schema_file.is_file():
                 codex_args.extend(["--output-schema", str(schema_file.resolve())])
@@ -207,6 +212,7 @@ class LocalLLMClient:
             completed = self._run_cli([
                 "-p", "ตอบตามข้อมูลจาก stdin เท่านั้น ห้ามใช้เครื่องมือ และคืนผลลัพธ์เท่านั้น",
                 "--output-format", "json", "--approval-mode", "plan", "--sandbox",
+                "--model", self.model,
             ], input_text=combined)
             content = self._extract_cli_json_output(completed.stdout)
         elif self.cli_provider == "agy":
@@ -217,6 +223,7 @@ class LocalLLMClient:
                 "--input-format", "stream-json", "--output-format", "stream-json",
                 "--mode", "plan", "--sandbox", "--disable-slash-commands",
                 "--print-timeout", f"{max(1, int(self.timeout))}s",
+                "--model", self.model,
             ], input_text=stream_request)
             content = self._extract_cli_json_output(self._extract_agy_stream_response(completed.stdout))
         else:
@@ -224,6 +231,7 @@ class LocalLLMClient:
                 "-p", "ตอบตามข้อมูลจาก stdin เท่านั้น คืนผลลัพธ์เท่านั้น และห้ามใช้เครื่องมือ",
                 "--input-format", "text", "--output-format", "json",
                 "--permission-mode", "plan", "--max-turns", "1",
+                "--model", self.model,
                 "--disallowedTools", "Bash", "Edit", "Write", "NotebookEdit", "WebFetch", "WebSearch",
             ], input_text=combined)
             content = self._extract_cli_json_output(completed.stdout)
@@ -291,16 +299,33 @@ class LocalLLMClient:
                 if self.cli_provider == "lms":
                     completed=self._run_lms(["ls","--llm","--json",self.model],timeout=min(self.timeout,15))
                     output=self._clean_cli_output(completed.stdout)
-                    found=completed.returncode==0 and self.model.lower() in output.lower()
+                    inventory = json.loads(output)
+                    def model_keys(value):
+                        if isinstance(value, dict):
+                            for key, item in value.items():
+                                if key in {"key", "modelKey", "model_key"} and isinstance(item, str):
+                                    yield item
+                                elif isinstance(item, (dict, list)):
+                                    yield from model_keys(item)
+                        elif isinstance(value, list):
+                            for item in value:
+                                yield from model_keys(item)
+                    available_models = list(model_keys(inventory))
+                    found=completed.returncode==0 and self.model in available_models
                     error = None if found else (self._clean_cli_output(completed.stderr) or f"Model '{self.model}' not found by LM Studio CLI")
                 else:
                     completed=self._run_cli(["--version"],timeout=min(self.timeout,10))
                     output=self._clean_cli_output(completed.stdout or completed.stderr)
-                    found=completed.returncode == 0 and bool(output)
-                    error = None if found else (output or f"ตรวจ {self.cli_provider} CLI ไม่สำเร็จ")
+                    installed=completed.returncode == 0 and bool(output)
+                    # A version string proves installation, not authentication or model access.
+                    return {"status":"unverified" if installed else "error", "transport":"cli",
+                            "cli_provider":self.cli_provider,"configured_model":self.model,
+                            "installed":installed,"model_found":False,"authentication":"not_verified",
+                            "available_models":[],"cli_version":output if installed else None,
+                            "error":f"AI CLI '{self.cli_provider}' authentication/model access could not be verified; generation blocked"}
                 return {"status":"connected" if found else "model_not_found","transport":"cli",
                         "cli_provider":self.cli_provider,"configured_model":self.model,"model_found":found,
-                        "available_models":[self.model] if found else [],"cli_version":output if found else None,
+                        "available_models":available_models,"authentication":"not_required",
                         "error":error}
             except subprocess.TimeoutExpired:
                 return {"status":"timeout","transport":"cli","configured_model":self.model,
@@ -343,7 +368,7 @@ class LocalLLMClient:
     def preflight(self) -> Dict[str, Any]:
         """Perform strict preflight validation before starting any generation."""
         health = self.check_health()
-        if health.get("status") not in {"connected", "healthy"}:
+        if health.get("status") not in {"connected", "healthy"} or health.get("model_found") is not True:
             error = health.get("error") or f"Preflight check failed for {self.transport} ({self.cli_provider if self.transport == 'cli' else self.base_url})"
             raise RuntimeError(error)
         return health
@@ -361,11 +386,16 @@ class LocalLLMClient:
         """
         if self.transport == "cli":
             try:
-                prompt="\n\n".join(f"{item.get('role','user').upper()}: {item.get('content','')}" for item in messages)
+                prompt=(messages[0].get("content", "") if len(messages)==1 and messages[0].get("role")=="user" else
+                        "\n\n".join(f"{item.get('role','user').upper()}: {item.get('content','')}" for item in messages))
                 return {"success":True,"status":"completed","finish_reason":"stop",
                         "content":self._cli_generate(prompt),"error":None,"raw_response":None}
             except subprocess.TimeoutExpired:
                 return {"success":False,"status":"timeout","content":"","error":f"Timeout after {self.timeout}s"}
+            except CliCancelledError as exc:
+                return {"success":False,"status":"cancelled","content":"","error":str(exc)}
+            except CliOutputError as exc:
+                return {"success":False,"status":"invalid_response","content":"","error":str(exc)}
             except Exception as exc:
                 return {"success":False,"status":"error","content":"","error":str(exc)}
         try:
@@ -448,5 +478,7 @@ class LocalLLMClient:
         )
         if not res.get("success"):
             err_msg = res.get("error") or f"LLM generation failed ({res.get('status')})"
-            raise RuntimeError(err_msg)
+            error = RuntimeError(err_msg)
+            error.code = res.get("status", "error")
+            raise error
         return res.get("content", "")

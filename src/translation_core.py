@@ -6,6 +6,7 @@ import html
 import json
 import os
 import re
+from collections import Counter
 from datetime import datetime, timezone
 from html.parser import HTMLParser
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -17,6 +18,7 @@ from src.html_exporter import sanitize_final_html
 SCHEMA_VERSION = "10.0"
 PROMPT_VERSION = "10.0.0"
 ASSEMBLER_VERSION = "10.2.0"
+VALIDATOR_VERSION = "10.4.1"
 STYLES = {"general", "novel", "academic", "official"}
 PROVIDERS = {
     "local", "local_api", "cli_codex", "cli_gemini", "cli_agy", "cli_claude", "cli_lms",
@@ -39,7 +41,7 @@ COMMON_RULE = ("ไม่ต้องพยายามแปลทุกคำ 
                "ให้คงเดิมหรือทับศัพท์ตาม glossary/context เมื่อการแปลทำให้ความหมายคลาดเคลื่อน")
 
 CRITICAL_PATTERNS = {
-    "number": r"(?<![\w])[-+]?\d(?:\d|,(?=\d))*(?:\.\d+)?%?",
+    "number": r"(?<![A-Za-z0-9_])[-+]?\d(?:\d|,(?=\d))*(?:\.\d+)?%?(?![A-Za-z0-9_])",
     "date": r"\b\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}\b",
     "time": r"\b\d{1,2}:\d{2}(?::\d{2})?\b",
     "money": r"(?:[$€£฿¥]\s?\d[\d,.]*|\d[\d,.]*\s?(?:USD|THB|EUR|GBP|CNY))",
@@ -632,15 +634,37 @@ def _target_script_missing(source: str, target: str, target_language: Optional[s
 def validate_translation(source: str, target: str, glossary: List[Dict[str, Any]],
                          target_language: Optional[str] = None) -> List[str]:
     warnings = []
+    target_tokens = critical_tokens(target)
     for kind, values in critical_tokens(source).items():
-        missing = [value for value in values if value not in target]
+        original, translated = Counter(values), Counter(target_tokens[kind])
+        missing = list((original - translated).elements())
         if missing:
             warnings.append(f"critical_{kind}_changed: {', '.join(missing[:5])}")
+        added = list((translated - original).elements())
+        if added:
+            warnings.append(f"critical_{kind}_unexpected: {', '.join(added[:5])}")
     for term in classify_terms(source, target, glossary):
         if term["status"] == "missing": warnings.append(f"glossary_term_changed: {term['source']}")
     if _target_script_missing(source, target, target_language):
         warnings.append("target_language_mismatch")
     return warnings
+
+
+def segment_output_text(segment: Dict[str, Any]) -> str:
+    """Manual final, including an explicit empty edit, is authoritative."""
+    if segment.get("final_text") is not None:
+        return segment["final_text"]
+    if segment.get("translated_text") is not None:
+        return segment["translated_text"]
+    return segment["source_text"]
+
+
+def suppress_continuation(segment: Dict[str, Any]) -> bool:
+    return bool(segment.get("translation_unit_id") and
+                segment.get("translation_unit_member_index", 0) > 0 and
+                segment.get("translation_unit_enabled", True) and
+                not segment.get("manual_edited") and
+                segment_output_text(segment) == "")
 
 
 def render_html(tokens: List[Dict[str, Any]], segments: List[Dict[str, Any]], title: str = "Translated document") -> str:
@@ -651,14 +675,11 @@ def render_html(tokens: List[Dict[str, Any]], segments: List[Dict[str, Any]], ti
             output.append(token["value"])
         else:
             segment = by_id[token["id"]]
-            if (segment.get("translation_unit_id") and
-                segment.get("translation_unit_member_index", 0) > 0 and
-                segment.get("translation_unit_enabled", True) and
-                segment.get("translated_text") == ""):
+            if suppress_continuation(segment):
                 # Continuation segment suppressed in reversible assembly
                 output.append(token["leading"] + token["trailing"])
             else:
-                text = segment.get("final_text") or segment.get("translated_text") or segment["source_text"]
+                text = segment_output_text(segment)
                 output.append(token["leading"] + html.escape(text, quote=False) + token["trailing"])
     return sanitize_final_html("".join(output), title=title)
 
@@ -686,10 +707,16 @@ def structure_signature(tokens: List[Dict[str, Any]], segments: List[Dict[str, A
 
 def translation_revision(model: Dict[str, Any]) -> str:
     payload = {
+        "validator_version": VALIDATOR_VERSION,
         "config": model["config"], "source_revision": model["source_revision"],
         "glossary_revision": model["glossary_revision"],
+        "assembler_version": model.get("assembler_version"),
+        "assembly": [{key: unit.get(key) for key in ("id", "assembler_version", "enabled", "source_segment_ids", "assembled_text", "spans")}
+                     for unit in model.get("translation_units", [])],
         "segments": [{key: segment.get(key) for key in ("id", "baseline_text", "translated_text", "final_text", "status", "warnings", "manual_edited", "term_states", "provenance")}
                      for segment in model["segments"]],
+        "segment_assembly": [{key: segment.get(key) for key in ("id", "translation_unit_id", "translation_unit_member_index", "translation_unit_enabled", "translation_unit_source_span")}
+                             for segment in model["segments"]],
     }
     return digest(payload)
 
@@ -743,12 +770,9 @@ def export_results(files_dir: str, job_id: str, model: Dict[str, Any]) -> Dict[s
     os.makedirs(directory, exist_ok=True)
     html_content = render_html(model["tokens"], model["segments"], title=f"Translated {job_id}")
     text_content = "\n\n".join(
-        (s.get("final_text") or s.get("translated_text") or s["source_text"])
+        segment_output_text(s)
         for s in model["segments"]
-        if not (s.get("translation_unit_id") and
-                s.get("translation_unit_member_index", 0) > 0 and
-                s.get("translation_unit_enabled", True) and
-                s.get("translated_text") == "")
+        if not suppress_continuation(s)
     )
     html_path, text_path = os.path.join(directory, "translated.html"), os.path.join(directory, "translated.txt")
     atomic_write_text(html_path, html_content)
