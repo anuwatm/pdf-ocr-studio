@@ -2,6 +2,7 @@
   <div class="card-header"><h2 class="card-title">แปลเอกสาร</h2><span data-export-job>ยังไม่ได้เลือกงาน</span></div>
   <p data-export-empty>เปิดงานที่มี HTML หรือ Text บันทึกแล้วก่อนเริ่มแปล</p>
   <fieldset data-export-controls disabled>
+    <div class="studio-translation-layout"><div class="studio-translation-setup">
     <div class="translation-config-grid">
       <div class="translation-source-control"><label>ต้นทาง<select id="translation-source"><option value="auto">อัตโนมัติ (HTML ก่อน Text)</option><optgroup label="HTML"><option value="final">final.html</option><option value="structured">structured.html</option><option value="ai">ai.html</option><option value="basic">basic.html</option></optgroup><optgroup label="Text"><option value="text_final">final.txt</option><option value="text_corrected">corrected.txt</option><option value="text_raw">raw.txt</option></optgroup></select></label><button id="btn-view-translation-source" class="btn btn-outline btn-xs" type="button">View เอกสาร</button></div>
       <label>ภาษาต้นทาง<select id="translation-source-language"><option value="auto">ตรวจอัตโนมัติ</option></select></label>
@@ -29,6 +30,7 @@
     <p id="translation-progress-text" class="text-muted text-xs" aria-live="polite">ยังไม่ได้เริ่ม</p>
     <p id="translation-language-status" class="text-muted text-xs" aria-live="polite"></p>
 
+    </div><div class="studio-translation-results">
     <section class="translation-review" aria-labelledby="translation-review-title">
       <div class="translation-review-header"><div><h3 id="translation-review-title">ตรวจคำแปล</h3><p class="text-muted text-xs">แก้ไขในช่อง Final แล้วกดบันทึก ระบบป้องกัน revision conflict</p></div>
         <div class="translation-review-filters"><label>หน้า<select id="translation-page-filter"><option value="all">ทุกหน้า</option></select></label><label>เทียบกับ<select id="translation-review-mode"><option value="source">Source</option><option value="google">Google baseline</option><option value="ai" selected>AI result</option><option value="final">Final</option></select></label></div>
@@ -53,5 +55,6 @@
       <button id="btn-open-translated-epub" class="btn btn-outline btn-sm hidden" type="button">เปิดใน EPUB Studio</button>
     </div>
     <iframe id="translation-preview-frame" sandbox="" class="html-preview-iframe hidden" title="ตัวอย่าง HTML ฉบับแปล"></iframe>
+    </div></div>
   </fieldset>
 </section>

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="th">
+<html lang="th" class="studio-layout">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="/static/vendor/codemirror/lib/codemirror.css">
 <link rel="stylesheet" href="/static/vendor/codemirror/addon/dialog/dialog.css">
   <link rel="stylesheet" href="/static/minimal.css?v=20261004-phase8-1">
+  <link rel="stylesheet" href="/static/studio-layout.css?v=20261101-upload-1">
 </head>
 <body class="theme-light">
   <div class="app-container">
@@ -90,10 +91,13 @@
       <!-- 1. Upload & Options Section -->
       <section id="section-upload" class="card upload-card" data-main-panel="upload">
         <div class="card-header">
-          <h2 class="card-title">อัปโหลดเอกสาร</h2>
-          <span class="badge badge-info">PDF / PNG / JPG • สูงสุด 300 MB • Batch ละ 200 หน้า</span>
+          <div class="upload-welcome"><h2 class="card-title">อัปโหลดเอกสาร</h2>
+          <p class="upload-intro">จากหน้าหนังสือ สู่ข้อความที่แก้ไขและจัดเล่มต่อได้</p>
+          <span class="badge badge-info">PDF / PNG / JPG • สูงสุด 300 MB • Batch ละ 200 หน้า</span></div>
+          <ol class="upload-path" aria-label="ภาพรวมขั้นตอน"><li><span>1</span>เพิ่มต้นฉบับ</li><li><span>2</span>ตรวจข้อความ</li><li><span>3</span>ส่งออกหนังสือ</li></ol>
         </div>
 
+        <div class="upload-source-column">
         <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="ลากไฟล์มาวางที่นี่ หรือคลิกเพื่อเลือกไฟล์">
           <input type="file" id="file-input" accept=".pdf, .png, .jpg, .jpeg" hidden>
           <div class="dropzone-content">
@@ -139,6 +143,8 @@
           <p class="dropzone-hint">ดาวน์โหลดภาพ PNG ตามช่วงหน้าที่เลือกได้ทันที โดยไม่ต้องเริ่ม OCR</p>
         </div>
 
+        </div>
+        <div class="upload-settings-column">
         <!-- Engine / AI Mode Options -->
         <div class="options-grid">
           <div class="option-card">
@@ -178,6 +184,7 @@
 
         <p class="dropzone-hint">OCR ทำงานครั้งเดียว แล้วเลือกเปิดผลลัพธ์เป็น Text หรือ Structured HTML ได้โดยไม่ประมวลผลเอกสารซ้ำ</p>
 
+        </div>
         <!-- Start Processing CTA -->
         <div class="action-footer">
           <button id="btn-start-job" class="btn btn-primary btn-large" disabled>
